@@ -1,0 +1,242 @@
+[
+  {
+    "categoria": "História da Radiologia",
+    "pergunta": "Em qual ano e por qual cientista foram descobertos os Raios X?",
+    "alternativas": [
+      "1895, por Wilhelm Conrad Röntgen",
+      "1905, por Albert Einstein",
+      "1898, por Marie Curie",
+      "1911, por Ernest Rutherford"
+    ],
+    "correta": 0,
+    "explicacao": "Wilhelm Conrad Röntgen descobriu os raios X em 8 de novembro de 1895 ao estudar a luminescência em tubos de raios catódicos."
+  },
+  {
+    "categoria": "Proteção Radiológica",
+    "pergunta": "O que preconiza o princípio de radioproteção conhecido internacionalmente pela sigla ALARA?",
+    "alternativas": [
+      "Utilizar sempre a maior dose de radiação possível para assegurar o diagnóstico",
+      "Manter a exposição à radiação tão baixa quanto razoavelmente exequível",
+      "Substituir todos os procedimentos radiológicos por termografia",
+      "Eliminar o uso de biombos de chumbo nas salas de exame"
+    ],
+    "correta": 1,
+    "explicacao": "ALARA ('As Low As Reasonably Achievable') estabelece que qualquer exposição à radiação ionizante deve ser minimizada ao máximo exequível."
+  },
+  {
+    "categoria": "Proteção Radiológica",
+    "pergunta": "Quais são os três pilares fundamentais da proteção radiológica para redução da dose ocupacional?",
+    "alternativas": [
+      "Tempo, Distância e Blindagem",
+      "Tensão, Corrente e Frequência",
+      "Filtração, Revelação e Fixação",
+      "Colimação, Grade e Foco"
+    ],
+    "correta": 0,
+    "explicacao": "A dose absorvida reduz-se diminuindo o tempo de exposição, aumentando a distância em relação à fonte emissora e interpondo blindagem protetora."
+  },
+  {
+    "categoria": "Dosimetria",
+    "pergunta": "Qual é a finalidade do dosímetro termoluminescente (TLD) ou óptico (OSL) utilizado pelo operador de radiologia?",
+    "alternativas": [
+      "Bloquear a radiação que atinge o tórax do profissional",
+      "Monitorar e registrar a dose de radiação acumulada no período de trabalho",
+      "Emitir um aviso sonoro imediato a cada disparo do tubo",
+      "Indicar a temperatura corporal do técnico"
+    ],
+    "correta": 1,
+    "explicacao": "O dosímetro pessoal registra cumulativamente a radiação ionizante recebida durante as atividades profissionais para controle radiológico legal."
+  },
+  {
+    "categoria": "Métodos de Imagem",
+    "pergunta": "Qual das seguintes modalidades de diagnóstico por imagem NÃO faz uso de radiação ionizante?",
+    "alternativas": [
+      "Tomografia Computadorizada (TC)",
+      "Mamografia Digital",
+      "Ressonância Magnética (RM)",
+      "Radiografia Panorâmica Odontológica"
+    ],
+    "correta": 2,
+    "explicacao": "A Ressonância Magnética utiliza campos magnéticos de alta intensidade e ondas de radiofrequência, não emitindo radiação ionizante."
+  },
+  {
+    "categoria": "Física Radiológica",
+    "pergunta": "No painel de controle do aparelho de raios X, qual parâmetro determina o poder de penetração (energia média) dos fótons emitidos?",
+    "alternativas": [
+      "Miliamperagem (mA)",
+      "Tempo de exposição em segundos (s)",
+      "Kilovoltagem de pico (kVp)",
+      "Tamanho do ponto focal catódico"
+    ],
+    "correta": 2,
+    "explicacao": "A kVp ajusta a diferença de potencial entre anodo e catodo, controlando a aceleração dos elétrons e a penetrabilidade do feixe resultante."
+  },
+  {
+    "categoria": "Física Radiológica",
+    "pergunta": "Qual parâmetro técnico define diretamente a quantidade total de fótons de raios X produzidos durante o disparo?",
+    "alternativas": [
+      "mAs (produto da corrente pelo tempo)",
+      "Espessura do filtro de alumínio",
+      "Distância foco-filme (DFF)",
+      "Número atômico do berílio"
+    ],
+    "correta": 0,
+    "explicacao": "O produto da corrente do filamento pelo tempo de exposição (mAs = mA × s) governa a quantidade total de radiação produzida."
+  },
+  {
+    "categoria": "Física do Tubo",
+    "pergunta": "O que descreve o Efeito Anódico (ou Efeito Heel) na emissão de raios X?",
+    "alternativas": [
+      "A intensidade do feixe de radiação é maior na extremidade voltada ao catodo do que ao anodo",
+      "A intensidade do feixe é maior no lado do anodo do que no do catodo",
+      "A radiação é emitida com distribuição perfeitamente esférica e uniforme",
+      "A conversão total de energia cinética em radiação sem gerar calor"
+    ],
+    "correta": 0,
+    "explicacao": "Devido à inclinação do alvo metálico, os raios que saem pelo lado do anodo sofrem maior autoatenuação, tornando o lado catódico mais intenso."
+  },
+  {
+    "categoria": "Técnicas Radiográficas",
+    "pergunta": "Qual é a principal vantagem da colimação rigorosa do feixe primário de raios X?",
+    "alternativas": [
+      "Aumentar a área exposta para dispensar novos posicionamentos",
+      "Reduzir a dose no paciente e minimizar a radiação espalhada que degrada o contraste",
+      "Substituir totalmente o uso de aventais de chumbo",
+      "Acelerar o processo de revelação do filme"
+    ],
+    "correta": 1,
+    "explicacao": "Colimar restringe a radiação apenas à área de interesse clínico, diminuindo a dose no paciente e a formação de espalhamento Compton."
+  },
+  {
+    "categoria": "Qualidade da Imagem",
+    "pergunta": "Qual é a finalidade primária de uma Grade Antidifusora colocada entre o paciente e o chassi?",
+    "alternativas": [
+      "Absorver a radiação secundária espalhada para melhorar o contraste da radiografia",
+      "Aumentar a quantidade de fótons que atingem o filme",
+      "Proteger a mesa de exames contra riscos mecânicos",
+      "Ampliar opticamente a imagem das pequenas fraturas"
+    ],
+    "correta": 0,
+    "explicacao": "As lamelas de chumbo da grade antidifusora absorvem os fótons espalhados em ângulos oblíquos, permitindo que apenas fótons primários atinjam o filme."
+  },
+  {
+    "categoria": "Radiobiologia",
+    "pergunta": "Como são classificados os efeitos biológicos da radiação que possuem um limiar de dose mínimo conhecido, como eritema e necrose tecidual?",
+    "alternativas": [
+      "Efeitos estocásticos (aleatórios)",
+      "Efeitos determinísticos (ou reações teciduais)",
+      "Efeitos mutagênicos hereditários",
+      "Efeitos fotoelétricos tardios"
+    ],
+    "correta": 1,
+    "explicacao": "Efeitos determinísticos têm um limiar claro de dose; acima deste valor, a severidade do dano orgânico é diretamente proporcional à dose."
+  },
+  {
+    "categoria": "Grandezas e Unidades",
+    "pergunta": "Qual é a unidade do Sistema Internacional empregada para expressar a Dose Equivalente e a Dose Efetiva de radiação?",
+    "alternativas": [
+      "Gray (Gy)",
+      "Sievert (Sv)",
+      "Roentgen (R)",
+      "Becquerel (Bq)"
+    ],
+    "correta": 1,
+    "explicacao": "O Sievert (Sv) quantifica o impacto biológico da radiação no tecido vivo, considerando os fatores de ponderação da radiação e dos órgãos."
+  },
+  {
+    "categoria": "Posicionamento Radiológico",
+    "pergunta": "Na projeção radiográfica de tórax padrão em PA (Posteroanterior), em que sentido o feixe de radiação incide no paciente?",
+    "alternativas": [
+      "Entra pela face anterior (peito) e emerge na face posterior (costas)",
+      "Entra pela face posterior (costas) e emerge na face anterior (peito)",
+      "Entra pela axila direita e sai pelo lado esquerdo",
+      "Incide obliquamente do topo do crânio para a pelve"
+    ],
+    "correta": 1,
+    "explicacao": "No tórax PA, o feixe penetra pelas costas do paciente e sai pelo tórax anterior, encostado na estativa/anteparo, diminuindo a magnificação cardíaca."
+  },
+  {
+    "categoria": "Contrastes Radiológicos",
+    "pergunta": "Qual substância radiopaca é rotineiramente utilizada como meio de contraste por via oral para o trato gastrointestinal?",
+    "alternativas": [
+      "Sulfato de bário",
+      "Gás hélio comprimido",
+      "Soro glicosado a 5%",
+      "Cloreto de sódio isotônico"
+    ],
+    "correta": 0,
+    "explicacao": "O sulfato de bário (BaSO4) possui alto número atômico, grande capacidade de absorver raios X e insolubilidade, sendo o contraste padrão para o tubo digestivo."
+  },
+  {
+    "categoria": "Mamografia",
+    "pergunta": "Qual é o objetivo técnico de se realizar a compressão mamária uniforme na mamografia?",
+    "alternativas": [
+      "Apenas diminuir o tempo de posicionamento da paciente",
+      "Homogeneizar a espessura da mama, reduzir a dose e diminuir a sobreposição anatômica",
+      "Impedir a penetração da radiação nos gânglios linfáticos",
+      "Estimular a vascularização cutânea na região das mamas"
+    ],
+    "correta": 1,
+    "explicacao": "A compressão espalha o tecido fibroglandular, reduz a espessura mamária, diminui a dispersão da radiação e viabiliza menor dose com maior nitidez."
+  },
+  {
+    "categoria": "Tubo de Raios X",
+    "pergunta": "Por que o Tungstênio (Volfrâmio) é o metal preferido na confecção do anodo e do filamento do tubo de raios X?",
+    "alternativas": [
+      "Porque tem baixo custo comercial e flexibilidade mecânica",
+      "Porque possui altíssimo ponto de fusão (3422 °C) e alto número atômico (Z = 74)",
+      "Porque não conduz corrente elétrica sob aquecimento",
+      "Porque bloqueia completamente a saída de calor do tubo"
+    ],
+    "correta": 1,
+    "explicacao": "O tungstênio tolera o calor extremo gerado na colisão dos elétrons (mais de 99% vira calor) e seu elevado Z propicia boa eficiência na produção de raios X."
+  },
+  {
+    "categoria": "Interação da Radiação",
+    "pergunta": "Qual tipo de interação da radiação com a matéria é responsável pela diferenciação de contraste entre ossos e tecidos moles?",
+    "alternativas": [
+      "Efeito Fotoelétrico",
+      "Espalhamento Compton puro",
+      "Produção de pares",
+      "Fotodesintegração nuclear"
+    ],
+    "correta": 0,
+    "explicacao": "O Efeito Fotoelétrico ocorre com fótons de baixa a média energia e depende fortemente do número atômico (Z³), gerando alto contraste entre osso e tecido mole."
+  },
+  {
+    "categoria": "Radiologia Digital",
+    "pergunta": "Nos sistemas de Radiografia Computadorizada (CR), o que armazena a imagem latente no interior do chassi?",
+    "alternativas": [
+      "Placa de fósforo fotoestimulável (PSP)",
+      "Filme de sais de prata tradicional em gelatina",
+      "Sensor de silício amorfo conectado via cabo",
+      "Câmara fotográfica de alta sensibilidade"
+    ],
+    "correta": 0,
+    "explicacao": "O sistema CR usa uma placa com cristais de fluor-haleto de bário dopados com európio, cuja energia retida é liberada como luz sob laser na leitora."
+  },
+  {
+    "categoria": "Terminologia Radiológica",
+    "pergunta": "O que caracteriza uma área 'radiotransparente' (ou radiolúcida) em um filme radiográfico?",
+    "alternativas": [
+      "Apresenta-se branca/clara devido à absorção total dos raios X",
+      "Apresenta-se escura/negra porque a radiação atravessou o tecido com facilidade",
+      "Estrutura com densidade metálica impenetrável",
+      "Falha ótica na lente do colimador"
+    ],
+    "correta": 1,
+    "explicacao": "Tecidos de baixa densidade (como o ar nos pulmões) deixam passar os fótons com pouca atenuação, sensibilizando o filme e gerando áreas escuras (radiolúcidas)."
+  },
+  {
+    "categoria": "EPI e Proteção do Paciente",
+    "pergunta": "Qual EPI plumbífero deve ser prioritariamente oferecido aos pacientes durante radiografias odontológicas intraorais e de coluna cervical?",
+    "alternativas": [
+      "Protetor de tireoide",
+      "Máscara descartável N95",
+      "Avental térmico de neoprene",
+      "Luvas estéreis de borracha natural"
+    ],
+    "correta": 0,
+    "explicacao": "A tireoide é um órgão altamente radiossensível; o colar cervical com blindagem de chumbo (mínimo 0,25 mm Pb eq) evita irradiação desnecessária."
+  }
+]

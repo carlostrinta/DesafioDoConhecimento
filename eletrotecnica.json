@@ -1,0 +1,242 @@
+[
+  {
+    "categoria": "Eletricidade Básica",
+    "pergunta": "Pela 1ª Lei de Ohm (V = R · I), o que ocorre com a corrente elétrica se a tensão for dobrada mantendo a resistência constante?",
+    "alternativas": [
+      "A corrente cai pela metade",
+      "A corrente dobra",
+      "A corrente não se altera",
+      "A corrente quadruplica"
+    ],
+    "correta": 1,
+    "explicacao": "A corrente é diretamente proporcional à tensão aplicada. Portanto, ao dobrar a tensão, a corrente também dobra."
+  },
+  {
+    "categoria": "Segurança e Normas (NR-10)",
+    "pergunta": "Qual equipamento de proteção individual (EPI) é indispensável para proteção contra arco elétrico e choque elétrico segundo a NR-10?",
+    "alternativas": [
+      "Luvas isolantes de borracha e vestimenta com proteção contra arco elétrico",
+      "Protetor auricular tipo concha e luvas de látex simples",
+      "Cinto de segurança tipo abdominal e botas de lona",
+      "Apenas óculos de grau convencionais"
+    ],
+    "correta": 0,
+    "explicacao": "A NR-10 preconiza a utilização de luvas de borracha com nível de isolamento compatível com a tensão de trabalho e vestimentas adequadas para arco elétrico."
+  },
+  {
+    "categoria": "Dispositivos de Proteção",
+    "pergunta": "Qual é a função primordial do Dispositivo Diferencial Residual (DR) em uma instalação residencial ou predial?",
+    "alternativas": [
+      "Proteger os cabos exclusivamente contra curto-circuitos de alta corrente",
+      "Detectar fugas de corrente para a terra e proteger pessoas contra choques elétricos",
+      "Desarmar o circuito apenas quando a tensão ultrapassar 250 Volts",
+      "Manter a frequência da rede estável em 60 Hz"
+    ],
+    "correta": 1,
+    "explicacao": "O DR monitora a diferença entre a corrente de fase e a de neutro. Se houver fuga para a terra (como uma pessoa sofrendo choque), ele desarma imediatamente."
+  },
+  {
+    "categoria": "Sistemas Trifásicos",
+    "pergunta": "Em um sistema trifásico equilibrado com tensão de linha de 380 V (ligação estrela), qual é a tensão de fase (fase-neutro)?",
+    "alternativas": [
+      "110 V",
+      "220 V",
+      "380 V",
+      "440 V"
+    ],
+    "correta": 1,
+    "explicacao": "Em uma ligação em estrela, a tensão de fase é obtida dividindo a tensão de linha por raiz de 3: 380 V / 1,732 ≈ 220 V."
+  },
+  {
+    "categoria": "Grandezas Elétricas",
+    "pergunta": "Quais são as unidades de medida oficiais para potência ativa, potência reativa e potência aparente no SI?",
+    "alternativas": [
+      "Watt (W), Volt-Ampère Reativo (VAr) e Volt-Ampère (VA)",
+      "Joule (J), Watt (W) e Newton (N)",
+      "Volt (V), Ampère (A) e Ohm (Ω)",
+      "Coulomb (C), Henry (H) e Farad (F)"
+    ],
+    "correta": 0,
+    "explicacao": "Potência ativa (trabalho útil) é medida em Watts (W), reativa em VAr e aparente (total fornecida) em VA."
+  },
+  {
+    "categoria": "Instrumentação",
+    "pergunta": "Como devem ser conectados o Voltímetro e o Amperímetro para efetuar medições corretas em um circuito em carga?",
+    "alternativas": [
+      "Voltímetro em série e Amperímetro em paralelo",
+      "Ambos ligados em série com a carga",
+      "Voltímetro em paralelo e Amperímetro em série",
+      "Ambos ligados em paralelo com a carga"
+    ],
+    "correta": 2,
+    "explicacao": "O voltímetro tem altíssima impedância interna e liga-se em paralelo; o amperímetro tem resistência quase nula e liga-se em série."
+  },
+  {
+    "categoria": "Associação de Resistores",
+    "pergunta": "Qual é a resistência equivalente de dois resistores idênticos de 100 Ω conectados em paralelo?",
+    "alternativas": [
+      "200 Ω",
+      "100 Ω",
+      "50 Ω",
+      "25 Ω"
+    ],
+    "correta": 2,
+    "explicacao": "Para resistores iguais associados em paralelo, Req = R / n. Como são 2 resistores de 100 Ω: 100 / 2 = 50 Ω."
+  },
+  {
+    "categoria": "Fundamentos Físicos",
+    "pergunta": "O que caracteriza o fenômeno físico conhecido como Efeito Joule?",
+    "alternativas": [
+      "A indução de corrente elétrica por um campo magnético rotativo",
+      "A conversão de energia elétrica em energia térmica devido à resistência do condutor",
+      "A defasagem de 90° entre corrente e tensão em circuitos puramente capacitivos",
+      "A emissão de elétrons livres quando a luz atinge uma superfície metálica"
+    ],
+    "correta": 1,
+    "explicacao": "O Efeito Joule ocorre quando elétrons colidem com átomos do condutor, transformando energia elétrica em calor (P = R · I²)."
+  },
+  {
+    "categoria": "Máquinas Elétricas",
+    "pergunta": "Em um motor de indução trifásico convencional, o que deve ser feito para inverter seu sentido de rotação?",
+    "alternativas": [
+      "Inverter a ordem de conexão das três fases simultaneamente",
+      "Inverter a posição de quaisquer duas das três fases de alimentação",
+      "Reduzir a tensão de alimentação pela metade",
+      "Desconectar o cabo de aterramento do motor"
+    ],
+    "correta": 1,
+    "explicacao": "Trocar a posição de duas fases entre si (por exemplo, R e S) inverte o sentido de rotação do campo magnético girante gerado pelo estator."
+  },
+  {
+    "categoria": "Corrente Alternada",
+    "pergunta": "Qual é a frequência nominal padrão da rede elétrica de distribuição no Brasil?",
+    "alternativas": [
+      "50 Hz",
+      "60 Hz",
+      "100 Hz",
+      "120 Hz"
+    ],
+    "correta": 1,
+    "explicacao": "No Brasil, toda a rede de geração e distribuição de energia elétrica é padronizada na frequência de 60 Hertz (Hz)."
+  },
+  {
+    "categoria": "Componentes Passivos",
+    "pergunta": "Qual grandeza elétrica representa a capacidade de um componente de armazenar cargas elétricas em um campo elétrico?",
+    "alternativas": [
+      "Indutância",
+      "Capacitância",
+      "Resistividade",
+      "Permeabilidade magnética"
+    ],
+    "correta": 1,
+    "explicacao": "A capacitância mede a razão entre a carga acumulada e a diferença de potencial elétrico, medida em Farads (F)."
+  },
+  {
+    "categoria": "Normas e Instalações (NBR 5410)",
+    "pergunta": "Qual é a cor de isolação padronizada pela norma NBR 5410 para o condutor de proteção (terra)?",
+    "alternativas": [
+      "Azul-claro",
+      "Preto",
+      "Verde ou verde-amarelo (brasileirinho)",
+      "Vermelho"
+    ],
+    "correta": 2,
+    "explicacao": "Pela NBR 5410, o condutor de terra/proteção deve ser verde ou verde-amarelo, enquanto o azul-claro é exclusivo para o condutor neutro."
+  },
+  {
+    "categoria": "2ª Lei de Ohm",
+    "pergunta": "O que acontece com a resistência elétrica de um cabo de cobre se duplicarmos seu comprimento mantendo a mesma espessura?",
+    "alternativas": [
+      "A resistência cai pela metade",
+      "A resistência dobra de valor",
+      "A resistência permanece rigorosamente igual",
+      "A resistência cai para zero"
+    ],
+    "correta": 1,
+    "explicacao": "Pela 2ª Lei de Ohm (R = ρ · L / A), a resistência elétrica é diretamente proporcional ao comprimento do condutor."
+  },
+  {
+    "categoria": "Transformadores",
+    "pergunta": "Qual é o princípio físico fundamental em que se baseia o funcionamento de um transformador de tensão?",
+    "alternativas": [
+      "Efeito fotoelétrico",
+      "Indução eletromagnética mútua",
+      "Emissão termoiônica",
+      "Ressonância nuclear"
+    ],
+    "correta": 1,
+    "explicacao": "O transformador funciona pelo princípio da indução eletromagnética de Faraday-Lenz: uma corrente alternada no enrolamento primário induz tensão no secundário."
+  },
+  {
+    "categoria": "Circuitos CA",
+    "pergunta": "Em um circuito puramente indutivo excitado por uma fonte de corrente alternada senoidal, qual é a relação de fase?",
+    "alternativas": [
+      "Tensão e corrente estão em fase",
+      "A corrente está adiantada de 90° em relação à tensão",
+      "A corrente está atrasada de 90° em relação à tensão",
+      "A tensão é nula em qualquer instante"
+    ],
+    "correta": 2,
+    "explicacao": "Em indutores puros, a força contraeletromotriz induzida faz com que a corrente fique atrasada de 90° (π/2 rad) em relação à tensão."
+  },
+  {
+    "categoria": "Cálculo de Cargas",
+    "pergunta": "Um aquecedor elétrico residencial opera em 220 V e tem potência de 4400 W. Qual é a corrente nominal demandada?",
+    "alternativas": [
+      "10 A",
+      "20 A",
+      "44 A",
+      "80 A"
+    ],
+    "correta": 1,
+    "explicacao": "Aplicando a relação básica de potência P = V · I para carga resistiva, obtemos I = P / V = 4400 / 220 = 20 Ampères."
+  },
+  {
+    "categoria": "Eficiência Energética",
+    "pergunta": "O que indica o Fator de Potência em uma instalação elétrica industrial?",
+    "alternativas": [
+      "A razão entre a potência ativa (W) e a potência aparente (VA)",
+      "A soma das potências reativa e aparente",
+      "A tensão máxima suportada pelos cabos de neutro",
+      "O rendimento mecânico dos rolamentos do motor"
+    ],
+    "correta": 0,
+    "explicacao": "O fator de potência (cos φ) representa a fração da potência total (aparente) que é efetivamente convertida em trabalho produtivo (ativa)."
+  },
+  {
+    "categoria": "Eletrônica de Potência",
+    "pergunta": "Qual dispositivo semicondutor conduz corrente elétrica preferencialmente em apenas um sentido?",
+    "alternativas": [
+      "Resistor",
+      "Indutor",
+      "Diodo",
+      "Capacitor cerâmico"
+    ],
+    "correta": 2,
+    "explicacao": "O diodo possui polarização direta (onde conduz com baixa resistência) e inversa (onde bloqueia a passagem da corrente)."
+  },
+  {
+    "categoria": "Comandos Elétricos",
+    "pergunta": "Qual componente de comando é especificamente projetado para proteger motores elétricos contra sobrecargas mecânicas contínuas?",
+    "alternativas": [
+      "Relé térmico (ou de sobrecarga bimetálico)",
+      "Fusível ultra-rápido",
+      "Chave fim de curso",
+      "Transformador de corrente"
+    ],
+    "correta": 0,
+    "explicacao": "O relé térmico atua por meio de lâminas bimetálicas que se deformam com o aquecimento prolongado, desarmando o contator em caso de sobrecarga."
+  },
+  {
+    "categoria": "Dispositivos de Manobra",
+    "pergunta": "Qual é a diferença funcional principal entre um Contator e um Relé auxiliar comum em painéis elétricos?",
+    "alternativas": [
+      "O contator possui contatos principais dimensionados para correntes elevadas de carga de força",
+      "O contator funciona apenas em corrente contínua e o relé em alternada",
+      "O relé não possui bobina eletromagnética",
+      "O contator desliga automaticamente em caso de sobretensão"
+    ],
+    "correta": 0,
+    "explicacao": "Contatores dispõem de contatos de potência robustos com câmara de extinção de arco para ligar cargas pesadas como motores elétricos."
+  }
+]
