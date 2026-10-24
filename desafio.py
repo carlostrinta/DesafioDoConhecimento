@@ -641,8 +641,6 @@ class Som:
             self._canal = pygame.mixer.Channel(0)
             self.disponivel = True
 
-            # Sons curtos de transição e disputa.
-            self._preparar_sons()
 
             print("[SOM] Sistema de áudio inicializado.")
 
@@ -668,98 +666,6 @@ class Som:
 
         return self._cache[chave]
 
-    def _preparar_sons(self):
-        """Pré-carrega os efeitos para evitar atrasos no momento do evento."""
-        self._efeitos = {
-            "nova": self._wav([
-                ("C5", 90), ("E5", 90), ("G5", 110), ("C6", 220)
-            ]),
-            "A": self._wav([
-                ("A4", 70), ("E5", 100)
-            ]),
-            "B": self._wav([
-                ("D5", 70), ("A5", 100)
-            ]),
-            "revelar": self._wav([
-                ("C5", 100), ("D5", 100), ("G5", 180)
-            ]),
-            "acerto": self._wav([
-                ("C5", 100), ("E5", 100),
-                ("G5", 120), ("C6", 320)
-            ]),
-            "tempo": self._wav([
-                ("E4", 150), ("C4", 180), ("A3", 260)
-            ]),
-            "tick": self._wav([
-                (880, 45)
-            ]),
-            "tick_final": self._wav([
-                (1174.66, 65)
-            ]),
-            "ativar": self._wav([
-                ("C5", 80), ("E5", 120)
-            ]),
-        }
-
-    def _tocar(self, nome, prioridade=True):
-        if not self.ativo or not self.disponivel:
-            return
-
-        try:
-            som = self._efeitos[nome]
-
-            if prioridade:
-                # Eventos importantes substituem o efeito anterior.
-                self._canal.stop()
-                self._canal.play(som)
-            else:
-                # O cronômetro nunca interrompe uma fanfarra.
-                if not self._canal.get_busy():
-                    self._canal.play(som)
-
-        except Exception as e:
-            print(f"[SOM] Erro ao reproduzir '{nome}': {e}")
-
-    def nova_pergunta(self):
-        self._ultimo_tick = None
-        self._tocar("nova")
-
-    def apertou(self, quem):
-        self._tocar("A" if quem == "A" else "B")
-
-    def revelou(self):
-        self._tocar("revelar")
-
-    def acertou(self):
-        self._tocar("acerto")
-
-    def tempo_esgotado(self):
-        self._tocar("tempo")
-
-    def tick(self, segundos, fase):
-        """
-        Sons discretos de cronômetro.
-        Nunca acumula bipes nem corta efeitos prioritários.
-        """
-        if segundos <= 0 or not self.ativo:
-            return
-
-        if segundos == self._ultimo_tick:
-            return
-
-        self._ultimo_tick = segundos
-
-        if fase == FASE_AGUARDANDO:
-            if segundos <= 3:
-                self._tocar("tick_final", prioridade=False)
-            elif segundos <= 10 and segundos % 3 == 0:
-                self._tocar("tick", prioridade=False)
-
-        elif fase == FASE_RESPONDENDO:
-            if segundos <= 3:
-                self._tocar("tick_final", prioridade=False)
-            elif segundos <= 8 and segundos % 2 == 0:
-                self._tocar("tick", prioridade=False)
 
     def tocar_ja(self, *notas):
         """
