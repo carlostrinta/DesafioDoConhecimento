@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Build / Dist
+build/
+dist/
+
+# Executáveis locais
+Desafio do Conhecimento.exe
+
+# Logs / Estado salvo
+*.log
+estado_partida.json
+config.json
+
+# Configuração local (versione config.exemplo.json)
+config.json
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+ehthumbs.db
+Desktop.ini

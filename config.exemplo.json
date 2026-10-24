@@ -1,0 +1,48 @@
+{
+  "tempos": {
+    "tempo_pergunta": 30,
+    "tempo_resposta": 15
+  },
+  "nomes_equipes": {
+    "A": "Competidor A",
+    "B": "Competidor B",
+    "C": "Competidor C",
+    "D": "Competidor D"
+  },
+  "cores_equipes": {
+    "A": "#3BA3FF",
+    "B": "#FF8F3F",
+    "C": "#2BD99F",
+    "D": "#FFD166"
+  },
+  "serial": {
+    "baud_rate": 9600,
+    "porta": "auto",
+    "vid_pid_conhecidos": [
+      "2341:0043",
+      "1A86:7523",
+      "10C4:EA60",
+      "0403:6001"
+    ]
+  },
+  "perguntas": {
+    "pasta": "perguntas",
+    "arquivo_padrao": "conhecimentos_gerais.json"
+  },
+  "jogo": {
+    "modo": "livre",
+    "alvo_pontos": 3,
+    "pontuar_apos_tempo": false,
+    "num_equipes": 2
+  },
+  "audio": {
+    "ativo": true
+  },
+  "interface": {
+    "tela_cheia": true,
+    "escala_maxima": 2.2
+  },
+  "persistencia": {
+    "continuar_automatico": false
+  }
+}
