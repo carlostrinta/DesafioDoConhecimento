@@ -35,12 +35,6 @@ except ImportError:
     SERIAL_DISPONIVEL = False
     print("AVISO: pyserial não instalado. Modo teclado ativo.")
 
-try:
-    import winsound
-    AUDIO_DISPONIVEL = True
-except ImportError:
-    AUDIO_DISPONIVEL = False
-    print("AVISO: winsound indisponível (som desativado).")
 import io
 import struct
 import wave
