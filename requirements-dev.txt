@@ -1,0 +1,3 @@
+# Dependências de desenvolvimento / teste
+pytest>=8.0,<9.0
+pytest-mock>=3.12,<4.0
