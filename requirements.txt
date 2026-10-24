@@ -1,0 +1,4 @@
+# Desafio do Conhecimento - Dependências
+# Python 3.9+
+pyserial>=3.5,<4.0
+pygame>=2.5,<3.0
