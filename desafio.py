@@ -741,13 +741,14 @@ class ModalSelecaoPerguntas(tk.Toplevel):
     Janela modal para escolha do arquivo de perguntas (tema / tecnologia) na inicialização
     ou durante a execução do jogo.
     """
-    def __init__(self, parent, lista_arquivos, arquivo_atual=None, ao_confirmar=None, permitir_cancelar=True):
+    def __init__(self, parent, lista_arquivos, arquivo_atual=None, ao_confirmar=None, permitir_cancelar=True, inicial=False):
         super().__init__(parent)
         self.parent = parent
         self.lista_arquivos = list(lista_arquivos)
         self.arquivo_selecionado = arquivo_atual
         self.ao_confirmar = ao_confirmar
         self.permitir_cancelar = permitir_cancelar
+        self.inicial = inicial
 
         self.title("Duelo de Conhecimento — Escolha de Tema")
         self.configure(bg=Cor.FUNDO)
@@ -1172,11 +1173,13 @@ class ModalSelecaoPerguntas(tk.Toplevel):
 
     def _ao_fechar(self):
         self._limpar_mousewheel()
-        if self.permitir_cancelar:
-            self.destroy()
-        else:
+        if self.inicial:
+            # Modal inicial: fechar a janela = sair do app
             if messagebox.askyesno("Sair", "Deseja fechar o Duelo de Conhecimento?", parent=self):
                 self.parent.destroy()
+        else:
+            # Modal durante o jogo: apenas fecha o modal
+            self.destroy()
 
 
 # =========================================================
@@ -1365,7 +1368,8 @@ class DueloDeConhecimento:
             lista_arquivos=arquivos,
             arquivo_atual=atual,
             ao_confirmar=ao_confirmar,
-            permitir_cancelar=not inicial or (self.perguntas and len(self.perguntas) > 0)
+            permitir_cancelar=True,
+            inicial=inicial
         )
 
     def proxima_pergunta(self, forcar=False):

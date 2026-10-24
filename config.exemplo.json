@@ -1,4 +1,5 @@
 {
+  "_aviso": "Este arquivo é um template. As chaves ainda não são lidas pelo código (passam a valer na Etapa 4.2). Copie para config.json e edite conforme necessário.",
   "tempos": {
     "tempo_pergunta": 30,
     "tempo_resposta": 15
