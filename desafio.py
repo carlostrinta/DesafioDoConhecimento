@@ -52,7 +52,7 @@ TITULO = "Desafio de Conhecimento"
 NOME_A = "Competidor A"
 NOME_B = "Competidor B"
 
-ARQUIVO_PERGUNTAS = "perguntas.json"
+ARQUIVO_PERGUNTAS = "conhecimentos_gerais.json"
 TEMPO_PERGUNTA = 30          # segundos para alguém apertar o botão
 TEMPO_RESPOSTA = 15          # segundos para quem apertou responder
 PONTUAR_APOS_TEMPO = False   # True = o monitor ainda pode pontuar após o tempo esgotar
