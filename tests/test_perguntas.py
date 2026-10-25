@@ -86,4 +86,3 @@ class TestCarregamentoPerguntas:
         #   o próximo incremento deixa índice=3 (>=3), pronto para reset na próxima chamada
         assert j.estado.indice_pergunta == 3  # pronto para reset na próxima chamada
         assert j.estado.numero_pergunta == total + 3  # 1 inicial + total+2 no loop
-        assert j.estado.numero_pergunta == total + 3

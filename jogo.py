@@ -1,21 +1,22 @@
 """
-Lógica pura do Duelo de Conhecimento — sem dependências de UI, serial ou áudio.
-Parametrizável para 2, 3 ou 4 equipes.
+Logica pura do Duelo de Conhecimento -- sem dependencias de UI, serial ou audio.
+Parametrizavel para 2, 3 ou 4 equipes.
 """
 
 from __future__ import annotations
 import random
 import time
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Callable
 
-# ─── Estados da rodada ───
+
+# Estados da rodada
 FASE_AGUARDANDO = 0
 FASE_RESPONDENDO = 1
 FASE_REVELADA = 2
 FASE_PONTUADA = 3
 
-# ─── Equipes suportadas ───
+# Equipes suportadas
 TODAS_EQUIPES = ("A", "B", "C", "D")
 
 
@@ -40,8 +41,9 @@ class EstadoRodada:
 
 class Jogo:
     """
-    Máquina de estados do jogo.
-    Não conhece tkinter, serial, áudio — apenas recebe eventos e expõe estado.
+    Maquina de estados do jogo.
+    Nao conhece tkinter, serial, audio -- apenas recebe eventos e expõe estado.
+    Retorna eventos de dominio para a camada de apresentacao disparar efeitos (LED, som, serial).
     """
 
     def __init__(
@@ -52,6 +54,7 @@ class Jogo:
         tempo_resposta: int = 15,
         pontuar_apos_tempo: bool = False,
         nomes_equipes: dict[str, str] | None = None,
+        clock: Callable[[], float] | None = None,
     ):
         if not 2 <= num_equipes <= 4:
             raise ValueError("num_equipes deve ser 2, 3 ou 4")
@@ -70,7 +73,9 @@ class Jogo:
             "D": "Competidor D",
         }
 
-        # Estado mutável
+        self._clock = clock or time.monotonic
+
+        # Estado mutavel
         self.placar: dict[str, int] = {eq: 0 for eq in self.equipes_ativas}
         self.perguntas: list[Pergunta] = []
         self.estado = EstadoRodada()
@@ -82,22 +87,27 @@ class Jogo:
         # Inicia a primeira pergunta e timer
         self.proxima_pergunta(forcar=True)
 
-    # ─── Carregamento / embaralhamento ───
+    # Carregamento / embaralhamento
     def _embaralhar_e_preparar(self) -> None:
         self.perguntas = self.perguntas_base.copy()
         random.shuffle(self.perguntas)
         self.estado.indice_pergunta = 0
         self.estado.numero_pergunta = 0
 
-    def recarregar_perguntas(self, novas: list[Pergunta]) -> None:
+    def recarregar_perguntas(self, novas: list[Pergunta]) -> list[str]:
+        """
+        Recarrega banco de perguntas. Retorna eventos ['reiniciou_banco'].
+        """
         self.perguntas_base = novas
         self._embaralhar_e_preparar()
         self.estado = EstadoRodada()
         self.placar = {eq: 0 for eq in self.equipes_ativas}
+        self.proxima_pergunta(forcar=True)
+        return ["reiniciou_banco"]
 
-    # ─── Timer (usa time.monotonic) ───
+    # Timer (usa clock injetavel)
     def _iniciar_timer(self, segundos: int, rotulo: str, cor: str) -> None:
-        self.timer_fim = time.monotonic() + segundos
+        self.timer_fim = self._clock() + segundos
         self.timer_rotulo = rotulo
         self.timer_cor = cor
 
@@ -107,7 +117,7 @@ class Jogo:
     def timer_restante(self) -> float:
         if self.timer_fim <= 0:
             return 0.0
-        return max(0.0, self.timer_fim - time.monotonic())
+        return max(0.0, self.timer_fim - self._clock())
 
     def timer_fracao(self) -> float:
         total = self.tempo_pergunta if self.estado.fase == FASE_AGUARDANDO else self.tempo_resposta
@@ -115,64 +125,86 @@ class Jogo:
             return 0.0
         return max(0.0, self.timer_restante() / total)
 
-    def tick_timer(self) -> bool:
-        """Chamado a cada frame. Retorna True se timer estourou agora."""
+    def tick_timer(self) -> list[str]:
+        """
+        Chamado a cada frame pela UI.
+        Retorna lista de eventos: ["tempo_esgotado"] se estourou agora, senao [].
+        """
         if self.timer_fim <= 0:
-            return False
-        if time.monotonic() >= self.timer_fim:
+            return []
+        if self._clock() >= self.timer_fim:
             self._parar_timer()
             self._tempo_esgotado()
-            return True
-        return False
+            return ["tempo_esgotado"]
+        return []
 
-    # ─── Eventos de botão (chamados pela UI/Serial) ───
-    def apertar_botao(self, equipe: str) -> bool:
-        """Retorna True se o botão foi aceito (primeiro a apertar)."""
+    # Eventos de botao (chamados pela UI/Serial)
+    def apertar_botao(self, equipe: str) -> list[str]:
+        """
+        Tenta registrar aperto de botao.
+        Retorna eventos: ["apertou:A"] se aceito, [] se rejeitado.
+        """
         if equipe not in self.equipes_ativas:
-            return False
+            return []
         if self.estado.fase != FASE_AGUARDANDO:
-            return False
+            return []
         if self.estado.pergunta_atual is None:
-            return False
+            return []
 
         self.estado.fase = FASE_RESPONDENDO
         self.estado.quem_apertou = equipe
         self.estado.tempo_estourou = False
         self._iniciar_timer(self.tempo_resposta, f"{self.nomes_equipes[equipe]} respondendo", "")
-        return True
+        return [f"apertou:{equipe}"]
 
-    def revelar_resposta(self) -> bool:
+    def revelar_resposta(self) -> list[str]:
+        """
+        Revela a resposta (so valido em RESPONDENDO).
+        Retorna ["revelou"] se aceito, [] se rejeitado.
+        """
         if self.estado.fase != FASE_RESPONDENDO:
-            return False
+            return []
         self.estado.fase = FASE_REVELADA
         self._parar_timer()
-        return True
+        return ["revelou"]
 
-    def confirmar_acerto(self, equipe: str) -> bool:
+    def confirmar_acerto(self, equipe: str) -> list[str]:
+        """
+        Confere ponto para a equipe (so valido em REVELADA, so quem apertou).
+        Retorna ["pontuou:A"] se aceito, [] se rejeitado.
+        """
         if self.estado.fase != FASE_REVELADA:
-            return False
+            return []
         if self.estado.quem_apertou is None:
-            return False
+            return []  # ninguem apertou: nao ha ponto para dar
         if equipe != self.estado.quem_apertou:
-            return False
+            return []  # so quem apertou pode pontuar
         if self.estado.tempo_estourou and not self.pontuar_apos_tempo:
-            return False
+            return []  # tempo esgotou e nao pontua apos tempo
 
         self.estado.fase = FASE_PONTUADA
         self.placar[equipe] += 1
-        return True
+        return [f"pontuou:{equipe}"]
 
-    def proxima_pergunta(self, forcar: bool = False) -> bool:
+    def proxima_pergunta(self, forcar: bool = False) -> list[str]:
+        """
+        Avanca para a proxima pergunta.
+        Retorna ["proxima_pergunta"] se avancou, ["reiniciou_banco"] se embaralhou,
+        [] se bloqueado (rodada nao resolvida e nao forcado).
+        """
+        eventos = []
+
         if not forcar and self.estado.pergunta_atual is not None and self.estado.fase not in (FASE_REVELADA, FASE_PONTUADA):
-            return False
+            return []
 
         if not self.perguntas:
             self.estado.pergunta_atual = None
-            return False
+            return []
 
         if self.estado.indice_pergunta >= len(self.perguntas):
             random.shuffle(self.perguntas)
             self.estado.indice_pergunta = 0
+            eventos.append("reiniciou_banco")
 
         self.estado.pergunta_atual = self.perguntas[self.estado.indice_pergunta]
         self.estado.indice_pergunta += 1
@@ -182,25 +214,27 @@ class Jogo:
         self.estado.quem_apertou = None
         self.estado.tempo_estourou = False
         self._iniciar_timer(self.tempo_pergunta, "Tempo para apertar", "")
-        return True
+        eventos.append("proxima_pergunta")
+        return eventos
 
-    def reiniciar_placar(self) -> None:
+    def reiniciar_placar(self) -> list[str]:
         for eq in self.equipes_ativas:
             self.placar[eq] = 0
+        return ["reiniciou_placar"]
 
     def _tempo_esgotado(self) -> None:
         if self.estado.fase == FASE_AGUARDANDO:
-            # Ninguém apertou: vai para REVELADA sem quem_apertou
+            # Ninguem apertou: vai para REVELADA sem quem_apertou
             self.estado.fase = FASE_REVELADA
             self.estado.quem_apertou = None
             self.timer_rotulo = "Tempo esgotado"
         elif self.estado.fase == FASE_RESPONDENDO:
-            # Quem apertou não respondeu a tempo
+            # Quem apertou nao respondeu a tempo
             self.estado.fase = FASE_REVELADA
             self.estado.tempo_estourou = True
             self.timer_rotulo = "Tempo esgotado"
 
-    # ─── Serial / estado para persistência ───
+    # Serial / estado para persistencia
     def to_dict(self) -> dict[str, Any]:
         return {
             "placar": self.placar,
@@ -220,7 +254,7 @@ class Jogo:
         jogo.estado.numero_pergunta = data.get("numero_pergunta", 0)
         jogo.estado.fase = data.get("fase", FASE_AGUARDANDO)
         jogo.estado.quem_apertou = data.get("quem_apertou")
-        # Nota: timer e fase intermediária NÃO são restaurados (regra da Etapa 4.3)
+        # Nota: timer e fase intermediaria NAO sao restaurados (regra da Etapa 4.3)
         jogo.estado.fase = FASE_AGUARDANDO
         jogo._parar_timer()
         if jogo.estado.indice_pergunta > 0 and jogo.estado.indice_pergunta <= len(jogo.perguntas):
@@ -228,7 +262,7 @@ class Jogo:
         return jogo
 
 
-# ─── Carregamento de perguntas (formato JSON) ───
+# Carregamento de perguntas (formato JSON)
 def carregar_perguntas_json(caminho: str) -> list[Pergunta]:
     import json
     import os
@@ -246,7 +280,7 @@ def carregar_perguntas_json(caminho: str) -> list[Pergunta]:
             continue
         if not 0 <= correta < len(alts):
             continue
-        # Suporta tanto "pergunta" (JSON original) quanto "texto" (serialização de Pergunta)
+        # Suporta tanto "pergunta" (JSON original) quanto "texto" (serializacao de Pergunta)
         texto = q.get("pergunta") or q.get("texto")
         if texto is None:
             continue

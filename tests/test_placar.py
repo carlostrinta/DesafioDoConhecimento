@@ -18,14 +18,14 @@ class TestPlacar:
         j = jogo_2
         j.apertar_botao("A")
         j.revelar_resposta()
-        j.confirmar_acerto("A")
+        assert j.confirmar_acerto("A") == ["pontuou:A"]
         assert j.placar == {"A": 1, "B": 0}
 
     def test_nao_incrementa_se_nao_apertou(self, jogo_2):
         j = jogo_2
         j.apertar_botao("A")
         j.revelar_resposta()
-        j.confirmar_acerto("B")  # B não apertou
+        assert j.confirmar_acerto("B") == []  # B não apertou
         assert j.placar == {"A": 0, "B": 0}
 
     def test_pontos_acumulam(self, jogo_2):
@@ -33,7 +33,7 @@ class TestPlacar:
         for _ in range(3):
             j.apertar_botao("A")
             j.revelar_resposta()
-            j.confirmar_acerto("A")
+            assert j.confirmar_acerto("A") == ["pontuou:A"]
             j.proxima_pergunta()
         assert j.placar["A"] == 3
 
@@ -42,14 +42,14 @@ class TestPlacar:
         for eq in ("A", "B", "C"):
             j.apertar_botao(eq)
             j.revelar_resposta()
-            j.confirmar_acerto(eq)
+            assert j.confirmar_acerto(eq) == [f"pontuou:{eq}"]
             j.proxima_pergunta()
         assert j.placar == {"A": 1, "B": 1, "C": 1}
 
     def test_reiniciar_placar_mantem_equipes_ativas(self, jogo_2):
         j = jogo_2
         j.placar["A"] = 5
-        j.reiniciar_placar()
+        assert j.reiniciar_placar() == ["reiniciou_placar"]
         assert set(j.placar.keys()) == {"A", "B"}
         assert all(v == 0 for v in j.placar.values())
 
