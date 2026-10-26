@@ -63,17 +63,33 @@ class TestModuloPuro:
         )
         assert saida.returncode == 0, saida.stderr
 
-    def test_existe_um_unico_json_load_no_projeto(self):
-        """Só o carregador único abre e decodifica JSON."""
-        arquivos = [
-            p for p in RAIZ.glob("*.py") if p.name not in {"setup.py"}
-        ]
-        achados = {
-            p.name: p.read_text(encoding="utf-8").count("json.load(")
-            for p in arquivos
+    def test_existe_um_unico_carregador_de_perguntas(self):
+        """Um único carregador/validador de bancos no projeto."""
+        definicoes = {
+            p.name: p.read_text(encoding="utf-8").count("def ler_banco_perguntas(")
+            for p in RAIZ.glob("*.py")
         }
-        achados = {nome: n for nome, n in achados.items() if n}
-        assert achados == {"perguntas.py": 1}
+        assert {n: c for n, c in definicoes.items() if c} == {"perguntas.py": 1}
+
+        atalhos = {
+            p.name: p.read_text(encoding="utf-8").count(
+                "def carregar_perguntas_json("
+            )
+            for p in RAIZ.glob("*.py")
+        }
+        assert {n: c for n, c in atalhos.items() if c} == {"perguntas.py": 1}
+
+    def test_ninguem_mais_decodifica_bancos_de_perguntas(self):
+        """
+        Lógica e UI não abrem JSON por conta própria: usam o carregador.
+
+        `config.py` (4.2) e a futura persistência (4.3) têm leitores próprios
+        de config.json/estado_partida.json — não são bancos de perguntas, por
+        isso ficam fora desta checagem.
+        """
+        for nome in ("desafio.py", "jogo.py", "protocolo.py"):
+            fonte = (RAIZ / nome).read_text(encoding="utf-8")
+            assert "json.load(" not in fonte, nome
 
 
 class TestPerguntaCompatibilidade:

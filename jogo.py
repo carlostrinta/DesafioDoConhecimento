@@ -24,6 +24,8 @@ from typing import Any, Callable
 
 # O carregador/validador e o modelo de pergunta foram para perguntas.py
 # (Etapa 3.2). São reexportados aqui para não quebrar quem já importa do jogo.
+# TODO(3.6/3.7): remover a reexportação e apontar desafio.py/testes direto
+# para perguntas.py.
 from perguntas import (
     CargaPerguntas,
     Pergunta,

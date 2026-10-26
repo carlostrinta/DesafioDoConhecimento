@@ -194,3 +194,6 @@ futuro, a pasta `sons/`) ficam sempre ao lado do executável.
   reinicia rápido (pendência da Etapa 4).
 - Sem log em arquivo e sem retomada automática de partida (Etapa 4).
 - O firmware usa `delay()` no bipe e será revisado junto com o protocolo v2.
+- `jogo.py` ainda reexporta `Pergunta`, `ler_banco_perguntas` e
+  `carregar_perguntas_json` por compatibilidade; a reexportação sai nas
+  Etapas 3.6/3.7 (há um `TODO` no código).
