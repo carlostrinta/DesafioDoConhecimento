@@ -102,6 +102,24 @@ carregando as demais.
 Bancos incluídos: `conhecimentos_gerais.json` (97 perguntas),
 `eletrotecnica.json` (20) e `radiologia.json` (20).
 
+> ⚠️ **Cuidado com os temas curtos.** `eletrotecnica.json` e
+> `radiologia.json` têm apenas **20 perguntas** cada. O baralho é embaralhado
+> a cada carga e, quando acaba, **recomeça do início** — numa partida longa as
+> mesmas perguntas voltam cedo. **Pendência da Etapa 4:** ampliar esses bancos
+> e/ou avisar na tela quando o tema escolhido for curto para o número de
+> equipes/alvo de pontos.
+
+## Configuração — `config.exemplo.json` (ainda **não** é lido)
+
+> ⚠️ Nesta versão **nenhum campo de `config.exemplo.json`/`config.json` é
+> lido pelo código**. O arquivo é só um **modelo** do que será configurável
+> (tempos, nomes e cores das equipes, serial, modo de jogo, `num_equipes`).
+> Os valores em uso continuam **fixos no código**: 30 s por pergunta, 15 s
+> para responder, 2 equipes nos botões e placar.
+>
+> Copiar o modelo para `config.json` ou editá-lo **não muda nada** no jogo. A
+> leitura de verdade entra na **Etapa 4.2**.
+
 ## Testes
 
 ```powershell
@@ -122,7 +140,7 @@ em modo headless. Nenhum teste abre janela ou exige Arduino.
 | `protocolo.py` | tradução pura entre linhas da serial e ações/eventos |
 | `tests/` | suíte pytest |
 | `duelo_arduino.ino/` | firmware do Arduino (protocolo v1) |
-| `config.exemplo.json` | modelo de configuração (lido a partir da Etapa 4.2) |
+| `config.exemplo.json` | modelo de configuração — **ainda não é lido** (Etapa 4.2) |
 | `Desafio do Conhecimento.spec` | receita de build com PyInstaller |
 
 ## Protocolo serial (v1)
@@ -164,5 +182,7 @@ arquivos JSON de perguntas precisam ficar ao lado do executável.
 
 - A interface ainda mostra **2 equipes**; a lógica já suporta 2, 3 ou 4.
 - `config.json` ainda não é lido (Etapa 4.2) — os tempos estão no código.
+- `eletrotecnica.json` e `radiologia.json` têm só 20 perguntas: o baralho
+  reinicia rápido (pendência da Etapa 4).
 - Sem log em arquivo e sem retomada automática de partida (Etapa 4).
 - O firmware usa `delay()` no bipe e será revisado junto com o protocolo v2.
