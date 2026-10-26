@@ -15,11 +15,9 @@ Atalhos de teclado (modo simulação, funcionam junto com o Arduino):
     Ctrl+R     zerar o placar
 """
 
-import json
 import math
 import os
 import queue
-import sys
 import threading
 import time
 import traceback
@@ -59,6 +57,7 @@ from perguntas import (
     listar_arquivos_perguntas,
 )
 from protocolo import comandos_para_arduino, mapear_evento_arduino
+from recursos import caminho_recurso, obter_diretorio_base
 
 try:
     import serial
@@ -162,16 +161,6 @@ def texto_ajustado(cv, x, y, largura, altura, texto, nome_fonte, minimo=10, **kw
             return item
         cv.delete(item)
         tam = max(minimo, tam - 2)
-
-
-def obter_diretorio_base():
-    if getattr(sys, "frozen", False):
-        return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__))
-
-
-def caminho_recurso(nome):
-    return os.path.join(obter_diretorio_base(), nome)
 
 
 def obter_icone_tema(titulo, nome_arquivo):

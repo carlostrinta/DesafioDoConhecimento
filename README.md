@@ -138,6 +138,7 @@ em modo headless. Nenhum teste abre janela ou exige Arduino.
 | `desafio.py` | interface tkinter: desenho, teclado, serial e sons |
 | `jogo.py` | regra de jogo pura: estado, placar e timer |
 | `perguntas.py` | modelo, carregador/validador, listagem e nomes de tema (puro) |
+| `recursos.py` | pasta da aplicação (código-fonte ou `.exe`) — puro |
 | `protocolo.py` | tradução pura entre linhas da serial e ações/eventos |
 | `config.py` | constantes atuais (tempos, equipes, serial) — **ainda não lê JSON** |
 | `tests/` | suíte pytest |
@@ -179,6 +180,11 @@ pyinstaller "Desafio do Conhecimento.spec"
 
 O `.exe` sai em `dist/`. Ele **não** é versionado (veja `.gitignore`); os
 arquivos JSON de perguntas precisam ficar ao lado do executável.
+
+Nada é empacotado dentro do `.exe` (`datas=[]` no `.spec`): os recursos são
+procurados na **pasta da aplicação** — a pasta do `.exe` quando congelado, ou a
+pasta do projeto rodando pelo fonte. Por isso os bancos de perguntas (e, no
+futuro, a pasta `sons/`) ficam sempre ao lado do executável.
 
 ## Limitações conhecidas (em evolução)
 
