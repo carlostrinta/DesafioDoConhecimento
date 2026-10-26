@@ -552,6 +552,18 @@ MENSAGENS_RECUSA = {
     MOTIVO_ACERTO_TEMPO: "O tempo de resposta esgotou: sem ponto nesta rodada.",
 }
 
+
+def mensagem_ignoradas(quantidade, nome_arquivo):
+    """
+    Texto do aviso de perguntas descartadas na carga.
+    Devolve None quando nada foi ignorado.
+    """
+    if quantidade <= 0:
+        return None
+    substantivo = "pergunta ignorada" if quantidade == 1 else "perguntas ignoradas"
+    return f"{quantidade} {substantivo} em {nome_arquivo}."
+
+
 # =========================================================
 # ÁUDIO — gera WAV em memória e reproduz via placa de som normal
 # (winsound.Beep usa o PC Speaker, que notebooks modernos não têm)
@@ -1209,6 +1221,7 @@ class DueloDeConhecimento:
         )
 
         self.aviso = None
+        self._aviso_carga = None
 
         self._job_timer = None
         self._job_aviso = None
@@ -1327,6 +1340,8 @@ class DueloDeConhecimento:
 
         self.jogo.recarregar_perguntas(carga.perguntas)
         print(f"[{self.tema_atual}] {len(carga.perguntas)} perguntas carregadas de {nome_arquivo}.")
+        # Aviso na tela (o detalhe de cada pergunta vai para o log na Etapa 4.1)
+        self._aviso_carga = mensagem_ignoradas(len(carga.ignoradas), nome_arquivo)
 
         if hasattr(self, "topo"):
             self.topo.tema = self.tema_atual
@@ -1622,6 +1637,12 @@ class DueloDeConhecimento:
         if quem_piscar:
             self.piscar(quem_piscar)
         self._reiniciar_loop_timer()
+        self._mostrar_aviso_carga()
+
+    def _mostrar_aviso_carga(self):
+        if self._aviso_carga:
+            texto, self._aviso_carga = self._aviso_carga, None
+            self.avisar(texto)
 
     def _texto_recusa(self, evento):
         motivo = evento.split(":", 1)[1]
