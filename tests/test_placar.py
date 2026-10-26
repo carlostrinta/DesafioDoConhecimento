@@ -25,7 +25,7 @@ class TestPlacar:
         j = jogo_2
         j.apertar_botao("A")
         j.revelar_resposta()
-        assert j.confirmar_acerto("B") == []  # B não apertou
+        assert j.confirmar_acerto("B") == ["recusado:acerto_outra_equipe"]
         assert j.placar == {"A": 0, "B": 0}
 
     def test_pontos_acumulam(self, jogo_2):

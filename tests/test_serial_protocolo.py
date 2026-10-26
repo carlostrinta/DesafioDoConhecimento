@@ -1,4 +1,6 @@
 """Testes do protocolo serial (função pura real, headless)."""
+from pathlib import Path
+
 import pytest
 from protocolo import (
     mapear_evento_arduino,
@@ -69,7 +71,7 @@ class TestProtocoloSerial:
         assert comandos_para_arduino(["pontuou:A"]) == ["BEEP_LONG"]
         assert comandos_para_arduino(["tempo_esgotado"]) == ["BEEP"]
         assert comandos_para_arduino(["proxima_pergunta"]) == ["RESET"]
-        assert comandos_para_arduino(["reiniciou_banco"]) == ["RESET"]
+        assert comandos_para_arduino(["reiniciou_banco"]) == []  # informativo: RESET vem de proxima_pergunta
         assert comandos_para_arduino(["led_reacender:A"]) == ["LED_A_ON"]
         assert comandos_para_arduino(["revelou"]) == []  # sem comando serial
         # Múltiplos eventos
@@ -81,3 +83,25 @@ class TestProtocoloSerial:
         eventos_v1 = set(EVENTOS_ARDUINO_PC_V1)
         assert "BTN_C" not in eventos_v1
         assert "BTN_ACERTO_C" not in eventos_v1
+
+
+class TestProtocoloHeadless:
+    """O módulo de protocolo não pode arrastar UI nem pygame."""
+
+    def test_importa_sem_tkinter_serial_ou_pygame(self):
+        import subprocess
+        import sys
+
+        codigo = (
+            "import sys; import protocolo; "
+            "proibidos = {'tkinter', 'serial', 'pygame'}; "
+            "achados = proibidos & set(sys.modules); "
+            "assert not achados, achados"
+        )
+        saida = subprocess.run(
+            [sys.executable, "-c", codigo],
+            capture_output=True,
+            text=True,
+            cwd=str(Path(__file__).resolve().parent.parent),
+        )
+        assert saida.returncode == 0, saida.stderr

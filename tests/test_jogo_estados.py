@@ -38,8 +38,8 @@ class TestMaquinaEstados:
 
     def test_revelar_apenas_em_respondendo(self, jogo_2_equipes):
         j = jogo_2_equipes
-        # Antes de apertar (AGUARDANDO): rejeita
-        assert j.revelar_resposta() == []
+        # Antes de apertar (AGUARDANDO): rejeita com motivo
+        assert j.revelar_resposta() == ["recusado:revelar_aguardando"]
         assert j.estado.fase == FASE_AGUARDANDO
 
         j.apertar_botao("A")
@@ -63,7 +63,7 @@ class TestMaquinaEstados:
         j.apertar_botao("A")
         j.revelar_resposta()
         # B não apertou, não pode pontuar
-        assert j.confirmar_acerto("B") == []
+        assert j.confirmar_acerto("B") == ["recusado:acerto_outra_equipe"]
         assert j.placar["A"] == 0
         assert j.placar["B"] == 0
 
@@ -73,7 +73,7 @@ class TestMaquinaEstados:
         # Força estado REVELADA sem quem_apertou (simula tempo esgotado em AGUARDANDO)
         j.estado.fase = FASE_REVELADA
         j.estado.quem_apertou = None
-        assert j.confirmar_acerto("A") == []
+        assert j.confirmar_acerto("A") == ["recusado:acerto_sem_quem"]
         assert j.placar["A"] == 0
 
     def test_confirmar_acerto_rejeita_se_tempo_estourou(self, jogo_2_equipes):
@@ -84,7 +84,7 @@ class TestMaquinaEstados:
         j.revelar_resposta()  # vai para REVELADA com tempo_estourou=True
         assert j.estado.tempo_estourou is True
         # Com PONTUAR_APOS_TEMPO=False (padrão), não pontua
-        assert j.confirmar_acerto("A") == []
+        assert j.confirmar_acerto("A") == ["recusado:acerto_tempo"]
         assert j.placar["A"] == 0
 
     def test_confirmar_acerto_permite_se_pontuar_apos_tempo_true(self, perguntas_exemplo):
@@ -101,7 +101,7 @@ class TestMaquinaEstados:
         n1 = j.estado.numero_pergunta
 
         # Só avança se rodada resolvida
-        assert j.proxima_pergunta() == []
+        assert j.proxima_pergunta() == ["recusado:avancar"]
 
         j.apertar_botao("A")
         j.revelar_resposta()
@@ -190,9 +190,21 @@ class TestTresQuatroEquipes:
 
         novas = [Pergunta("Nova", "P?", ["X", "Y"], 0, "")]
         assert j.recarregar_perguntas(novas) == ["reiniciou_banco"]
-        assert j.placar == {"A": 0, "B": 0}
+        # A UI decide sobre o placar (o carregador não zera por conta própria)
+        assert j.placar["A"] == 1
         assert j.estado.fase == FASE_AGUARDANDO
-        assert j.estado.pergunta_atual is not None
+        assert j.estado.pergunta_atual is None
+        assert j.timer_restante() == 0
+
+        # Quem apresenta chama proxima_pergunta(forcar=True) em seguida
+        assert "proxima_pergunta" in j.proxima_pergunta(forcar=True)
+        assert j.estado.pergunta_atual.texto == "P?"
+
+    def test_recarregar_perguntas_com_zerar_placar(self, perguntas_exemplo):
+        j = Jogo(perguntas_exemplo, num_equipes=2)
+        j.placar["A"] = 7
+        j.recarregar_perguntas(perguntas_exemplo, zerar_placar=True)
+        assert j.placar == {"A": 0, "B": 0}
 
 
 class TestTimerComClockInjetavel:

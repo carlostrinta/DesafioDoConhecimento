@@ -43,5 +43,9 @@ class TestTimer:
     def test_parar_timer_zera(self, jogo_timer):
         j = jogo_timer
         j._parar_timer()
+        # O prazo para de correr...
         assert j.timer_restante() == 0
-        assert j.timer_fracao() == 0
+        assert j.timer_ativo is False
+        # ...mas a barra preserva o restante congelado (como no protótipo)
+        assert j.timer_restante_visual() > 0
+        assert j.timer_fracao() == pytest.approx(1.0, rel=0.1)
