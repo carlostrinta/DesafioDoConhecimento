@@ -18,8 +18,6 @@ Atalhos de teclado (modo simulação, funcionam junto com o Arduino):
 import math
 import os
 import queue
-import threading
-import time
 import traceback
 import tkinter as tk
 from tkinter import font as tkfont, messagebox, filedialog
@@ -27,11 +25,9 @@ from tkinter import font as tkfont, messagebox, filedialog
 from audio import Som
 from config import (
     ARQUIVO_PERGUNTAS,
-    BAUD_RATE,
     NOMES_EQUIPES,
     NUM_EQUIPES,
     PONTUAR_APOS_TEMPO,
-    PORTA_FORCADA,
     TEMPO_PERGUNTA,
     TEMPO_RESPOSTA,
     TITULO,
@@ -60,12 +56,9 @@ from perguntas import (
 from protocolo import comandos_para_arduino, mapear_evento_arduino
 from recursos import caminho_recurso, obter_diretorio_base
 
-try:
-    import serial
-    import serial.tools.list_ports
-    SERIAL_DISPONIVEL = True
-except ImportError:
-    SERIAL_DISPONIVEL = False
+from serial_comm import SERIAL_DISPONIVEL, ComunicacaoSerial
+
+if not SERIAL_DISPONIVEL:
     print("AVISO: pyserial não instalado. Modo teclado ativo.")
 
 # =========================================================
@@ -950,9 +943,9 @@ class DueloDeConhecimento:
         self._job_aviso = None
         self._job_escala = None
 
-        self.serial = None
         self.rodando = True
         self.fila = queue.Queue()
+        self.serial_comm = ComunicacaoSerial(self.fila)
 
         # Ícone da janela principal
         ico_path = caminho_recurso("desafio.ico")
@@ -1379,80 +1372,10 @@ class DueloDeConhecimento:
     # SERIAL
     # -----------------------------------------------------
     def iniciar_thread_serial(self):
-        if not SERIAL_DISPONIVEL:
-            return
-        threading.Thread(target=self.loop_serial, daemon=True).start()
-
-    def _candidatas(self):
-        portas = list(serial.tools.list_ports.comports())
-        print("\n=== PORTAS SERIAIS DETECTADAS ===")
-        for p in portas:
-            print(f"  {p.device} | descrição: {p.description}")
-        print("=================================\n")
-        chaves = ("arduino", "ch340", "ch341", "usb serial", "usb-serial")
-        lista = []
-        if PORTA_FORCADA:
-            lista.append(PORTA_FORCADA)
-        lista += [p.device for p in portas if any(k in (p.description or "").lower() for k in chaves)]
-        lista += [p.device for p in portas]
-        vistas, unicas = set(), []
-        for porta in lista:
-            if porta not in vistas:
-                vistas.add(porta)
-                unicas.append(porta)
-        return unicas
-
-    def _tentar_conectar(self, porta):
-        try:
-            s = serial.Serial(porta, BAUD_RATE, timeout=0.1)
-            time.sleep(2)  # Arduino reinicia ao abrir a serial
-            s.reset_input_buffer()
-            self.serial = s
-            print(f"✓ Conectado em {porta}")
-            return True
-        except Exception as e:
-            print(f"✗ Falha em {porta}: {e}")
-            return False
-
-    def _fechar_serial(self):
-        s, self.serial = self.serial, None
-        try:
-            if s:
-                s.close()
-        except Exception:
-            pass
+        self.serial_comm.iniciar()
 
     def enviar_serial(self, cmd):
-        s = self.serial
-        if s and s.is_open:
-            try:
-                s.write((cmd + "\n").encode())
-            except Exception:
-                pass
-
-    def loop_serial(self):
-        """Thread: nunca mexe na interface, só coloca mensagens na fila."""
-        ultima_busca = 0.0
-        while self.rodando:
-            s = self.serial
-            if not (s and s.is_open):
-                if time.monotonic() - ultima_busca >= 3:
-                    ultima_busca = time.monotonic()
-                    for porta in self._candidatas():
-                        if self._tentar_conectar(porta):
-                            self.fila.put(("conexao", porta))
-                            break
-                time.sleep(0.2)
-                continue
-            try:
-                linha = s.readline().decode(errors="ignore").strip()
-                if linha:
-                    print(f"[ARDUINO] {linha}")
-                    self.fila.put(("evento", linha))
-            except Exception as e:
-                print(f"[ERRO SERIAL] {e} — tentando reconectar")
-                self._fechar_serial()
-                self.fila.put(("conexao", None))
+        self.serial_comm.enviar(cmd)
 
     def drenar_fila(self):
         try:
@@ -1534,8 +1457,9 @@ class DueloDeConhecimento:
 
     def fechar(self):
         self.rodando = False
+        self.serial_comm.rodando = False
         self.enviar_serial("RESET")
-        self._fechar_serial()
+        self.serial_comm.fechar()
         self.som.parar()
         self.root.destroy()
 

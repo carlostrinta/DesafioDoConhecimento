@@ -88,7 +88,12 @@ class TestUiUsaConfig:
         assert desafio.TEMPO_PERGUNTA == config.TEMPO_PERGUNTA
         assert desafio.TEMPO_RESPOSTA == config.TEMPO_RESPOSTA
         assert desafio.PONTUAR_APOS_TEMPO == config.PONTUAR_APOS_TEMPO
-        assert desafio.BAUD_RATE == config.BAUD_RATE
-        assert desafio.PORTA_FORCADA == config.PORTA_FORCADA
         assert desafio.NOME_A == config.NOMES_EQUIPES["A"]
         assert desafio.NOME_B == config.NOMES_EQUIPES["B"]
+
+    def test_serial_comm_usa_os_mesmos_valores(self):
+        """A serial saiu da UI na Etapa 3.4: os valores vêm de config.py."""
+        serial_comm = pytest.importorskip("serial_comm")
+
+        assert serial_comm.BAUD_RATE == config.BAUD_RATE
+        assert serial_comm.PORTA_FORCADA == config.PORTA_FORCADA

@@ -135,7 +135,8 @@ em modo headless. Nenhum teste abre janela ou exige Arduino.
 
 | Arquivo | Papel |
 | --- | --- |
-| `desafio.py` | interface tkinter: desenho, teclado e serial |
+| `desafio.py` | interface tkinter: desenho e teclado |
+| `serial_comm.py` | thread serial, detecção de porta, reconexão e fila de eventos |
 | `audio.py` | efeitos sonoros sintetizados (pygame opcional; sem ele fica mudo) |
 | `jogo.py` | regra de jogo pura: estado, placar e timer |
 | `perguntas.py` | modelo, carregador/validador, listagem e nomes de tema (puro) |
