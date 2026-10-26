@@ -174,6 +174,15 @@ PC → Arduino:
 O protocolo **não muda** sem aprovação: a tabela acima é a referência
 congelada da v1. A versão 2 (4 equipes, `VERSAO 2`) será definida na Etapa 5.
 
+**Como o app escolhe a porta (3.4-B):** só entram na varredura portas com
+VID/PID de Arduino (2341, 2A03) ou de adaptador USB-serial conhecido (CH340/
+CH341, CP210x, FTDI, PL2303 e compatíveis) ou, sem VID/PID, com descrição de
+Arduino/CH340. Portas Bluetooth/virtuais (VID/PID `None`) ficam de fora. A
+porta só é considerada conectada depois de receber `PRONTO` em até 3 s;
+enquanto isso não acontece, o app fecha a porta e varre de novo a cada 3 s.
+`PORTA_FORCADA` (config.py) continua sendo tentada primeiro, mas também
+precisa do `PRONTO`.
+
 ## Gerar o executável
 
 ```powershell

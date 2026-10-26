@@ -123,7 +123,7 @@ def criar_comm(fila, modulo, **kwargs):
         listar_portas=modulo.comports,
         intervalo_reconexao=0.05,
         timeout_leitura=0.01,
-        pausa_reset=0.01,
+        timeout_handshake=0.2,
         log=lambda *a, **k: None,
     )
     params.update(kwargs)

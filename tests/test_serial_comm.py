@@ -1,9 +1,10 @@
 """
-Testes de `serial_comm.py` (Etapa 3.4).
+Testes de `serial_comm.py` (Etapas 3.4-A/B/C).
 
-A Etapa 3.4 é só movimentação: o comportamento é o mesmo do protótipo v2.1.
-Por isso os defeitos D1/D2 aparecem aqui como `xfail(strict=True)` — eles
-documentam a falha atual e viram testes normais nas Etapas 3.4-B e 3.4-C.
+A 3.4-A foi só movimentação (comportamento idêntico à v2.1). A 3.4-B corrigiu
+o D1 (VID/PID + handshake PRONTO + sem fallback). A 3.4-C corrige o D2
+(parada com timeout, fechamento seguro). O que ainda falta fica como
+`xfail(strict=True)` para não passar despercebido.
 
 Nada aqui abre porta real: `ModuloSerialFalso` substitui o pyserial.
 """
@@ -38,7 +39,7 @@ class TestCandidatas:
             Porta("COM6", "Arduino Uno", 0x2341, 0x0043),
         ]
         comm = criar_comm(queue.Queue(), modulo, porta_forcada="COM9")
-        assert comm._candidatas() == ["COM9", "COM6", "COM4"]
+        assert comm._candidatas() == ["COM9", "COM6"]
 
     def test_descricao_conhecida_tem_prioridade(self):
         modulo = ModuloSerialFalso()
@@ -47,26 +48,38 @@ class TestCandidatas:
             Porta("COM6", "Arduino Uno", 0x2341, 0x0043),
         ]
         comm = criar_comm(queue.Queue(), modulo)
-        assert comm._candidatas() == ["COM6", "COM4"]
+        assert comm._candidatas() == ["COM6"]
 
-    def test_sem_descricao_conhecida_ainda_lista_todas(self):
-        """Comportamento atual (D1): qualquer porta vira candidata."""
+    def test_vid_pid_arduino_uno_e_ch340(self):
+        modulo = ModuloSerialFalso()
+        modulo.portas = [
+            Porta("COM5", "USB Serial Device", 0x2341, 0x0043),
+            Porta("COM7", "USB-SERIAL CH340", 0x1A86, 0x7523),
+            Porta("COM8", "Arduino Mega 2560", 0x2341, 0x0042),
+        ]
+        comm = criar_comm(queue.Queue(), modulo)
+        assert comm._candidatas() == ["COM5", "COM7", "COM8"]
+
+    def test_porta_sem_vid_pid_nao_e_candidata(self):
+        """D1: Bluetooth (VID/PID None) nunca vira candidata."""
         modulo = ModuloSerialFalso()
         modulo.portas = [
             Porta("COM3", "Serial Padrão por link Bluetooth"),
             Porta("COM4", "Serial Padrão por link Bluetooth"),
+            Porta("COM5", "USB Serial Device"),  # sem VID/PID e sem "arduino"
         ]
         comm = criar_comm(queue.Queue(), modulo)
-        assert comm._candidatas() == ["COM3", "COM4"]
+        assert comm._candidatas() == []
 
 
 # ─────────────────────────────────────────────────────────
 # Conexão, leitura e envio
 # ─────────────────────────────────────────────────────────
 class TestConexao:
-    def test_conecta_avisa_na_fila_e_reseta_o_buffer(self):
+    def test_conecta_apos_pronto_e_avisa_na_fila(self):
         modulo = ModuloSerialFalso()
         modulo.portas = [Porta("COM6", "Arduino Uno", 0x2341, 0x0043)]
+        modulo.manda_pronto = {"COM6"}
         fila = queue.Queue()
         comm = criar_comm(fila, modulo)
 
@@ -74,8 +87,29 @@ class TestConexao:
         try:
             assert esperar(lambda: comm.serial is not None)
             assert comm.serial.port == "COM6"
-            assert modulo.abertas[0].resets == 1
-            assert ("conexao", "COM6") in drenar(fila)
+            assert modulo.abertas[0].resets == 0  # não descarta o PRONTO
+            itens = drenar(fila)
+            assert ("conexao", "COM6") in itens
+            assert ("evento", "PRONTO") in itens
+        finally:
+            comm.rodando = False
+            comm.fechar()
+
+    def test_nao_conecta_sem_pronto(self):
+        """D1: abrir a porta não basta; precisa do handshake."""
+        modulo = ModuloSerialFalso()
+        modulo.portas = [Porta("COM6", "Arduino Uno", 0x2341, 0x0043)]
+        modulo.manda_pronto = set()  # nunca manda PRONTO
+        fila = queue.Queue()
+        comm = criar_comm(fila, modulo)
+
+        comm.iniciar()
+        try:
+            assert esperar(lambda: len(modulo.abertas) >= 1, timeout=0.5)
+            assert esperar(lambda: comm.serial is not None, timeout=0.5) is False
+            assert comm.serial is None
+            assert modulo.abertas[0].fechado is True
+            assert drenar(fila) == []
         finally:
             comm.rodando = False
             comm.fechar()
@@ -83,6 +117,7 @@ class TestConexao:
     def test_encaminha_linhas_do_arduino(self):
         modulo = ModuloSerialFalso()
         modulo.portas = [Porta("COM6", "Arduino Uno")]
+        modulo.manda_pronto = {"COM6"}
         fila = queue.Queue()
         comm = criar_comm(fila, modulo)
         comm.iniciar()
@@ -100,6 +135,7 @@ class TestConexao:
     def test_erro_de_leitura_fecha_e_avisa(self):
         modulo = ModuloSerialFalso()
         modulo.portas = [Porta("COM6", "Arduino Uno")]
+        modulo.manda_pronto = {"COM6"}
         fila = queue.Queue()
         comm = criar_comm(fila, modulo)
         comm.iniciar()
@@ -193,12 +229,9 @@ class TestSemPyserial:
 # ─────────────────────────────────────────────────────────
 # Defeitos conhecidos (documentados; corrigidos em B e C)
 # ─────────────────────────────────────────────────────────
-class TestDefeitosAtuais:
-    @pytest.mark.xfail(
-        strict=True,
-        reason="D1: porta Bluetooth sem PRONTO é aceita como conectada",
-    )
-    def test_d1_porta_sem_pronto_nao_deve_ser_conectada(self):
+class TestD1PortaCerta:
+    def test_porta_sem_pronto_nao_e_conectada(self):
+        """D1: Bluetooth sem PRONTO nunca é aceita como Arduino."""
         modulo = ModuloSerialFalso()
         modulo.portas = [Porta("COM4", "Serial Padrão por link Bluetooth")]
         fila = queue.Queue()
@@ -206,17 +239,16 @@ class TestDefeitosAtuais:
 
         comm.iniciar()
         try:
-            esperar(lambda: comm.serial is not None, timeout=0.5)
-            assert comm.serial is None, "conectou sem handshake"
+            esperar(lambda: len(modulo.abertas) >= 1, timeout=0.5)
+            assert esperar(lambda: comm.serial is not None, timeout=0.5) is False
+            assert comm.serial is None
+            assert drenar(fila) == []
         finally:
             comm.rodando = False
             comm.fechar()
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="D1: com a COM4 aceita, o app não volta para a COM6 ao reconectar",
-    )
-    def test_d1_volta_para_a_com6_quando_ela_reaparece(self):
+    def test_volta_para_a_com6_quando_ela_reaparece(self):
+        """D1: queda na COM6, COM4 fantasma no meio, placa volta na COM6."""
         modulo = ModuloSerialFalso()
         modulo.manda_pronto = {"COM6"}
         modulo.portas = [Porta("COM6", "Arduino Uno", 0x2341, 0x0043)]
@@ -243,14 +275,30 @@ class TestDefeitosAtuais:
             comm.rodando = False
             comm.fechar()
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="D2: fechar durante a abertura deixa a porta aberta",
-    )
-    def test_d2_fechar_durante_a_conexao_nao_deixa_porta_aberta(self):
+    def test_so_o_arduino_e_aberto_quando_ha_bluetooth(self):
+        """A COM4 nem chega a ser aberta se a COM6 está presente."""
         modulo = ModuloSerialFalso()
-        modulo.portas = [Porta("COM4", "Serial Padrão por link Bluetooth")]
-        comm = criar_comm(queue.Queue(), modulo, pausa_reset=0.3)
+        modulo.manda_pronto = {"COM6"}
+        modulo.portas = [
+            Porta("COM4", "Serial Padrão por link Bluetooth"),
+            Porta("COM6", "Arduino Uno", 0x2341, 0x0043),
+        ]
+        comm = criar_comm(queue.Queue(), modulo)
+        comm.iniciar()
+        try:
+            assert esperar(lambda: comm.serial is not None)
+            assert [s.port for s in modulo.abertas] == ["COM6"]
+        finally:
+            comm.rodando = False
+            comm.fechar()
+
+
+class TestD2Encerramento:
+    def test_fechar_durante_a_conexao_nao_deixa_porta_aberta(self):
+        """Fechar enquanto o handshake corre: o worker fecha a porta."""
+        modulo = ModuloSerialFalso()
+        modulo.portas = [Porta("COM6", "Arduino Uno", 0x2341, 0x0043)]
+        comm = criar_comm(queue.Queue(), modulo, timeout_handshake=0.3)
 
         comm.iniciar()
         assert esperar(lambda: len(modulo.abertas) == 1, timeout=0.5)
@@ -261,12 +309,13 @@ class TestDefeitosAtuais:
             comm._thread.join(timeout=2)
 
         assert comm.serial is None or comm.serial.is_open is False
+        assert modulo.abertas[0].fechado is True
 
     @pytest.mark.xfail(
         strict=True,
         reason="D2: não existe parada com timeout; fechar pode travar no driver",
     )
-    def test_d2_parar_e_limitado_pelo_timeout(self):
+    def test_parar_e_limitado_pelo_timeout(self):
         modulo = ModuloSerialFalso()
         modulo.portas = [Porta("COM6", "Arduino Uno")]
         modulo.manda_pronto = {"COM6"}
@@ -277,6 +326,6 @@ class TestDefeitosAtuais:
         comm.serial.write_timeout = None
 
         try:
-            comm.parar(timeout=0.3)  # ainda não existe na Etapa 3.4-A
+            comm.parar(timeout=0.3)  # ainda não existe na Etapa 3.4-B
         finally:
             comm.rodando = False

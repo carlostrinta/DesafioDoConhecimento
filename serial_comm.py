@@ -9,7 +9,7 @@ Sem tkinter aqui. O `pyserial` é opcional: sem ele, `disponivel` fica False e
 `iniciar()` não faz nada (o jogo segue no modo teclado).
 
 Os parâmetros de tempo são injetáveis apenas para teste; a interface usa os
-padrões, idênticos ao protótipo v2.1.
+padrões (reconexão a cada 3 s, leitura de 0,1 s, handshake de 3 s).
 """
 
 from __future__ import annotations
@@ -29,12 +29,33 @@ except ImportError:  # pragma: no cover - depende do ambiente
 
 SERIAL_DISPONIVEL = _serial_padrao is not None and _list_ports_padrao is not None
 
-# Descrições que identificam uma placa/adaptador (mesma lista do protótipo).
-PALAVRAS_CONHECIDAS = ("arduino", "ch340", "ch341", "usb serial", "usb-serial")
+# ─── Quem pode ser o Arduino ───
+# Placas Arduino oficiais: 2341 = Arduino SA, 2A03 = Arduino.org.
+# Adaptadores USB-serial comuns: 1A86 = CH340/CH341, 10C4 = CP210x,
+# 0403 = FTDI, 067B = PL2303. Compatíveis: SparkFun, Adafruit, Atmel,
+# Microchip e pid.codes.
+# Portas sem VID/PID (Bluetooth, virtuais) NUNCA entram: era o furo que
+# fazia o app "conectar" na COM4 do Bluetooth.
+VIDS_CONHECIDOS = frozenset({
+    0x2341, 0x2A03,
+    0x1A86, 0x10C4, 0x0403, 0x067B,
+    0x1B4F, 0x239A, 0x03EB, 0x04D8, 0x1209,
+})
+
+# Descrições aceitas quando o driver não informa VID/PID.
+PALAVRAS_CONHECIDAS = ("arduino", "ch340", "ch341")
 
 INTERVALO_RECONEXAO = 3.0   # s entre varreduras enquanto não há conexão
 TIMEOUT_LEITURA = 0.1       # s do readline (não bloqueia a thread por muito tempo)
-PAUSA_RESET = 2.0           # s de espera após abrir (Arduino reinicia na serial)
+TIMEOUT_HANDSHAKE = 3.0     # s esperando "PRONTO" depois de abrir a porta
+
+
+def porta_conhecida(porta):
+    """True se a porta tem cara de Arduino/adaptador USB-serial."""
+    if porta.vid in VIDS_CONHECIDOS:
+        return True
+    descricao = (porta.description or "").lower()
+    return any(k in descricao for k in PALAVRAS_CONHECIDAS)
 
 
 class ComunicacaoSerial:
@@ -57,7 +78,7 @@ class ComunicacaoSerial:
         porta_forcada=PORTA_FORCADA,
         intervalo_reconexao=INTERVALO_RECONEXAO,
         timeout_leitura=TIMEOUT_LEITURA,
-        pausa_reset=PAUSA_RESET,
+        timeout_handshake=TIMEOUT_HANDSHAKE,
         log=print,
     ):
         self.fila = fila
@@ -65,7 +86,7 @@ class ComunicacaoSerial:
         self.porta_forcada = porta_forcada
         self.intervalo_reconexao = intervalo_reconexao
         self.timeout_leitura = timeout_leitura
-        self.pausa_reset = pausa_reset
+        self.timeout_handshake = timeout_handshake
         self.log = log
 
         modulo = serial_modulo if serial_modulo is not None else _serial_padrao
@@ -117,12 +138,7 @@ class ComunicacaoSerial:
         lista = []
         if self.porta_forcada:
             lista.append(self.porta_forcada)
-        lista += [
-            p.device
-            for p in portas
-            if any(k in (p.description or "").lower() for k in PALAVRAS_CONHECIDAS)
-        ]
-        lista += [p.device for p in portas]
+        lista += [p.device for p in portas if porta_conhecida(p)]
 
         vistas, unicas = set(), []
         for porta in lista:
@@ -132,18 +148,45 @@ class ComunicacaoSerial:
         return unicas
 
     def _tentar_conectar(self, porta):
+        """
+        Abre a porta e só considera conectada depois de receber "PRONTO".
+
+        A placa reinicia quando a serial abre; o firmware manda PRONTO no
+        setup(). Se a linha não chegar em `timeout_handshake`, fecha e deixa
+        a próxima candidata tentar. Sem isso, uma porta fantasma (Bluetooth)
+        era aceita como se fosse o Arduino.
+        """
         try:
             s = self._serial_modulo.Serial(
                 porta,
                 self.baud_rate,
                 timeout=self.timeout_leitura,
             )
-            time.sleep(self.pausa_reset)  # Arduino reinicia ao abrir a serial
-            s.reset_input_buffer()
-            self.serial = s
-            self.log(f"✓ Conectado em {porta}")
-            return True
         except Exception as e:
+            self.log(f"✗ Falha em {porta}: {e}")
+            return False
+
+        limite = time.monotonic() + self.timeout_handshake
+        try:
+            while time.monotonic() < limite:
+                if not self.rodando:
+                    s.close()
+                    return False
+                linha = s.readline().decode(errors="ignore").strip()
+                if linha == "PRONTO":
+                    self.serial = s
+                    self.log(f"✓ Conectado em {porta}")
+                    # Avisa a UI (reacende o LED se a rodada está em andamento).
+                    self.fila.put(("evento", "PRONTO"))
+                    return True
+            s.close()
+            self.log(f"✗ {porta}: sem PRONTO em {self.timeout_handshake:.0f}s")
+            return False
+        except Exception as e:
+            try:
+                s.close()
+            except Exception:
+                pass
             self.log(f"✗ Falha em {porta}: {e}")
             return False
 
