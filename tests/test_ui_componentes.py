@@ -5,10 +5,13 @@ A prova principal é um dump dos itens de Canvas (tipo, coordenadas, cores,
 fonte e texto) de cada componente em tamanhos fixos, comparado com o golden
 capturado **antes** da movimentação para `ui_componentes.py`.
 
+O golden é **opt-in** (`DESAFIO_GOLDEN_UI=1`) porque as métricas de fonte
+variam entre PCs e ele é uma guarda de refatoração local, não um teste de CI.
 O dump usa Tk de verdade; em ambiente sem display o teste é pulado.
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -16,6 +19,7 @@ import pytest
 
 RAIZ = Path(__file__).resolve().parent.parent
 GOLDEN = Path(__file__).resolve().parent / "dados" / "ui_componentes_v23.json"
+GOLDEN_ATIVO = os.environ.get("DESAFIO_GOLDEN_UI") == "1"
 
 # Casos fixos: (nome, classe, atributos, largura, altura)
 CASOS = [
@@ -211,6 +215,10 @@ def capturar_componentes(mod):
         root.destroy()
 
 
+@pytest.mark.skipif(
+    not GOLDEN_ATIVO,
+    reason="golden visual é opt-in: defina DESAFIO_GOLDEN_UI=1",
+)
 @pytest.mark.skipif(sys.platform != "win32", reason="golden capturado no Windows")
 def test_layout_dos_componentes_nao_mudou():
     import ui_componentes

@@ -129,7 +129,15 @@ python -m pytest tests/ -q
 
 A suíte cobre a máquina de estados, o placar, o carregador de perguntas, o
 timer (com relógio injetável — nenhum teste usa `sleep`) e o protocolo serial
-em modo headless. Nenhum teste abre janela ou exige Arduino.
+em modo headless. Nenhum teste exige Arduino. O único que abre uma janela Tk é
+o **golden visual** dos componentes (Etapa 3.5), e ele é **opt-in** — as
+métricas de fonte variam entre PCs, então serve como guarda local de
+refatoração, não como teste de CI:
+
+```powershell
+$env:DESAFIO_GOLDEN_UI=1
+python -m pytest tests/test_ui_componentes.py -q
+```
 
 ## Estrutura do projeto
 
@@ -198,6 +206,25 @@ Nada é empacotado dentro do `.exe` (`datas=[]` no `.spec`): os recursos são
 procurados na **pasta da aplicação** — a pasta do `.exe` quando congelado, ou a
 pasta do projeto rodando pelo fonte. Por isso os bancos de perguntas (e, no
 futuro, a pasta `sons/`) ficam sempre ao lado do executável.
+
+## Roadmap (próximas etapas)
+
+Ordem combinada: **3.6**, **3.7**, **4.x** (com a **4.6 antes da Etapa 5**) e
+depois a **Etapa 5**.
+
+### Etapa 4.6 — Contagem de largada (não implementada)
+
+- Nova fase `CONTAGEM` no `Jogo`, antes de `AGUARDANDO`, com relógio
+  injetável e duração configurável (padrão 3 s; `0` desativa).
+- Overlay com números grandes (3, 2, 1, JÁ!), desenhado em
+  `ui_componentes.py`.
+- Botões das equipes ignorados durante a contagem; descartar eventos de
+  botão acumulados na fila serial ao entrar em `AGUARDANDO`.
+- O tempo de 30 s só começa no "JÁ!"; pergunta oculta ou desfocada durante a
+  contagem (configurável).
+- Sons: tick por número e som distinto para o "JÁ!" (junto da 4.5).
+- Vale também para a primeira pergunta e para a partida restaurada.
+- Sem mudança de firmware nem de protocolo serial.
 
 ## Limitações conhecidas (em evolução)
 
