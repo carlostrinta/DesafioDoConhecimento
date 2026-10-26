@@ -1,6 +1,7 @@
 """Fixtures compartilhados para pytest."""
 import pytest
-from jogo import Jogo, Pergunta, FASE_AGUARDANDO, FASE_RESPONDENDO, FASE_REVELADA, FASE_PONTUADA
+from jogo import Jogo, FASE_AGUARDANDO, FASE_RESPONDENDO, FASE_REVELADA, FASE_PONTUADA
+from perguntas import Pergunta
 
 
 @pytest.fixture

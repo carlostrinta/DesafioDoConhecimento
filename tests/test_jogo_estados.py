@@ -1,9 +1,10 @@
 """Testes da máquina de estados do jogo."""
 import pytest
 from jogo import (
-    Jogo, Pergunta,
+    Jogo,
     FASE_AGUARDANDO, FASE_RESPONDENDO, FASE_REVELADA, FASE_PONTUADA
 )
+from perguntas import Pergunta
 
 
 class TestMaquinaEstados:

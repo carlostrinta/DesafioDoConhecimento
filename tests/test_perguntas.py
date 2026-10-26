@@ -3,7 +3,8 @@ import pytest
 import tempfile
 import os
 import json
-from jogo import Pergunta, carregar_perguntas_json, Jogo
+from jogo import Jogo
+from perguntas import Pergunta, carregar_perguntas_json
 
 
 class TestCarregamentoPerguntas:

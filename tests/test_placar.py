@@ -1,6 +1,7 @@
 """Testes de placar e pontuação."""
 import pytest
-from jogo import Jogo, Pergunta
+from jogo import Jogo
+from perguntas import Pergunta
 
 
 @pytest.fixture

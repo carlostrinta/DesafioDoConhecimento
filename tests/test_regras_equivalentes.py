@@ -320,7 +320,7 @@ class TestCarregadorUnico:
         assert "json.load(" not in fonte
 
     def test_erro_de_arquivo_inexistente_nao_levanta(self, tmp_path):
-        from jogo import ler_banco_perguntas
+        from perguntas import ler_banco_perguntas
 
         carga = ler_banco_perguntas(str(tmp_path / "nao_existe.json"), tema_padrao="X")
         assert carga.perguntas == []
@@ -331,7 +331,7 @@ class TestCarregadorUnico:
         """config.json tem "perguntas": {"pasta": ..., "arquivo_padrao": ...}."""
         import json
 
-        from jogo import ler_banco_perguntas
+        from perguntas import ler_banco_perguntas
 
         arquivo = tmp_path / "config.json"
         arquivo.write_text(
@@ -346,7 +346,7 @@ class TestCarregadorUnico:
     def test_aceita_pergunta_e_texto(self, tmp_path):
         import json
 
-        from jogo import ler_banco_perguntas
+        from perguntas import ler_banco_perguntas
 
         arquivo = tmp_path / "banco.json"
         arquivo.write_text(

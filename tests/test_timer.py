@@ -1,6 +1,7 @@
 """Testes de timer (time.monotonic, frações, estouro)."""
 import pytest
-from jogo import Jogo, Pergunta, FASE_AGUARDANDO, FASE_RESPONDENDO, FASE_REVELADA
+from jogo import Jogo, FASE_AGUARDANDO, FASE_RESPONDENDO, FASE_REVELADA
+from perguntas import Pergunta
 
 
 @pytest.fixture

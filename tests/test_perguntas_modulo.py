@@ -52,16 +52,13 @@ class TestModuloPuro:
         )
         assert saida.returncode == 0, saida.stderr
 
-    def test_jogo_importa_de_perguntas_sem_ciclo(self):
-        """`jogo` pode importar `perguntas`; o contrário não."""
-        codigo = "import jogo, perguntas; assert jogo.Pergunta is perguntas.Pergunta"
-        saida = subprocess.run(
-            [sys.executable, "-c", codigo],
-            capture_output=True,
-            text=True,
-            cwd=str(RAIZ),
-        )
-        assert saida.returncode == 0, saida.stderr
+    def test_jogo_nao_reexporta_modelo_nem_carregador(self):
+        """Etapa 3.6: quem precisa do modelo/carregador importa de perguntas."""
+        import jogo
+
+        assert not hasattr(jogo, "Pergunta")
+        assert not hasattr(jogo, "ler_banco_perguntas")
+        assert not hasattr(jogo, "carregar_perguntas_json")
 
     def test_existe_um_unico_carregador_de_perguntas(self):
         """Um único carregador/validador de bancos no projeto."""
@@ -90,17 +87,6 @@ class TestModuloPuro:
         for nome in ("desafio.py", "jogo.py", "protocolo.py"):
             fonte = (RAIZ / nome).read_text(encoding="utf-8")
             assert "json.load(" not in fonte, nome
-
-
-class TestPerguntaCompatibilidade:
-    def test_mesma_classe_reexportada_por_jogo(self):
-        import jogo
-
-        assert jogo.Pergunta is perguntas.Pergunta
-        assert jogo.ler_banco_perguntas is perguntas.ler_banco_perguntas
-        assert (
-            jogo.carregar_perguntas_json is perguntas.carregar_perguntas_json
-        )
 
 
 class TestFormatarNomeTema:

@@ -145,6 +145,7 @@ python -m pytest tests/test_ui_componentes.py -q
 | --- | --- |
 | `desafio.py` | interface tkinter: telas, teclado e ligação com o jogo |
 | `ui_componentes.py` | componentes Canvas: paleta, tipografia e widgets visuais (sem lógica de jogo) |
+| `ui_selecao.py` | modal de escolha do banco de perguntas (widgets Tk clássicos) |
 | `serial_comm.py` | thread serial, detecção de porta, reconexão e fila de eventos |
 | `audio.py` | efeitos sonoros sintetizados (pygame opcional; sem ele fica mudo) |
 | `jogo.py` | regra de jogo pura: estado, placar e timer |
@@ -234,9 +235,6 @@ depois a **Etapa 5**.
   reinicia rápido (pendência da Etapa 4).
 - Sem log em arquivo e sem retomada automática de partida (Etapa 4).
 - O firmware usa `delay()` no bipe e será revisado junto com o protocolo v2.
-- `jogo.py` ainda reexporta `Pergunta`, `ler_banco_perguntas` e
-  `carregar_perguntas_json` por compatibilidade; a reexportação sai nas
-  Etapas 3.6/3.7 (há um `TODO` no código).
 - **Pendência de hardware:** validar com clone **CH340**; se o `PRONTO`
   demorar mais de 3 s após o reset por DTR, aumentar o timeout (tornar
   configurável na 4.2).

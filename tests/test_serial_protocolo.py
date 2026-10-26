@@ -10,7 +10,8 @@ from protocolo import (
     EVENTOS_ARDUINO_PC_V1,
     COMANDOS_PC_ARDUINO_V1,
 )
-from jogo import Jogo, Pergunta
+from jogo import Jogo
+from perguntas import Pergunta
 
 
 class TestProtocoloSerial:

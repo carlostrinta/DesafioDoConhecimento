@@ -20,18 +20,13 @@ from __future__ import annotations
 import random
 import time
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
-# O carregador/validador e o modelo de pergunta foram para perguntas.py
-# (Etapa 3.2). São reexportados aqui para não quebrar quem já importa do jogo.
-# TODO(3.6/3.7): remover a reexportação e apontar desafio.py/testes direto
-# para perguntas.py.
-from perguntas import (
-    CargaPerguntas,
-    Pergunta,
-    carregar_perguntas_json,
-    ler_banco_perguntas,
-)
+# `Pergunta` aparece só em anotações (avaliadas por `from __future__ import
+# annotations`); o import fica em TYPE_CHECKING para não haver reexportação
+# em tempo de execução (Etapa 3.6).
+if TYPE_CHECKING:
+    from perguntas import Pergunta
 
 
 # ─── Estados da rodada ───
