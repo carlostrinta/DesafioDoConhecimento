@@ -2,9 +2,8 @@
 Testes de `serial_comm.py` (Etapas 3.4-A/B/C).
 
 A 3.4-A foi só movimentação (comportamento idêntico à v2.1). A 3.4-B corrigiu
-o D1 (VID/PID + handshake PRONTO + sem fallback). A 3.4-C corrige o D2
-(parada com timeout, fechamento seguro). O que ainda falta fica como
-`xfail(strict=True)` para não passar despercebido.
+o D1 (VID/PID + handshake PRONTO + sem fallback). A 3.4-C corrigiu o D2
+(evento de parada, timeouts de leitura/escrita, fechamento seguro).
 
 Nada aqui abre porta real: `ModuloSerialFalso` substitui o pyserial.
 """
@@ -12,9 +11,8 @@ Nada aqui abre porta real: `ModuloSerialFalso` substitui o pyserial.
 import queue
 import subprocess
 import sys
+import time
 from pathlib import Path
-
-import pytest
 
 import serial_comm
 from apoio_serial import (
@@ -311,21 +309,64 @@ class TestD2Encerramento:
         assert comm.serial is None or comm.serial.is_open is False
         assert modulo.abertas[0].fechado is True
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="D2: não existe parada com timeout; fechar pode travar no driver",
-    )
     def test_parar_e_limitado_pelo_timeout(self):
+        """Driver travado não pode segurar o fechamento da janela."""
         modulo = ModuloSerialFalso()
         modulo.portas = [Porta("COM6", "Arduino Uno")]
         modulo.manda_pronto = {"COM6"}
         comm = criar_comm(queue.Queue(), modulo)
         comm.iniciar()
         assert esperar(lambda: comm.serial is not None)
-        comm.serial.bloqueio_escrita = 5.0
-        comm.serial.write_timeout = None
 
-        try:
-            comm.parar(timeout=0.3)  # ainda não existe na Etapa 3.4-B
-        finally:
-            comm.rodando = False
+        comm.serial.bloqueio_escrita = 5.0
+        comm.serial.write_timeout = None  # driver que ignora o timeout
+
+        inicio = time.monotonic()
+        comm.parar(timeout=0.3)
+        decorrido = time.monotonic() - inicio
+        assert decorrido < 1.5
+
+    def test_parar_sem_placa_nao_trava(self):
+        modulo = ModuloSerialFalso()
+        modulo.portas = []
+        comm = criar_comm(queue.Queue(), modulo)
+        comm.iniciar()
+        time.sleep(0.05)
+
+        inicio = time.monotonic()
+        comm.parar(timeout=0.5)
+        decorrido = time.monotonic() - inicio
+
+        assert decorrido < 0.5
+        assert comm._thread is not None and not comm._thread.is_alive()
+        assert comm.rodando is False
+
+    def test_parar_manda_reset_e_fecha(self):
+        modulo = ModuloSerialFalso()
+        modulo.portas = [Porta("COM6", "Arduino Uno")]
+        modulo.manda_pronto = {"COM6"}
+        comm = criar_comm(queue.Queue(), modulo)
+        comm.iniciar()
+        assert esperar(lambda: comm.serial is not None)
+        aberta = comm.serial
+
+        comm.parar(timeout=1.0)
+
+        assert aberta.escritas == [b"RESET\n"]
+        assert aberta.fechado is True
+        assert comm.serial is None
+        assert not comm._thread.is_alive()
+
+    def test_parar_com_close_travado_nao_espera_para_sempre(self):
+        modulo = ModuloSerialFalso()
+        modulo.portas = [Porta("COM6", "Arduino Uno")]
+        modulo.manda_pronto = {"COM6"}
+        comm = criar_comm(queue.Queue(), modulo)
+        comm.iniciar()
+        assert esperar(lambda: comm.serial is not None)
+        comm.serial.bloqueio_fechamento = 5.0
+
+        inicio = time.monotonic()
+        comm.parar(timeout=0.3)
+        decorrido = time.monotonic() - inicio
+        assert decorrido < 1.5

@@ -48,6 +48,9 @@ PALAVRAS_CONHECIDAS = ("arduino", "ch340", "ch341")
 INTERVALO_RECONEXAO = 3.0   # s entre varreduras enquanto não há conexão
 TIMEOUT_LEITURA = 0.1       # s do readline (não bloqueia a thread por muito tempo)
 TIMEOUT_HANDSHAKE = 3.0     # s esperando "PRONTO" depois de abrir a porta
+TIMEOUT_ESCRITA = 0.5       # s do write (driver sem par não trava a UI)
+TIMEOUT_PARADA = 1.0        # s esperando a thread terminar em parar()
+TIMEOUT_FECHAMENTO = 0.5    # s esperando write+close em parar()
 
 
 def porta_conhecida(porta):
@@ -79,6 +82,7 @@ class ComunicacaoSerial:
         intervalo_reconexao=INTERVALO_RECONEXAO,
         timeout_leitura=TIMEOUT_LEITURA,
         timeout_handshake=TIMEOUT_HANDSHAKE,
+        timeout_escrita=TIMEOUT_ESCRITA,
         log=print,
     ):
         self.fila = fila
@@ -87,6 +91,7 @@ class ComunicacaoSerial:
         self.intervalo_reconexao = intervalo_reconexao
         self.timeout_leitura = timeout_leitura
         self.timeout_handshake = timeout_handshake
+        self.timeout_escrita = timeout_escrita
         self.log = log
 
         modulo = serial_modulo if serial_modulo is not None else _serial_padrao
@@ -99,16 +104,28 @@ class ComunicacaoSerial:
         self.disponivel = modulo is not None and listar is not None
 
         self.serial = None
-        self.rodando = False
+        self._parar = threading.Event()
+        self._parar.set()  # parado até iniciar()
         self._thread = None
 
     # -----------------------------------------------------
     # Ciclo de vida
     # -----------------------------------------------------
+    @property
+    def rodando(self):
+        return not self._parar.is_set()
+
+    @rodando.setter
+    def rodando(self, valor):
+        if valor:
+            self._parar.clear()
+        else:
+            self._parar.set()
+
     def iniciar(self):
         if not self.disponivel or self.rodando:
             return
-        self.rodando = True
+        self._parar.clear()
         self._thread = threading.Thread(
             target=self._loop,
             daemon=True,
@@ -116,8 +133,43 @@ class ComunicacaoSerial:
         )
         self._thread.start()
 
+    def parar(self, timeout=TIMEOUT_PARADA):
+        """
+        Para a thread e fecha a porta sem travar a interface.
+
+        O `write`+`close` correm numa thread daemon com espera limitada: se o
+        driver de uma porta fantasma travar, o app fecha mesmo assim.
+        """
+        self._parar.set()
+
+        t = self._thread
+        if t is not None and t.is_alive():
+            t.join(timeout)
+
+        s, self.serial = self.serial, None
+        if s is not None:
+            self._encerrar_porta(s)
+
+    def _encerrar_porta(self, s):
+        """Manda RESET (apaga LEDs) e fecha, com tempo limitado."""
+
+        def alvo():
+            try:
+                if s.is_open:
+                    s.write(b"RESET\n")
+            except Exception:
+                pass
+            try:
+                s.close()
+            except Exception:
+                pass
+
+        t = threading.Thread(target=alvo, daemon=True, name="serial-fechar")
+        t.start()
+        t.join(TIMEOUT_FECHAMENTO)
+
     def fechar(self):
-        """Fecha a porta (não mexe na thread; a interface controla `rodando`)."""
+        """Fecha a porta (não mexe na thread; use `parar()` para encerrar)."""
         s, self.serial = self.serial, None
         try:
             if s:
@@ -161,6 +213,7 @@ class ComunicacaoSerial:
                 porta,
                 self.baud_rate,
                 timeout=self.timeout_leitura,
+                write_timeout=self.timeout_escrita,
             )
         except Exception as e:
             self.log(f"✗ Falha em {porta}: {e}")
@@ -213,7 +266,7 @@ class ComunicacaoSerial:
                         if self._tentar_conectar(porta):
                             self.fila.put(("conexao", porta))
                             break
-                time.sleep(0.2)
+                self._parar.wait(0.2)
                 continue
             try:
                 linha = s.readline().decode(errors="ignore").strip()

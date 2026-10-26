@@ -1457,9 +1457,7 @@ class DueloDeConhecimento:
 
     def fechar(self):
         self.rodando = False
-        self.serial_comm.rodando = False
-        self.enviar_serial("RESET")
-        self.serial_comm.fechar()
+        self.serial_comm.parar()
         self.som.parar()
         self.root.destroy()
 
