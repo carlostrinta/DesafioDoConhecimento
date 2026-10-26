@@ -1,3 +1,4 @@
-# Dependências de desenvolvimento / teste
+# Dependencias de desenvolvimento / teste
+# Versao de Python fixada do projeto: 3.12.x (testado em 3.12.15)
 pytest>=8.0,<9.0
 pytest-mock>=3.12,<4.0
