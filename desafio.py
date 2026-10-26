@@ -19,13 +19,30 @@ import json
 import math
 import os
 import queue
-import random
 import sys
 import threading
 import time
 import traceback
 import tkinter as tk
 from tkinter import font as tkfont, messagebox, filedialog
+
+from jogo import (
+    Jogo,
+    FASE_AGUARDANDO,
+    FASE_RESPONDENDO,
+    FASE_REVELADA,
+    FASE_PONTUADA,
+    MOTIVO_ACERTO_FASE,
+    MOTIVO_ACERTO_OUTRA_EQUIPE,
+    MOTIVO_ACERTO_SEM_QUEM,
+    MOTIVO_ACERTO_TEMPO,
+    MOTIVO_AVANCAR,
+    MOTIVO_REVELAR_AGUARDANDO,
+    PREFIXO_RECUSA,
+    TIMER_MOTIVO_REVELADA,
+    ler_banco_perguntas,
+)
+from protocolo import comandos_para_arduino, mapear_evento_arduino
 
 try:
     import serial
@@ -204,56 +221,23 @@ def obter_icone_tema(titulo, nome_arquivo):
 def inspecionar_arquivo_perguntas(caminho):
     """
     Analisa um arquivo .json e retorna metadados se for um banco de perguntas válido.
+    Usa o mesmo carregador/validador do jogo (jogo.ler_banco_perguntas).
     """
     try:
         if not os.path.isfile(caminho):
             return None
-        conteudo = None
-        for enc in ("utf-8-sig", "utf-8", "latin-1"):
-            try:
-                with open(caminho, "r", encoding=enc) as f:
-                    conteudo = json.load(f)
-                break
-            except (UnicodeDecodeError, json.JSONDecodeError):
-                continue
-        if conteudo is None:
-            return None
-
-        titulo_definido = None
-        if isinstance(conteudo, dict):
-            titulo_definido = conteudo.get("tema") or conteudo.get("titulo")
-            perguntas_brutas = conteudo.get("perguntas", [])
-        elif isinstance(conteudo, list):
-            perguntas_brutas = conteudo
-        else:
-            return None
-
-        validas = 0
-        categorias = set()
-        for q in perguntas_brutas:
-            if isinstance(q, dict) and "pergunta" in q and "alternativas" in q and "correta" in q:
-                if isinstance(q["alternativas"], list) and 2 <= len(q["alternativas"]) <= 4:
-                    try:
-                        c_idx = int(q["correta"])
-                        if 0 <= c_idx < len(q["alternativas"]):
-                            validas += 1
-                            if "categoria" in q and q["categoria"]:
-                                categorias.add(str(q["categoria"]))
-                    except (ValueError, TypeError):
-                        pass
-
-        if validas == 0:
-            return None
-
         nome_arquivo = os.path.basename(caminho)
-        titulo = titulo_definido or formatar_nome_tema(nome_arquivo)
+        carga = ler_banco_perguntas(caminho, tema_padrao=formatar_nome_tema(nome_arquivo))
+        if carga.erro or not carga.perguntas:
+            return None
 
+        categorias = {p.categoria for p in carga.perguntas}
         return {
             "caminho": os.path.abspath(caminho),
             "arquivo": nome_arquivo,
-            "titulo": str(titulo),
-            "total": validas,
-            "categorias": sorted(list(categorias)),
+            "titulo": str(carga.tema),
+            "total": len(carga.perguntas),
+            "categorias": sorted(categorias),
         }
     except Exception as e:
         print(f"Erro ao inspecionar {caminho}: {e}")
@@ -556,9 +540,17 @@ class Rodape(Cartao):
 
 
 # =========================================================
-# FASES DA RODADA
+# FASES DA RODADA (definidas em jogo.py — fonte única)
 # =========================================================
-FASE_AGUARDANDO, FASE_RESPONDENDO, FASE_REVELADA, FASE_PONTUADA = range(4)
+# Mensagens das recusas do Jogo. A regra mora no Jogo; aqui só o texto.
+MENSAGENS_RECUSA = {
+    MOTIVO_AVANCAR: "Resolva a pergunta atual (revele ou pontue) antes de avançar.",
+    MOTIVO_REVELAR_AGUARDANDO: "Ninguém apertou ainda. REVELAR só funciona depois que A ou B apertar.",
+    MOTIVO_ACERTO_FASE: "Revele a resposta (botão REVELAR) antes de pontuar.",
+    MOTIVO_ACERTO_SEM_QUEM: "Ninguém apertou nesta rodada: não há ponto para dar.",
+    MOTIVO_ACERTO_OUTRA_EQUIPE: "Só quem apertou pode pontuar (apertou: {equipe}).",
+    MOTIVO_ACERTO_TEMPO: "O tempo de resposta esgotou: sem ponto nesta rodada.",
+}
 
 # =========================================================
 # ÁUDIO — gera WAV em memória e reproduz via placa de som normal
@@ -1201,25 +1193,22 @@ class DueloDeConhecimento:
         FAMILIAS["corpo"] = escolher_fonte(["Segoe UI", "Calibri", "Arial"])
 
         # ---------- Estado ----------
-        self.perguntas = []
+        # O Jogo é o dono único das regras, do placar e do tempo.
+        # A UI lê o estado por propriedades (placar_a/b, fase, ...) e não
+        # reimplementa nenhuma regra.
         self.arquivo_atual = None
         self.tema_atual = ""
         self.erro_carga = ""
-        self.indice = 0
-        self.numero = 0
-        self.pergunta_atual = None
-        self.placar_a = 0
-        self.placar_b = 0
+        self.jogo = Jogo(
+            [],
+            num_equipes=2,
+            tempo_pergunta=TEMPO_PERGUNTA,
+            tempo_resposta=TEMPO_RESPOSTA,
+            pontuar_apos_tempo=PONTUAR_APOS_TEMPO,
+            nomes_equipes={"A": NOME_A, "B": NOME_B},
+        )
 
-        self.fase = FASE_AGUARDANDO
-        self.quem_apertou = None
-        self.tempo_estourou = False
         self.aviso = None
-
-        self.timer_total = TEMPO_PERGUNTA
-        self.timer_fim = 0.0
-        self.timer_rotulo = ""
-        self.timer_cor = Cor.APOIO
 
         self._job_timer = None
         self._job_aviso = None
@@ -1265,70 +1254,79 @@ class DueloDeConhecimento:
         self.root.after(100, lambda: self.abrir_seletor_tema(inicial=True))
 
     # -----------------------------------------------------
+    # LEITURA DO ESTADO (compatibilidade: a UI antiga continua
+    # usando os mesmos nomes; a verdade está no Jogo)
+    # -----------------------------------------------------
+    @property
+    def perguntas(self):
+        return self.jogo.perguntas_base
+
+    @property
+    def pergunta_atual(self):
+        return self.jogo.estado.pergunta_atual
+
+    @property
+    def indice(self):
+        return self.jogo.estado.indice_pergunta
+
+    @property
+    def numero(self):
+        return self.jogo.estado.numero_pergunta
+
+    @property
+    def fase(self):
+        return self.jogo.estado.fase
+
+    @property
+    def quem_apertou(self):
+        return self.jogo.estado.quem_apertou
+
+    @property
+    def tempo_estourou(self):
+        return self.jogo.estado.tempo_estourou
+
+    @property
+    def placar_a(self):
+        return self.jogo.placar.get("A", 0)
+
+    @placar_a.setter
+    def placar_a(self, valor):
+        self.jogo.placar["A"] = valor
+
+    @property
+    def placar_b(self):
+        return self.jogo.placar.get("B", 0)
+
+    @placar_b.setter
+    def placar_b(self, valor):
+        self.jogo.placar["B"] = valor
+
+    # -----------------------------------------------------
     # PERGUNTAS E TEMAS
     # -----------------------------------------------------
     def carregar_perguntas(self, caminho=None, nome_tema=None):
-        self._parar_timer()
+        self._cancelar_job_timer()
         if caminho is None:
             caminho = caminho_recurso(ARQUIVO_PERGUNTAS)
 
         self.arquivo_atual = caminho
         nome_arquivo = os.path.basename(caminho)
-        self.tema_atual = nome_tema or formatar_nome_tema(nome_arquivo)
 
-        bruto = []
-        self.erro_carga = ""
-        try:
-            conteudo = None
-            for enc in ("utf-8-sig", "utf-8", "latin-1"):
-                try:
-                    with open(caminho, "r", encoding=enc) as f:
-                        conteudo = json.load(f)
-                    break
-                except (UnicodeDecodeError, json.JSONDecodeError):
-                    continue
+        # Carregador/validador único do projeto (jogo.ler_banco_perguntas)
+        carga = ler_banco_perguntas(
+            caminho,
+            tema_padrao=nome_tema or formatar_nome_tema(nome_arquivo),
+            aceitar_tema_do_arquivo=not nome_tema,
+        )
+        self.tema_atual = carga.tema
+        self.erro_carga = carga.erro
+        if carga.erro:
+            print(carga.erro)
+        for linha in carga.ignoradas:
+            print(linha)
 
-            if conteudo is None:
-                raise ValueError("Arquivo inválido ou codificação incompatível.")
-
-            if isinstance(conteudo, dict):
-                if "tema" in conteudo and not nome_tema:
-                    self.tema_atual = str(conteudo["tema"])
-                bruto = conteudo.get("perguntas", [])
-            elif isinstance(conteudo, list):
-                bruto = conteudo
-            else:
-                raise ValueError("O arquivo deve conter uma lista de perguntas ou objeto com 'perguntas'.")
-        except Exception as e:
-            self.erro_carga = f"Não foi possível ler {nome_arquivo}: {e}"
-            print(self.erro_carga)
-            bruto = []
-
-        validas = []
-        for i, q in enumerate(bruto, 1):
-            try:
-                alts = [str(a) for a in q["alternativas"]]
-                correta = int(q["correta"])
-                if not 2 <= len(alts) <= 4:
-                    raise ValueError("use de 2 a 4 alternativas")
-                if not 0 <= correta < len(alts):
-                    raise ValueError("'correta' fora do intervalo")
-                validas.append({
-                    "categoria": str(q.get("categoria", self.tema_atual or "Geral")),
-                    "pergunta": str(q["pergunta"]),
-                    "alternativas": alts,
-                    "correta": correta,
-                    "explicacao": str(q.get("explicacao", "")),
-                })
-            except Exception as e:
-                print(f"Pergunta #{i} ignorada: {e}")
-
-        self.perguntas = validas
-        self.indice = 0
-        self.numero = 0
-        self.pergunta_atual = None
-        print(f"[{self.tema_atual}] {len(validas)} perguntas carregadas de {nome_arquivo}.")
-        random.shuffle(self.perguntas)
+        self.jogo.recarregar_perguntas(carga.perguntas)
+        print(f"[{self.tema_atual}] {len(carga.perguntas)} perguntas carregadas de {nome_arquivo}.")
 
         if hasattr(self, "topo"):
             self.topo.tema = self.tema_atual
@@ -1337,7 +1335,7 @@ class DueloDeConhecimento:
     def abrir_seletor_tema(self, inicial=False):
         """Abre a tela modal para escolha de tema/arquivo de perguntas."""
         if self._job_timer:
-            self._parar_timer()
+            self._cancelar_job_timer()
 
         diretorio = obter_diretorio_base()
         arquivos = listar_arquivos_perguntas(diretorio)
@@ -1373,35 +1371,8 @@ class DueloDeConhecimento:
         )
 
     def proxima_pergunta(self, forcar=False):
-        # REGRA: só avança se a pergunta atual foi resolvida (ou se forçar início de tema)
-        if not forcar and self.pergunta_atual is not None and self.fase not in (FASE_REVELADA, FASE_PONTUADA):
-            self.avisar("Resolva a pergunta atual (revele ou pontue) antes de avançar.")
-            return
-
-        if not self.perguntas:
-            self.pergunta_atual = None
-            self.render()
-            return
-
-        if self.indice >= len(self.perguntas):
-            random.shuffle(self.perguntas)
-            self.indice = 0
-
-        self.pergunta_atual = self.perguntas[self.indice]
-        self.indice += 1
-        self.numero += 1
-
-        self.fase = FASE_AGUARDANDO
-        self.quem_apertou = None
-        self.tempo_estourou = False
-        self._limpar_aviso()
-
-        self.enviar_serial("RESET")
-        self._iniciar_timer(TEMPO_PERGUNTA, "Tempo para apertar", Cor.APOIO)
-        self.render()
-
-        self._ultimo_seg_tick = None
-        self.som.nova_pergunta()
+        # A regra de bloqueio e o avanço do baralho são do Jogo.
+        self._despachar(self.jogo.proxima_pergunta(forcar))
 
     # -----------------------------------------------------
     # INTERFACE
@@ -1489,24 +1460,24 @@ class DueloDeConhecimento:
 
         cp = self.cartao_pergunta
         if p:
-            cp.categoria, cp.texto, cp.numero = p["categoria"], p["pergunta"], self.numero
+            cp.categoria, cp.texto, cp.numero = p.categoria, p.texto, self.numero
         else:
             cp.categoria, cp.texto, cp.numero = "", "Nenhuma pergunta carregada.", 0
         cp.desenhar()
 
         for i, c in enumerate(self.cartoes_alt):
-            if p and i < len(p["alternativas"]):
+            if p and i < len(p.alternativas):
                 c.grid()
                 if revelado:
-                    estado = "correta" if i == p["correta"] else "apagada"
+                    estado = "correta" if i == p.correta else "apagada"
                 else:
                     estado = "normal"
-                c.definir(chr(65 + i), p["alternativas"][i], estado)
+                c.definir(chr(65 + i), p.alternativas[i], estado)
                 c.desenhar()
             else:
                 c.grid_remove()
 
-        self.cartao_explic.texto = p["explicacao"] if (p and revelado) else ""
+        self.cartao_explic.texto = p.explicacao if (p and revelado) else ""
         self.cartao_explic.desenhar()
 
         msg, cor = (self.aviso, Cor.AVISO) if self.aviso else self._status_padrao()
@@ -1563,63 +1534,102 @@ class DueloDeConhecimento:
                 t.desenhar()
 
     # -----------------------------------------------------
-    # TIMER (único, baseado em relógio monotônico, sem acúmulo de callbacks)
+    # TIMER — o prazo é do Jogo; a UI só agenda o after(),
+    # consulta timer_restante()/timer_fracao() e desenha.
     # -----------------------------------------------------
-    def _iniciar_timer(self, total, rotulo, cor):
-        self._parar_timer()
-        self.timer_total = total
-        self.timer_fim = time.monotonic() + total
-        self.timer_rotulo = rotulo
-        self.timer_cor = cor
-        self._tick()
-
-    def _parar_timer(self):
+    def _cancelar_job_timer(self):
         if self._job_timer:
             self.root.after_cancel(self._job_timer)
             self._job_timer = None
 
+    def _reiniciar_loop_timer(self):
+        self._cancelar_job_timer()
+        if self.jogo.timer_ativo:
+            self._tick()
+
     def _tick(self):
-        restante = self.timer_fim - time.monotonic()
-        if restante <= 0:
-            self._job_timer = None
-            self._atualizar_barra(0)
-            self._tempo_esgotado()
+        self._job_timer = None
+        if not self.jogo.timer_ativo:
             return
-        self._atualizar_barra(restante)
+
+        eventos = self.jogo.tick_timer()
+        if eventos:
+            self._despachar(eventos)   # estouro: o Jogo já fez a transição
+            return
+
+        self._atualizar_barra()
+        restante = self.jogo.timer_restante()
         seg = math.ceil(restante)
         if seg != self._ultimo_seg_tick:
             self._ultimo_seg_tick = seg
             self.som.tick(seg, self.fase)
         self._job_timer = self.root.after(100, self._tick)
 
-    def _atualizar_barra(self, restante, rotulo=None, cor=None):
+    def _atualizar_barra(self):
+        j = self.jogo
+        if j.estado.pergunta_atual is None:
+            return
         b = self.barra
-        b.rotulo = rotulo if rotulo is not None else self.timer_rotulo
-        b.frac = max(0.0, restante) / self.timer_total
-        b.segundos = math.ceil(max(0.0, restante))
-        b.cor = cor or (Cor.ERRO if b.frac <= 0.34 else self.timer_cor)
+        b.rotulo = j.timer_rotulo
+        b.frac = j.timer_fracao()
+        b.segundos = math.ceil(max(0.0, j.timer_restante_visual()))
+        if j.timer_motivo == TIMER_MOTIVO_REVELADA:
+            b.cor = Cor.APAGADO
+        elif b.frac <= 0.34:
+            b.cor = Cor.ERRO
+        elif j.timer_cor:
+            b.cor = self._cor(j.timer_cor)
+        else:
+            b.cor = Cor.APOIO
         b.desenhar()
 
-    def _congelar_barra(self, rotulo):
-        self._parar_timer()
-        restante = max(0.0, self.timer_fim - time.monotonic())
-        self._atualizar_barra(restante, rotulo=rotulo, cor=Cor.APAGADO)
-
-    def _tempo_esgotado(self):
-        if self.fase == FASE_AGUARDANDO:
-            self.fase = FASE_REVELADA
-            self.barra.rotulo = "Tempo esgotado"
-        elif self.fase == FASE_RESPONDENDO:
-            self.fase = FASE_REVELADA
-            self.tempo_estourou = True
-            self.barra.rotulo = "Tempo esgotado"
-        else:
+    # -----------------------------------------------------
+    # EVENTOS DO JOGO -> LED, som e tela (nenhuma regra aqui)
+    # -----------------------------------------------------
+    def _despachar(self, eventos):
+        if eventos and eventos[0].startswith(PREFIXO_RECUSA):
+            self.avisar(self._texto_recusa(eventos[0]))
             return
-        self._limpar_aviso()
-        self.enviar_serial("BEEP")
-        self.som.tempo_esgotado()
+
+        for cmd in comandos_para_arduino(eventos):
+            self.enviar_serial(cmd)
+
+        quem_piscar = None
+        for ev in eventos:
+            if ev.startswith("apertou:"):
+                quem_piscar = ev.split(":", 1)[1]
+                self._limpar_aviso()
+                self.som.apertou(quem_piscar)
+            elif ev == "revelou":
+                self._limpar_aviso()
+                self.som.revelou()
+            elif ev.startswith("pontuou:"):
+                self._limpar_aviso()
+                self.som.acertou()
+            elif ev == "tempo_esgotado":
+                self._limpar_aviso()
+                self.som.tempo_esgotado()
+            elif ev == "proxima_pergunta":
+                self._limpar_aviso()
+                self._ultimo_seg_tick = None
+                self.som.nova_pergunta()
+            elif ev == "reiniciou_placar":
+                self._limpar_aviso()
+            # "reiniciou_banco" e "led_reacender:*" só têm efeito serial/tela
+
         self.render()
-        self.barra.desenhar()
+        self._atualizar_barra()
+        if quem_piscar:
+            self.piscar(quem_piscar)
+        self._reiniciar_loop_timer()
+
+    def _texto_recusa(self, evento):
+        motivo = evento.split(":", 1)[1]
+        texto = MENSAGENS_RECUSA.get(motivo, "")
+        if motivo == MOTIVO_ACERTO_OUTRA_EQUIPE:
+            quem = self.quem_apertou
+            texto = texto.format(equipe=self._nome(quem) if quem else "?")
+        return texto
 
     # -----------------------------------------------------
     # SERIAL
@@ -1718,82 +1728,27 @@ class DueloDeConhecimento:
             self.root.after(20, self.drenar_fila)
 
     def processar_evento(self, evento):
-        if evento == "BTN_A":
-            self.apertar_botao("A")
-        elif evento == "BTN_B":
-            self.apertar_botao("B")
-        elif evento == "BTN_AVANCAR":
-            self.proxima_pergunta()
-        elif evento == "BTN_ACERTO_A":
-            self.confirmar_acerto("A")
-        elif evento == "BTN_ACERTO_B":
-            self.confirmar_acerto("B")
-        elif evento == "BTN_REVELAR":
-            self.revelar_resposta()
-        elif evento == "PRONTO":
+        # Mapeamento linha-da-serial -> ação é uma função pura (protocolo.py)
+        if evento == "PRONTO":
             print("Arduino reiniciado.")
-            if self.quem_apertou:  # reacende o LED se reiniciou no meio da rodada
-                self.enviar_serial(f"LED_{self.quem_apertou}_ON")
+        self._despachar(mapear_evento_arduino(evento, self.jogo))
 
     # -----------------------------------------------------
-    # LÓGICA DO JOGO (máquina de estados)
+    # AÇÕES DA UI (só delegam ao Jogo e despacham os eventos)
     # AGUARDANDO -> RESPONDENDO -> REVELADA -> PONTUADA
     # -----------------------------------------------------
     def apertar_botao(self, quem):
-        if self.pergunta_atual is None or self.fase != FASE_AGUARDANDO:
-            return
-        self.fase = FASE_RESPONDENDO
-        self.quem_apertou = quem
-        self._limpar_aviso()
-        self._iniciar_timer(TEMPO_RESPOSTA, f"{self._nome(quem)} respondendo", self._cor(quem))
-        self.enviar_serial(f"LED_{quem}_ON")
-        self.enviar_serial("BEEP")
-        self.som.apertou(quem)
-        self.render()
-        self.piscar(quem)
+        self._despachar(self.jogo.apertar_botao(quem))
 
     def revelar_resposta(self):
-        if self.fase == FASE_AGUARDANDO:
-            self.avisar("Ninguém apertou ainda. REVELAR só funciona depois que A ou B apertar.")
-            return
-        if self.fase != FASE_RESPONDENDO:
-            return
-        self.fase = FASE_REVELADA
-        self._limpar_aviso()
-        self._congelar_barra("Resposta revelada")
-        self.som.revelou()
-        self.render()
+        self._despachar(self.jogo.revelar_resposta())
 
     def confirmar_acerto(self, quem):
-        if self.fase == FASE_PONTUADA:
-            return
-        if self.fase != FASE_REVELADA:
-            self.avisar("Revele a resposta (botão REVELAR) antes de pontuar.")
-            return
-        if self.quem_apertou is None:
-            self.avisar("Ninguém apertou nesta rodada: não há ponto para dar.")
-            return
-        if self.quem_apertou != quem:
-            self.avisar(f"Só quem apertou pode pontuar (apertou: {self._nome(self.quem_apertou)}).")
-            return
-        if self.tempo_estourou and not PONTUAR_APOS_TEMPO:
-            self.avisar("O tempo de resposta esgotou: sem ponto nesta rodada.")
-            return
-
-        self.fase = FASE_PONTUADA
-        if quem == "A":
-            self.placar_a += 1
-        else:
-            self.placar_b += 1
-        self._limpar_aviso()
-        self.enviar_serial("BEEP_LONG")
-        self.som.acertou()
-        self.render()
+        self._despachar(self.jogo.confirmar_acerto(quem))
 
     def reiniciar_placar(self):
         if messagebox.askyesno(TITULO, "Zerar o placar dos dois competidores?"):
-            self.placar_a = self.placar_b = 0
-            self.render()
+            self._despachar(self.jogo.reiniciar_placar())
 
     
     def alternar_som(self):
