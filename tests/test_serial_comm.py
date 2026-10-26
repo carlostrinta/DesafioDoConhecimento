@@ -370,3 +370,91 @@ class TestD2Encerramento:
         comm.parar(timeout=0.3)
         decorrido = time.monotonic() - inicio
         assert decorrido < 1.5
+
+
+# ─────────────────────────────────────────────────────────
+# Cenário do usuário (D1/D2 no Windows real, sem hardware)
+# ─────────────────────────────────────────────────────────
+class TestCenarioReal:
+    def test_ciclo_completo_com4_fantasma_com6_real_e_troca_de_porta(self):
+        """
+        Abre sem placa (só COM4 Bluetooth) -> COM6 aparece -> cabo cai ->
+        COM4 continua lá -> placa volta em outra porta (COM7) -> fecha.
+        """
+        modulo = ModuloSerialFalso()
+        modulo.portas = [Porta("COM4", "Serial Padrão por link Bluetooth")]
+        fila = queue.Queue()
+        comm = criar_comm(fila, modulo)
+        comm.iniciar()
+
+        try:
+            # 1. Sem placa: a COM4 nem é aberta.
+            time.sleep(0.3)
+            assert comm.serial is None
+            assert modulo.abertas == []
+
+            # 2. Arduino real na COM6: conecta com PRONTO.
+            modulo.portas.append(Porta("COM6", "Arduino Uno", 0x2341, 0x0043))
+            modulo.manda_pronto.add("COM6")
+            assert esperar(lambda: comm.serial is not None)
+            assert comm.serial.port == "COM6"
+
+            # 3. Eventos continuam chegando.
+            comm.serial.linhas.append(b"BTN_A\n")
+            assert esperar(lambda: ("evento", "BTN_A") in drenar(fila))
+
+            # 4. Cabo cai; a COM4 fantasma continua disponível.
+            comm.serial.queda = True
+            modulo.portas = [Porta("COM4", "Serial Padrão por link Bluetooth")]
+            assert esperar(lambda: comm.serial is None)
+            time.sleep(0.3)
+            assert comm.serial is None, "assumiu a COM4 depois da queda"
+
+            # 5. Placa volta em outra porta: COM7 (clone CH340).
+            modulo.portas.append(
+                Porta("COM7", "USB-SERIAL CH340", 0x1A86, 0x7523)
+            )
+            modulo.manda_pronto.add("COM7")
+            assert esperar(
+                lambda: comm.serial is not None and comm.serial.port == "COM7",
+                timeout=2.0,
+            )
+
+            # 6. Fecha sem travar e sem deixar porta aberta.
+            aberta = comm.serial
+            inicio = time.monotonic()
+            comm.parar(timeout=1.0)
+            assert time.monotonic() - inicio < 1.5
+            assert aberta.fechado is True
+            assert comm.serial is None
+            assert not comm._thread.is_alive()
+        finally:
+            comm.rodando = False
+            comm.fechar()
+
+    def test_sem_portas_conecta_quando_a_placa_aparece(self):
+        modulo = ModuloSerialFalso()
+        modulo.portas = []
+        fila = queue.Queue()
+        comm = criar_comm(fila, modulo)
+        comm.iniciar()
+        try:
+            time.sleep(0.2)
+            assert comm.serial is None
+            assert drenar(fila) == []
+
+            modulo.portas = [Porta("COM6", "Arduino Mega 2560", 0x2341, 0x0042)]
+            modulo.manda_pronto.add("COM6")
+            assert esperar(lambda: comm.serial is not None)
+            assert comm.serial.port == "COM6"
+        finally:
+            comm.parar(timeout=1.0)
+
+    def test_parar_duas_vezes_e_idempotente(self):
+        modulo = ModuloSerialFalso()
+        modulo.portas = []
+        comm = criar_comm(queue.Queue(), modulo)
+        comm.iniciar()
+        comm.parar(timeout=0.5)
+        comm.parar(timeout=0.5)  # não levanta
+        assert comm.rodando is False

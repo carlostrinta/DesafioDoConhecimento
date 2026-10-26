@@ -147,6 +147,7 @@ em modo headless. Nenhum teste abre janela ou exige Arduino.
 | `duelo_arduino.ino/` | firmware do Arduino (protocolo v1) |
 | `config.exemplo.json` | modelo de configuração — **ainda não é lido** (Etapa 4.2) |
 | `Desafio do Conhecimento.spec` | receita de build com PyInstaller |
+| `ROTEIRO_SERIAL_HARDWARE.md` | checklist de validação com Arduino real |
 
 ## Protocolo serial (v1)
 
