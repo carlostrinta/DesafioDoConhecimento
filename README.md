@@ -45,7 +45,7 @@ Sem Arduino conectado o jogo inicia normalmente em **modo teclado**. Sem
 ## Execução
 
 ```powershell
-python desafio.py
+python main.py
 ```
 
 O aplicativo abre em tela cheia. Na primeira execução ele pede o tema
@@ -143,6 +143,7 @@ python -m pytest tests/test_ui_componentes.py -q
 
 | Arquivo | Papel |
 | --- | --- |
+| `main.py` | ponto de entrada: monta a janela e inicia o loop do Tk |
 | `desafio.py` | interface tkinter: telas, teclado e ligação com o jogo |
 | `ui_componentes.py` | componentes Canvas: paleta, tipografia e widgets visuais (sem lógica de jogo) |
 | `ui_selecao.py` | modal de escolha do banco de perguntas (widgets Tk clássicos) |

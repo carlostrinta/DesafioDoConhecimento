@@ -664,11 +664,3 @@ class DueloDeConhecimento:
         self.som.parar()
         self.root.destroy()
 
-
-# =========================================================
-# MAIN
-# =========================================================
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = DueloDeConhecimento(root)
-    root.mainloop()
