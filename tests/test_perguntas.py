@@ -62,13 +62,16 @@ class TestCarregamentoPerguntas:
         finally:
             os.unlink(tmp)
 
-    def test_embaralha_na_carga(self, perguntas_exemplo):
-        j1 = Jogo(perguntas_exemplo, num_equipes=2)
-        j2 = Jogo(perguntas_exemplo, num_equipes=2)
-        # Ordem das perguntas deve ser diferente (probabilidade alta)
-        ord1 = [p.texto for p in j1.perguntas]
-        ord2 = [p.texto for p in j2.perguntas]
-        assert ord1 != ord2 or len(set(ord1)) == 1  # pode empatar se só 1 pergunta única
+    def test_embaralha_na_carga(self, perguntas_exemplo, monkeypatch):
+        # Determinístico: troca o shuffle por uma inversão de ordem
+        monkeypatch.setattr("jogo.random.shuffle", lambda seq: seq.reverse())
+        original = [p.texto for p in perguntas_exemplo]
+
+        j = Jogo(perguntas_exemplo, num_equipes=2)
+
+        assert [p.texto for p in j.perguntas] == list(reversed(original))
+        # A lista recebida não é alterada no lugar (o Jogo trabalha numa cópia)
+        assert [p.texto for p in perguntas_exemplo] == original
 
     def test_reinicia_banco_ao_final(self, perguntas_exemplo):
         j = Jogo(perguntas_exemplo, num_equipes=2)
