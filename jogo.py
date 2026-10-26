@@ -399,6 +399,13 @@ def ler_banco_perguntas(
         )
         return carga
 
+    if not isinstance(bruto, list):
+        # Ex.: config.json, cujo "perguntas" é um objeto com pasta/arquivo padrão
+        carga.erro = (
+            f"Não foi possível ler {nome_arquivo}: o campo 'perguntas' deve ser uma lista."
+        )
+        return carga
+
     for i, q in enumerate(bruto, 1):
         try:
             alts = [str(a) for a in q["alternativas"]]

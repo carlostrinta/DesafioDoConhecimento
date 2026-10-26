@@ -327,6 +327,22 @@ class TestCarregadorUnico:
         assert carga.erro
         assert carga.tema == "X"
 
+    def test_perguntas_que_nao_e_lista_nao_vira_ignoradas(self, tmp_path):
+        """config.json tem "perguntas": {"pasta": ..., "arquivo_padrao": ...}."""
+        import json
+
+        from jogo import ler_banco_perguntas
+
+        arquivo = tmp_path / "config.json"
+        arquivo.write_text(
+            json.dumps({"perguntas": {"pasta": "perguntas", "arquivo_padrao": "x.json"}}),
+            encoding="utf-8",
+        )
+        carga = ler_banco_perguntas(str(arquivo))
+        assert carga.perguntas == []
+        assert carga.ignoradas == []          # não inventa "pergunta ignorada"
+        assert "deve ser uma lista" in carga.erro
+
     def test_aceita_pergunta_e_texto(self, tmp_path):
         import json
 
