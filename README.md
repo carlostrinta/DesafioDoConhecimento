@@ -209,3 +209,9 @@ futuro, a pasta `sons/`) ficam sempre ao lado do executável.
 - `jogo.py` ainda reexporta `Pergunta`, `ler_banco_perguntas` e
   `carregar_perguntas_json` por compatibilidade; a reexportação sai nas
   Etapas 3.6/3.7 (há um `TODO` no código).
+- **Pendência de hardware:** validar com clone **CH340**; se o `PRONTO`
+  demorar mais de 3 s após o reset por DTR, aumentar o timeout (tornar
+  configurável na 4.2).
+- A validação com hardware real usou uma **Mega 2560** (VID `2341:0042`).
+  A Etapa 5 deve validar o mapeamento de pinos do firmware em uma **Uno** e
+  documentar a diferença Mega × Uno.

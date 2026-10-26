@@ -10,6 +10,9 @@ dist/
 
 # Executáveis locais
 Desafio do Conhecimento.exe
+desafio.exe
+desafio.spec
+DesafioV1/
 
 # Logs / Estado salvo
 *.log
