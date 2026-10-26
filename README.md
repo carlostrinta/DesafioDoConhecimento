@@ -114,8 +114,8 @@ Bancos incluídos: `conhecimentos_gerais.json` (97 perguntas),
 > ⚠️ Nesta versão **nenhum campo de `config.exemplo.json`/`config.json` é
 > lido pelo código**. O arquivo é só um **modelo** do que será configurável
 > (tempos, nomes e cores das equipes, serial, modo de jogo, `num_equipes`).
-> Os valores em uso continuam **fixos no código**: 30 s por pergunta, 15 s
-> para responder, 2 equipes nos botões e placar.
+> Os valores em uso continuam **fixos em `config.py`**: 30 s por pergunta,
+> 15 s para responder, 2 equipes nos botões e placar.
 >
 > Copiar o modelo para `config.json` ou editá-lo **não muda nada** no jogo. A
 > leitura de verdade entra na **Etapa 4.2**.
@@ -138,6 +138,7 @@ em modo headless. Nenhum teste abre janela ou exige Arduino.
 | `desafio.py` | interface tkinter: desenho, teclado, serial e sons |
 | `jogo.py` | regra de jogo pura: estado, placar, timer, perguntas |
 | `protocolo.py` | tradução pura entre linhas da serial e ações/eventos |
+| `config.py` | constantes atuais (tempos, equipes, serial) — **ainda não lê JSON** |
 | `tests/` | suíte pytest |
 | `duelo_arduino.ino/` | firmware do Arduino (protocolo v1) |
 | `config.exemplo.json` | modelo de configuração — **ainda não é lido** (Etapa 4.2) |
@@ -181,7 +182,7 @@ arquivos JSON de perguntas precisam ficar ao lado do executável.
 ## Limitações conhecidas (em evolução)
 
 - A interface ainda mostra **2 equipes**; a lógica já suporta 2, 3 ou 4.
-- `config.json` ainda não é lido (Etapa 4.2) — os tempos estão no código.
+- `config.json` ainda não é lido (Etapa 4.2) — os tempos estão em `config.py`.
 - `eletrotecnica.json` e `radiologia.json` têm só 20 perguntas: o baralho
   reinicia rápido (pendência da Etapa 4).
 - Sem log em arquivo e sem retomada automática de partida (Etapa 4).

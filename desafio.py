@@ -26,6 +26,17 @@ import traceback
 import tkinter as tk
 from tkinter import font as tkfont, messagebox, filedialog
 
+from config import (
+    ARQUIVO_PERGUNTAS,
+    BAUD_RATE,
+    NOMES_EQUIPES,
+    NUM_EQUIPES,
+    PONTUAR_APOS_TEMPO,
+    PORTA_FORCADA,
+    TEMPO_PERGUNTA,
+    TEMPO_RESPOSTA,
+    TITULO,
+)
 from jogo import (
     Jogo,
     FASE_AGUARDANDO,
@@ -57,19 +68,12 @@ import struct
 import wave
 
 # =========================================================
-# CONFIGURAÇÕES  (ajuste aqui sem mexer no resto)
+# CONFIGURAÇÕES
+# Os valores (título, equipes, tempos, serial) ficam em config.py.
+# Este módulo ainda NÃO lê config.json — isso entra na Etapa 4.2.
 # =========================================================
-TITULO = "Desafio de Conhecimento"
-NOME_A = "Competidor A"
-NOME_B = "Competidor B"
-
-ARQUIVO_PERGUNTAS = "conhecimentos_gerais.json"
-TEMPO_PERGUNTA = 30          # segundos para alguém apertar o botão
-TEMPO_RESPOSTA = 15          # segundos para quem apertou responder
-PONTUAR_APOS_TEMPO = False   # True = o monitor ainda pode pontuar após o tempo esgotar
-
-BAUD_RATE = 9600
-PORTA_FORCADA = None         # ex: "COM3" — deixe None para autodetectar
+NOME_A = NOMES_EQUIPES["A"]
+NOME_B = NOMES_EQUIPES["B"]
 
 
 # =========================================================
@@ -1213,11 +1217,11 @@ class DueloDeConhecimento:
         self.erro_carga = ""
         self.jogo = Jogo(
             [],
-            num_equipes=2,
+            num_equipes=NUM_EQUIPES,
             tempo_pergunta=TEMPO_PERGUNTA,
             tempo_resposta=TEMPO_RESPOSTA,
             pontuar_apos_tempo=PONTUAR_APOS_TEMPO,
-            nomes_equipes={"A": NOME_A, "B": NOME_B},
+            nomes_equipes=dict(NOMES_EQUIPES),
         )
 
         self.aviso = None
