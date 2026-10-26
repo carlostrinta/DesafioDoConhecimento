@@ -87,8 +87,8 @@ uma **lista** de perguntas ou um **objeto** com a chave `perguntas`:
 ]
 ```
 
-Regras de validação (aplicadas por `jogo.ler_banco_perguntas`, o carregador
-único do projeto):
+Regras de validação (aplicadas por `perguntas.ler_banco_perguntas`, o
+carregador único do projeto):
 
 - `pergunta` (ou `texto`) obrigatório e não vazio;
 - `alternativas`: lista de **2 a 4** itens, todos não vazios;
@@ -136,7 +136,8 @@ em modo headless. Nenhum teste abre janela ou exige Arduino.
 | Arquivo | Papel |
 | --- | --- |
 | `desafio.py` | interface tkinter: desenho, teclado, serial e sons |
-| `jogo.py` | regra de jogo pura: estado, placar, timer, perguntas |
+| `jogo.py` | regra de jogo pura: estado, placar e timer |
+| `perguntas.py` | modelo, carregador/validador, listagem e nomes de tema (puro) |
 | `protocolo.py` | tradução pura entre linhas da serial e ações/eventos |
 | `config.py` | constantes atuais (tempos, equipes, serial) — **ainda não lê JSON** |
 | `tests/` | suíte pytest |

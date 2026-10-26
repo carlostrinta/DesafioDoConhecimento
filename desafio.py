@@ -51,7 +51,12 @@ from jogo import (
     MOTIVO_REVELAR_AGUARDANDO,
     PREFIXO_RECUSA,
     TIMER_MOTIVO_REVELADA,
+)
+from perguntas import (
+    formatar_nome_tema,
+    inspecionar_arquivo_perguntas,
     ler_banco_perguntas,
+    listar_arquivos_perguntas,
 )
 from protocolo import comandos_para_arduino, mapear_evento_arduino
 
@@ -169,33 +174,6 @@ def caminho_recurso(nome):
     return os.path.join(obter_diretorio_base(), nome)
 
 
-def formatar_nome_tema(nome_arquivo):
-    """Converte o nome do arquivo em um título legível e amigável."""
-    base = os.path.splitext(os.path.basename(nome_arquivo))[0]
-    mapa_termos = {
-        "conhecimentos_gerais": "Conhecimentos Gerais",
-        "conhecimento_gerais": "Conhecimentos Gerais",
-        "conhecimentos gerais": "Conhecimentos Gerais",
-        "conhecimento gerais": "Conhecimentos Gerais",
-        "eletrotecnica": "Eletrotécnica",
-        "eletrotécnica": "Eletrotécnica",
-        "radiologia": "Radiologia",
-        "ti": "Tecnologia da Informação",
-        "tecnologia_da_informacao": "Tecnologia da Informação",
-        "mecanica": "Mecânica",
-        "mecânica": "Mecânica",
-        "enfermagem": "Enfermagem",
-        "seguranca_do_trabalho": "Segurança do Trabalho",
-        "perguntas": "Perguntas Gerais",
-    }
-    chave = base.strip().lower()
-    if chave in mapa_termos:
-        return mapa_termos[chave]
-    limpo = base.replace("_", " ").replace("-", " ")
-    palavras = [p.capitalize() for p in limpo.split()]
-    return " ".join(palavras) if palavras else base
-
-
 def obter_icone_tema(titulo, nome_arquivo):
     """Retorna um emoji representativo para a tecnologia ou tema."""
     t = (str(titulo) + " " + str(nome_arquivo)).lower()
@@ -220,75 +198,6 @@ def obter_icone_tema(titulo, nome_arquivo):
     if "hist" in t or "geogr" in t:
         return "🌍"
     return "📚"
-
-
-def inspecionar_arquivo_perguntas(caminho):
-    """
-    Analisa um arquivo .json e retorna metadados se for um banco de perguntas válido.
-    Usa o mesmo carregador/validador do jogo (jogo.ler_banco_perguntas).
-    """
-    try:
-        if not os.path.isfile(caminho):
-            return None
-        nome_arquivo = os.path.basename(caminho)
-        carga = ler_banco_perguntas(caminho, tema_padrao=formatar_nome_tema(nome_arquivo))
-        if carga.erro or not carga.perguntas:
-            return None
-
-        categorias = {p.categoria for p in carga.perguntas}
-        return {
-            "caminho": os.path.abspath(caminho),
-            "arquivo": nome_arquivo,
-            "titulo": str(carga.tema),
-            "total": len(carga.perguntas),
-            "categorias": sorted(categorias),
-        }
-    except Exception as e:
-        print(f"Erro ao inspecionar {caminho}: {e}")
-        return None
-
-
-def listar_arquivos_perguntas(diretorio_base):
-    """
-    Lista todos os arquivos JSON de perguntas na pasta da aplicação e subpastas comuns.
-    """
-    arquivos = []
-    if not os.path.exists(diretorio_base):
-        return arquivos
-
-    candidatos = []
-    try:
-        for f in os.listdir(diretorio_base):
-            if f.lower().endswith(".json"):
-                candidatos.append(os.path.join(diretorio_base, f))
-    except Exception as e:
-        print(f"Erro ao listar pasta base {diretorio_base}: {e}")
-
-    # Também inspeciona subpasta 'perguntas' caso exista
-    subpasta = os.path.join(diretorio_base, "perguntas")
-    if os.path.isdir(subpasta):
-        try:
-            for f in os.listdir(subpasta):
-                if f.lower().endswith(".json"):
-                    candidatos.append(os.path.join(subpasta, f))
-        except Exception:
-            pass
-
-    candidatos_unicos = []
-    vistos = set()
-    for c in candidatos:
-        abs_c = os.path.abspath(c)
-        if abs_c not in vistos:
-            vistos.add(abs_c)
-            candidatos_unicos.append(c)
-
-    for caminho in candidatos_unicos:
-        info = inspecionar_arquivo_perguntas(caminho)
-        if info:
-            arquivos.append(info)
-
-    arquivos.sort(key=lambda x: x["titulo"].lower())
-    return arquivos
 
 
 # =========================================================

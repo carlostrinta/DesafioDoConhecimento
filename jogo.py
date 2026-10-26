@@ -19,8 +19,17 @@ apresentação apenas reage a eles (LED, som, serial, tela):
 from __future__ import annotations
 import random
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable
+
+# O carregador/validador e o modelo de pergunta foram para perguntas.py
+# (Etapa 3.2). São reexportados aqui para não quebrar quem já importa do jogo.
+from perguntas import (
+    CargaPerguntas,
+    Pergunta,
+    carregar_perguntas_json,
+    ler_banco_perguntas,
+)
 
 
 # ─── Estados da rodada ───
@@ -54,15 +63,6 @@ TIMER_MOTIVO_REVELADA = "revelada"
 TIMER_MOTIVO_TEMPO_ESGOTADO = "tempo_esgotado"
 
 PREFIXO_RECUSA = "recusado:"
-
-
-@dataclass
-class Pergunta:
-    categoria: str
-    texto: str
-    alternativas: list[str]
-    correta: int
-    explicacao: str = ""
 
 
 @dataclass
@@ -330,110 +330,3 @@ class Jogo:
             jogo.estado.pergunta_atual = jogo.perguntas[jogo.estado.indice_pergunta - 1]
         jogo._iniciar_timer(jogo.tempo_pergunta, "Tempo para apertar", "")
         return jogo
-
-
-# ─────────────────────────────────────────────────────────
-# Carregador/validador ÚNICO de perguntas do projeto.
-# (substitui os dois carregadores que existiam em desafio.py e jogo.py)
-# ─────────────────────────────────────────────────────────
-@dataclass
-class CargaPerguntas:
-    tema: str
-    perguntas: list[Pergunta] = field(default_factory=list)
-    erro: str = ""
-    ignoradas: list[str] = field(default_factory=list)
-
-
-ENCODINGS_PERGUNTAS = ("utf-8-sig", "utf-8", "latin-1")
-
-
-def ler_banco_perguntas(
-    caminho: str,
-    tema_padrao: str = "",
-    aceitar_tema_do_arquivo: bool = True,
-) -> CargaPerguntas:
-    """
-    Lê e valida um banco de perguntas.
-
-    Formato aceito: lista de perguntas, ou objeto com a chave "perguntas"
-    (opcionalmente com "tema"). Cada pergunta precisa de 2 a 4 alternativas e
-    "correta" dentro do intervalo; o texto pode vir em "pergunta" ou "texto".
-
-    Nunca levanta exceção por conteúdo inválido: devolve `erro` (falha de
-    leitura/estrutura) e `ignoradas` (perguntas descartadas, com o motivo).
-    """
-    import json
-    import os
-
-    nome_arquivo = os.path.basename(caminho)
-    carga = CargaPerguntas(tema=tema_padrao or nome_arquivo)
-
-    conteudo = None
-    for enc in ENCODINGS_PERGUNTAS:
-        try:
-            with open(caminho, "r", encoding=enc) as f:
-                conteudo = json.load(f)
-            break
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            continue
-        except OSError as e:
-            carga.erro = f"Não foi possível ler {nome_arquivo}: {e}"
-            return carga
-
-    if conteudo is None:
-        carga.erro = f"Não foi possível ler {nome_arquivo}: arquivo inválido ou codificação incompatível."
-        return carga
-
-    if isinstance(conteudo, dict):
-        if aceitar_tema_do_arquivo:
-            tema_arquivo = conteudo.get("tema") or conteudo.get("titulo")
-            if tema_arquivo:
-                carga.tema = str(tema_arquivo)
-        bruto = conteudo.get("perguntas", [])
-    elif isinstance(conteudo, list):
-        bruto = conteudo
-    else:
-        carga.erro = (
-            f"Não foi possível ler {nome_arquivo}: o arquivo deve conter uma "
-            "lista de perguntas ou objeto com 'perguntas'."
-        )
-        return carga
-
-    if not isinstance(bruto, list):
-        # Ex.: config.json, cujo "perguntas" é um objeto com pasta/arquivo padrão
-        carga.erro = (
-            f"Não foi possível ler {nome_arquivo}: o campo 'perguntas' deve ser uma lista."
-        )
-        return carga
-
-    for i, q in enumerate(bruto, 1):
-        try:
-            alts = [str(a) for a in q["alternativas"]]
-            correta = int(q["correta"])
-            if not 2 <= len(alts) <= 4:
-                raise ValueError("use de 2 a 4 alternativas")
-            if not 0 <= correta < len(alts):
-                raise ValueError("'correta' fora do intervalo")
-            texto = q.get("pergunta")
-            if texto is None:
-                texto = q.get("texto")
-            if texto is None:
-                raise ValueError("campo 'pergunta' ausente")
-            carga.perguntas.append(
-                Pergunta(
-                    categoria=str(q.get("categoria", carga.tema or "Geral")),
-                    texto=str(texto),
-                    alternativas=alts,
-                    correta=correta,
-                    explicacao=str(q.get("explicacao", "")),
-                )
-            )
-        except Exception as e:
-            carga.ignoradas.append(f"Pergunta #{i} ignorada: {e}")
-
-    return carga
-
-
-def carregar_perguntas_json(caminho: str) -> list[Pergunta]:
-    """Atalho de compatibilidade: só a lista de perguntas do carregador único."""
-    return ler_banco_perguntas(caminho).perguntas
