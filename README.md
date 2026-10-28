@@ -133,15 +133,22 @@ python -m pytest tests/ -q
 
 A suíte cobre a máquina de estados, o placar, o carregador de perguntas, o
 timer (com relógio injetável — nenhum teste usa `sleep`) e o protocolo serial
-em modo headless. Nenhum teste exige Arduino. O único que abre uma janela Tk é
-o **golden visual** dos componentes (Etapa 3.5), e ele é **opt-in** — as
-métricas de fonte variam entre PCs, então serve como guarda local de
-refatoração, não como teste de CI:
+em modo headless. Nenhum teste exige Arduino. Abrem uma janela Tk de verdade
+apenas dois testes, e ambos são pulados em ambiente headless:
+
+- o **golden visual** dos componentes (Etapa 3.5), **opt-in** porque as
+  métricas de fonte variam entre PCs — guarda local de refatoração, não de CI:
 
 ```powershell
 $env:DESAFIO_GOLDEN_UI=1
 python -m pytest tests/test_ui_componentes.py -q
 ```
+
+- o teste de **regressão do entrypoint**, que executa `python main.py` como
+  subprocesso com `DESAFIO_AUTO_FECHAR=1` (a janela se fecha após 1 s) e exige
+  código de saída 0.
+
+O teste de `desafio.py` é headless: apenas confere o aviso e o código 1.
 
 ## Estrutura do projeto
 
