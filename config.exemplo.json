@@ -23,7 +23,8 @@
     "arquivo_padrao": "conhecimentos_gerais.json"
   },
   "audio": {
-    "ativo": true
+    "ativo": true,
+    "volume": 1.0
   },
   "persistencia": {
     "continuar_automatico": false

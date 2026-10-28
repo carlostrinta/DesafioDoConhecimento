@@ -5,6 +5,10 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
+    # `sons/` é pasta EXTERNA: deve ser copiada ao lado do .exe na
+    # distribuição (D6), junto com config.json e os bancos de perguntas.
+    # Não usar `datas`: isso colocaria os arquivos dentro de _MEIPASS, e o
+    # usuário não conseguiria substituí-los ao lado do executável.
     datas=[],
     hiddenimports=['pygame', 'pygame.mixer'],
     hookspath=[],

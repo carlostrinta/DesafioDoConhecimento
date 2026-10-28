@@ -60,6 +60,8 @@ class ComunicacaoSerial:
         ("conexao", "COM6")  -> conectou
         ("conexao", None)    -> caiu
         ("placa", "Arduino Uno (2341:0043)")  -> nome para a barra de status
+        ("porta_ausente", "COM9") -> configurada, mas não encontrada
+        ("porta_ausente", None)   -> a porta configurada voltou a existir
         ("evento", "BTN_A")  -> linha recebida do Arduino
     """
 
@@ -98,6 +100,7 @@ class ComunicacaoSerial:
         self.serial = None
         self.placa_atual = ""
         self._info_portas = {}
+        self._porta_ausente_avisada = False
         self._parar = threading.Event()
         self._parar.set()  # parado até iniciar()
         self._thread = None
@@ -237,7 +240,43 @@ class ComunicacaoSerial:
                 self.log(f"  {indice}. {porta} | {nome} | prioridade={rotulo}")
         else:
             self.log("Nenhuma porta candidata (Arduino/adaptador) encontrada.")
+
+        self._atualizar_aviso_porta_configurada(portas, forcadas)
         return unicas
+
+    def _atualizar_aviso_porta_configurada(self, portas, forcadas):
+        """
+        Avisa a UI uma única vez quando a porta explícita do config.json não
+        existe. A detecção automática continua (decisão da Etapa 4.4): o app
+        tenta a porta configurada e, se ela não estiver disponível, usa as
+        demais candidatas, mas a barra de status deixa de ficar em silêncio.
+        """
+        if not self.porta_forcada:
+            return
+
+        vid_pid = separar_vid_pid(self.porta_forcada)
+        if vid_pid:
+            presente = bool(forcadas)
+        else:
+            alvo = self.porta_forcada.upper()
+            presente = any(
+                (getattr(p, "device", "") or "").upper() == alvo for p in portas
+            )
+
+        if presente:
+            if self._porta_ausente_avisada:
+                self._porta_ausente_avisada = False
+                self.fila.put(("porta_ausente", None))
+            return
+
+        if self._porta_ausente_avisada:
+            return
+        self._porta_ausente_avisada = True
+        self.log(
+            f"!! Porta configurada {self.porta_forcada} não encontrada; "
+            "usando a detecção automática."
+        )
+        self.fila.put(("porta_ausente", self.porta_forcada))
 
     def _tentar_conectar(self, porta):
         """
@@ -272,6 +311,15 @@ class ComunicacaoSerial:
                     self.placa_atual = descricao_placa(info)
                     detalhe = f" - {self.placa_atual}" if self.placa_atual else ""
                     self.log(f"✓ Conectado em {porta}{detalhe}")
+                    # Caso a enumeração não tenha listado a COMx forçada, mas
+                    # ela tenha aberto e respondido, o aviso deixa de valer.
+                    if (
+                        self.porta_forcada
+                        and porta.upper() == self.porta_forcada.upper()
+                        and self._porta_ausente_avisada
+                    ):
+                        self._porta_ausente_avisada = False
+                        self.fila.put(("porta_ausente", None))
                     # Avisa a UI (reacende o LED se a rodada está em andamento).
                     self.fila.put(("evento", "PRONTO"))
                     return True

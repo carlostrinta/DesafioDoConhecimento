@@ -100,6 +100,7 @@ class TestModuloConfig:
         assert config.PASTA_PERGUNTAS == config.CONFIG.pasta_perguntas
         assert config.ARQUIVO_PERGUNTAS == config.CONFIG.arquivo_perguntas
         assert config.SOM_ATIVO is config.CONFIG.som_ativo
+        assert config.VOLUME_AUDIO == config.CONFIG.volume_audio
         assert config.CONTINUAR_AUTOMATICO is config.CONFIG.continuar_automatico
         assert config.AVISOS_CONFIG == config.CONFIG.avisos
 
@@ -126,6 +127,7 @@ class TestSemArquivo:
         assert cfg.pasta_perguntas == str(tmp_path)
         assert cfg.arquivo_perguntas == "conhecimentos_gerais.json"
         assert cfg.som_ativo is True
+        assert cfg.volume_audio == 1.0
         assert cfg.continuar_automatico is False
 
     def test_comportamento_identico_sem_config_json(self, tmp_path):
@@ -170,7 +172,7 @@ class TestLeitura:
                     "pasta": "perguntas",
                     "arquivo_padrao": "meu_banco.json",
                 },
-                "audio": {"ativo": False},
+                "audio": {"ativo": False, "volume": 0.4},
                 "persistencia": {"continuar_automatico": True},
             },
         )
@@ -190,6 +192,7 @@ class TestLeitura:
         assert cfg.pasta_perguntas == str(tmp_path / "perguntas")
         assert cfg.arquivo_perguntas == "meu_banco.json"
         assert cfg.som_ativo is False
+        assert cfg.volume_audio == 0.4
         assert cfg.encontrado is True
         assert Path(cfg.caminho_config) == tmp_path / "config.json"
 
@@ -271,6 +274,10 @@ class TestValidacao:
             ({"jogo": {"pontuar_apos_tempo": 0}}, "pontuar_apos_tempo", False),
             ({"audio": {"ativo": 1}}, "som_ativo", True),
             ({"audio": {"ativo": "sim"}}, "som_ativo", True),
+            ({"audio": {"volume": 1.1}}, "volume_audio", 1.0),
+            ({"audio": {"volume": -0.1}}, "volume_audio", 1.0),
+            ({"audio": {"volume": "0.5"}}, "volume_audio", 1.0),
+            ({"audio": {"volume": True}}, "volume_audio", 1.0),
             ({"serial": {"baud_rate": 0}}, "baud_rate", 9600),
             ({"serial": {"baud_rate": 3000000}}, "baud_rate", 9600),
             ({"serial": {"baud_rate": "9600"}}, "baud_rate", 9600),
@@ -322,6 +329,22 @@ class TestValidacao:
 
         assert cfg.nomes_equipes["A"] == "Azul"
         assert cfg.nomes_equipes["B"] == "Laranja"
+        assert cfg.avisos == ()
+
+    @pytest.mark.parametrize(
+        "valor, esperado",
+        [
+            (0, 0.0),
+            (0.35, 0.35),
+            (1, 1.0),
+        ],
+    )
+    def test_volume_valido_e_convertido_para_float(
+        self, tmp_path, valor, esperado
+    ):
+        cfg = _carregar(tmp_path, {"audio": {"volume": valor}})
+
+        assert cfg.volume_audio == esperado
         assert cfg.avisos == ()
 
     @pytest.mark.parametrize(
@@ -512,6 +535,7 @@ class TestExemploECriacao:
         assert cfg.encontrado is True
         assert cfg.avisos == ()
         assert cfg.tempo_pergunta == 30
+        assert cfg.volume_audio == 1.0
         assert cfg.pasta_perguntas == str(RAIZ)
 
     def test_criar_config_exemplo(self, tmp_path):

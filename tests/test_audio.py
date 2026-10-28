@@ -1,19 +1,21 @@
 """
-Testes de `audio.py` (Etapa 3.3).
+Testes de `audio.py` (Etapas 3.3 e 4.5).
 
-Duas provas principais:
+Provas principais:
 
-1. Os bytes WAV de cada evento são **idênticos** aos gerados pelo código da
-   v2.2 (sha256 fixado abaixo, capturado de `v2.2-logica-integrada` antes da
-   movimentação). Se qualquer nota, frequência, duração, volume ou envelope
-   mudar, o teste falha.
-2. O áudio é opcional: sem pygame, `Som` fica inativo e nada levanta exceção;
-   com um pygame falso, dá para verificar qual som cada evento pede.
+1. Os bytes WAV dos efeitos sintetizados são **idênticos** aos da v2.2
+   (sha256 fixado abaixo). O pacote externo em `sons/` não altera esse
+   fallback.
+2. Cada evento procura o arquivo correspondente em `sons/`, aceita WAV/OGG e
+   cai no som sintetizado com WARNING único se o arquivo faltar ou estiver
+   corrompido.
+3. O áudio é opcional: sem pygame, `Som` fica inativo e nada levanta exceção.
 
 Nada aqui toca a placa de som de verdade.
 """
 
 import hashlib
+import logging
 import subprocess
 import sys
 from pathlib import Path
@@ -31,7 +33,20 @@ RAIZ = Path(__file__).resolve().parent.parent
 # ─────────────────────────────────────────────────────────
 class FakeSound:
     def __init__(self, file=None, buffer=None):
-        self.dados = file.read() if file is not None else b""
+        self.arquivo = None
+        self.volume = 1.0
+        if hasattr(file, "read"):
+            self.dados = file.read()
+        elif file is not None:
+            self.arquivo = str(file)
+            self.dados = Path(self.arquivo).read_bytes()
+            if self.dados.startswith(b"CORROMPIDO"):
+                raise ValueError("formato de áudio inválido")
+        else:
+            self.dados = b""
+
+    def set_volume(self, valor):
+        self.volume = valor
 
 
 class FakeCanal:
@@ -55,11 +70,15 @@ class FakeCanal:
 
 class FakeMixer:
     def __init__(self):
+        self.pre_init_kwargs = None
         self.init_kwargs = None
         self.num_channels = None
         self.canais = {}
         self.sons = []
         self.quit_chamado = False
+
+    def pre_init(self, **kw):
+        self.pre_init_kwargs = kw
 
     def init(self, **kw):
         self.init_kwargs = kw
@@ -89,6 +108,13 @@ def pygame_falso(monkeypatch):
     fake = FakePygame()
     monkeypatch.setitem(sys.modules, "pygame", fake)
     return fake
+
+
+@pytest.fixture
+def pasta_sons(tmp_path):
+    pasta = tmp_path / audio.PASTA_SONS
+    pasta.mkdir()
+    return pasta
 
 
 # ─────────────────────────────────────────────────────────
@@ -174,7 +200,7 @@ class TestBytesIdenticosV22:
         assert hashlib.sha256(dados).hexdigest() == sha_esperado, nome
 
     def test_volume_do_efeito_continua_042(self, monkeypatch, pygame_falso):
-        """O volume usado em `_wav` é parte da identidade sonora."""
+        """O volume usado em `_gerar_wav` é parte da identidade sonora."""
         capturado = {}
         original = audio._gerar_wav
 
@@ -187,6 +213,144 @@ class TestBytesIdenticosV22:
         audio.Som().nova_pergunta()
 
         assert capturado == {"volume": 0.42, "taxa": 22050}
+
+
+# ─────────────────────────────────────────────────────────
+# 2. Pacote de sons externo
+# ─────────────────────────────────────────────────────────
+class TestPacoteDeSons:
+    def test_tabela_cobre_todos_os_eventos(self):
+        assert audio.ARQUIVOS_SOM == {
+            "nova_pergunta": "nova_pergunta",
+            "botao_a": "botao_a",
+            "botao_b": "botao_b",
+            "botao_c": "botao_c",
+            "botao_d": "botao_d",
+            "revelou": "revelar",
+            "acertou": "acerto",
+            "tempo_esgotado": "tempo_esgotado",
+            "tick": "tick",
+            "tick_final": "tick_final",
+            "vitoria": "vitoria",
+            "troca_tema": "troca_tema",
+        }
+
+    def test_arquivo_wav_tem_preferencia_e_substitui_o_sintetizado(
+        self, pygame_falso, pasta_sons
+    ):
+        (pasta_sons / "nova_pergunta.wav").write_bytes(b"externo-wav")
+        (pasta_sons / "nova_pergunta.ogg").write_bytes(b"externo-ogg")
+
+        som = audio.Som(diretorio_sons=str(pasta_sons))
+        som.nova_pergunta()
+
+        externo = som._cache_arquivos["nova_pergunta"]
+        assert externo.arquivo.endswith("nova_pergunta.wav")
+        assert externo.dados == b"externo-wav"
+        assert som._cache == {}
+
+    def test_ogg_e_aceito_quando_nao_ha_wav(
+        self, pygame_falso, pasta_sons
+    ):
+        (pasta_sons / "botao_c.ogg").write_bytes(b"externo-ogg")
+
+        som = audio.Som(diretorio_sons=str(pasta_sons))
+        som.apertou("C")
+
+        externo = som._cache_arquivos["botao_c"]
+        assert externo.arquivo.endswith("botao_c.ogg")
+
+    def test_arquivo_ausente_cai_no_sintetizado_com_um_warning(
+        self, pygame_falso, pasta_sons, caplog
+    ):
+        som = audio.Som(diretorio_sons=str(pasta_sons))
+
+        with caplog.at_level(logging.WARNING, logger="desafio.audio"):
+            som.nova_pergunta()
+            som.nova_pergunta()
+
+        assert list(som._cache) == [(("E5", 90), ("G5", 90), ("C6", 140))]
+        avisos = [
+            registro.getMessage()
+            for registro in caplog.records
+            if "não encontrado" in registro.getMessage()
+        ]
+        assert len(avisos) == 1
+
+    def test_arquivo_corrompido_nao_derruba_e_usa_fallback(
+        self, pygame_falso, pasta_sons, caplog
+    ):
+        (pasta_sons / "nova_pergunta.wav").write_bytes(b"CORROMPIDO")
+
+        som = audio.Som(diretorio_sons=str(pasta_sons))
+        with caplog.at_level(logging.WARNING, logger="desafio.audio"):
+            som.nova_pergunta()
+            som.nova_pergunta()
+
+        assert som._cache_arquivos["nova_pergunta"] is None
+        assert list(som._cache) == [(("E5", 90), ("G5", 90), ("C6", 140))]
+        avisos = [
+            registro.getMessage()
+            for registro in caplog.records
+            if "inválido/corrompido" in registro.getMessage()
+        ]
+        assert len(avisos) == 1
+
+    def test_volume_configuravel_chega_aos_sons_externos_e_sintetizados(
+        self, pygame_falso, pasta_sons
+    ):
+        (pasta_sons / "nova_pergunta.wav").write_bytes(b"externo")
+        (pasta_sons / "troca_tema.wav").write_bytes(b"externo")
+
+        externo = audio.Som(diretorio_sons=str(pasta_sons), volume=0.25)
+        externo.nova_pergunta()
+        assert externo.volume == 0.25
+        assert externo._cache_arquivos["nova_pergunta"].volume == 0.25
+
+        sintetizado = audio.Som(diretorio_sons=str(pasta_sons), volume=0.5)
+        sintetizado.vitoria()
+        som = next(iter(sintetizado._cache.values()))
+        assert som.volume == 0.5
+
+    def test_eventos_de_botao_a_a_d_sao_distintos(
+        self, pygame_falso, pasta_sons
+    ):
+        dados = []
+        for equipe in ("A", "B", "C", "D"):
+            som = audio.Som(diretorio_sons=str(pasta_sons))
+            som.apertou(equipe)
+            (som_sintetizado,) = som._cache.values()
+            dados.append(som_sintetizado.dados)
+
+        assert len(set(dados)) == 4
+
+    def test_vitoria_e_troca_de_tema_tem_mapeamento(
+        self, pygame_falso, pasta_sons
+    ):
+        for nome in ("vitoria.wav", "troca_tema.wav"):
+            (pasta_sons / nome).write_bytes(b"externo")
+
+        som = audio.Som(diretorio_sons=str(pasta_sons))
+        som.vitoria()
+        som.fim_partida()
+        som.troca_tema()
+
+        assert som._cache_arquivos["vitoria"] is not None
+        assert som._cache_arquivos["troca_tema"] is not None
+
+    def test_volume_invalido_direto_vira_um(self, pygame_falso, pasta_sons):
+        assert audio.Som(diretorio_sons=str(pasta_sons), volume="x").volume == 1.0
+        assert audio.Som(diretorio_sons=str(pasta_sons), volume=-2).volume == 0.0
+        assert audio.Som(diretorio_sons=str(pasta_sons), volume=3).volume == 1.0
+
+    def test_pasta_sons_padrao_fica_ao_lado_da_aplicacao(
+        self, pygame_falso, tmp_path, monkeypatch
+    ):
+        monkeypatch.setattr(
+            audio, "obter_diretorio_base", lambda: str(tmp_path)
+        )
+        som = audio.Som()
+        assert som._pasta_sons == str(tmp_path / audio.PASTA_SONS)
 
 
 class TestSemSom:
@@ -213,21 +377,26 @@ class TestSemPygame:
         som = audio.Som()
         for _, acao, _, _ in EVENTOS_V22:
             acao(som)  # não pode levantar
+        som.vitoria()
+        som.troca_tema()
         som.parar()
         assert som._cache == {}
 
 
 class TestPygameFalso:
-    def test_inicializacao_do_mixer_inalterada(self, pygame_falso):
+    def test_inicializacao_do_mixer_com_pre_init_de_baixa_latencia(
+        self, pygame_falso
+    ):
         som = audio.Som()
         assert som.disponivel is True
         assert som.ativo is True
-        assert pygame_falso.mixer.init_kwargs == {
+        assert pygame_falso.mixer.pre_init_kwargs == {
             "frequency": 22050,
             "size": -16,
             "channels": 1,
-            "buffer": 512,
+            "buffer": 256,
         }
+        assert pygame_falso.mixer.init_kwargs == {}
         assert pygame_falso.mixer.num_channels == 4
         assert 0 in pygame_falso.mixer.canais  # Channel(0)
 

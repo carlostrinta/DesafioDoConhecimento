@@ -37,6 +37,7 @@ from config import (
     TEMPO_PERGUNTA,
     TEMPO_RESPOSTA,
     TITULO,
+    VOLUME_AUDIO,
     texto_avisos,
 )
 from jogo import (
@@ -211,7 +212,7 @@ class DueloDeConhecimento:
                 pass
 
         # ---------- Áudio ----------
-        self.som = Som(ativo=SOM_ATIVO)
+        self.som = Som(ativo=SOM_ATIVO, volume=VOLUME_AUDIO)
         self._ultimo_seg_tick = None
 
         # ---------- Inicialização ----------
@@ -328,6 +329,12 @@ class DueloDeConhecimento:
         if hasattr(self, "topo"):
             self.topo.tema = self.tema_atual
             self.topo.desenhar()
+
+        # O arquivo de "troca de tema" é opcional; sem ele, o fallback
+        # sintetizado mantém o app funcionando.
+        som = getattr(self, "som", None)
+        if som is not None and carga.perguntas and not carga.erro:
+            som.troca_tema()
 
     # -----------------------------------------------------
     # PARTIDA SALVA (Etapa 4.3)
@@ -752,6 +759,9 @@ class DueloDeConhecimento:
                         self.topo.desenhar()
                     elif tipo == "placa":
                         self.topo.placa = valor or ""
+                        self.topo.desenhar()
+                    elif tipo == "porta_ausente":
+                        self.topo.aviso_porta = valor or ""
                         self.topo.desenhar()
                 except Exception:
                     log.exception("Falha ao processar item da fila serial")

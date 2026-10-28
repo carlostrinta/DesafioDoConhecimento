@@ -38,6 +38,29 @@ class _RootFalso:
         self.destruida = True
 
 
+def test_fechar_remove_o_estado_partida_lock_real(tmp_path):
+    """O caminho normal (X, Esc nos modais, modal inicial) apaga a trava."""
+    trava = desafio.persistencia.TravaInstancia(diretorio_base=str(tmp_path))
+    assert trava.adquirir() is True
+    caminho_lock = tmp_path / desafio.persistencia.NOME_TRAVA
+    assert caminho_lock.exists()
+
+    app = object.__new__(desafio.DueloDeConhecimento)
+    app._salvador = _SalvadorFalso()
+    app.serial_comm = _ServicoFalso()
+    app.som = _ServicoFalso()
+    app._trava = trava
+    app.root = _RootFalso()
+    app.rodando = True
+
+    app.fechar()
+
+    assert app.rodando is False
+    assert app.root.destruida is True
+    assert not caminho_lock.exists()
+    assert trava.ativa is False
+
+
 def test_fechar_grava_para_servicos_libera_trava_e_destroi_root():
     app = object.__new__(desafio.DueloDeConhecimento)
     app._salvador = _SalvadorFalso()

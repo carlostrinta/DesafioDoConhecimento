@@ -10,10 +10,11 @@ interface. Sabe apenas onde está a "pasta da aplicação":
 
 Sobre `sys._MEIPASS`: ele **não** é consultado. O `.spec` do projeto hoje usa
 `datas=[]`, ou seja, nenhum arquivo é empacotado dentro do executável — logo
-não existe nada para procurar na pasta temporária do PyInstaller. Quando os
-JSONs (ou os sons) forem empacotados de verdade, `caminho_recurso` ganha uma
-busca em `_MEIPASS` **somente para os recursos empacotados**, mantendo a pasta
-do `.exe` como lugar dos arquivos do usuário.
+não existe nada para procurar na pasta temporária do PyInstaller. Os JSONs,
+`config.json` e a pasta `sons/` são arquivos **do usuário**, sempre ao lado do
+`.exe`; não devem entrar em `datas`. Se algum recurso interno for empacotado no
+futuro, `caminho_recurso` pode ganhar uma busca em `_MEIPASS` **somente para
+esse recurso**, mantendo a pasta do `.exe` como lugar dos arquivos externos.
 """
 
 from __future__ import annotations

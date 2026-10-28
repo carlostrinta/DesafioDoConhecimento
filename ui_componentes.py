@@ -102,6 +102,37 @@ def texto_ajustado(cv, x, y, largura, altura, texto, nome_fonte, minimo=10, **kw
         tam = max(minimo, tam - 2)
 
 
+def truncar_texto(texto, largura_max, medir, reticencias="…"):
+    """
+    Encurta `texto` para caber em `largura_max`, terminando em reticências.
+
+    `medir` recebe uma string e devolve a largura em pixels. A função é pura e
+    recebe a medição de fora para poder ser testada sem abrir uma janela Tk.
+    Devolve "" quando nem as reticências cabem.
+    """
+    texto = str(texto)
+    if largura_max <= 0:
+        return ""
+    if medir(texto) <= largura_max:
+        return texto
+    if medir(reticencias) > largura_max:
+        return ""
+
+    # Busca binária pelo maior prefixo que ainda cabe com as reticências.
+    inicio, fim = 0, len(texto)
+    while inicio < fim:
+        meio = (inicio + fim + 1) // 2
+        candidato = texto[:meio].rstrip() + reticencias
+        if medir(candidato) <= largura_max:
+            inicio = meio
+        else:
+            fim = meio - 1
+
+    if inicio <= 0:
+        return ""
+    return texto[:inicio].rstrip() + reticencias
+
+
 def obter_icone_tema(titulo, nome_arquivo):
     """Retorna um emoji representativo para a tecnologia ou tema."""
     t = (str(titulo) + " " + str(nome_arquivo)).lower()
@@ -168,12 +199,24 @@ class Cartao(Tela):
         pass
 
 
-def texto_status_serial(conexao, placa="", disponivel=None):
+def texto_status_serial(conexao, placa="", disponivel=None, aviso_porta=""):
     """Texto e cor da barra de status; função pura para facilitar testes."""
     if disponivel is None:
         disponivel = SERIAL_DISPONIVEL
     if not disponivel:
         return "pyserial não instalado. Modo teclado ativo.", Cor.AVISO
+    if aviso_porta:
+        if conexao:
+            return (
+                f"Arduino conectado ({conexao}) · "
+                f"porta {aviso_porta} não encontrada",
+                Cor.AVISO,
+            )
+        return (
+            f"Porta {aviso_porta} não encontrada; "
+            "usando detecção automática.",
+            Cor.AVISO,
+        )
     if conexao:
         detalhe = f" · {placa}" if placa else ""
         return f"Arduino conectado ({conexao}){detalhe}", Cor.CERTO
@@ -186,6 +229,14 @@ class BarraTopo(Tela):
         self.conexao = None
         self.placa = ""
         self.tema = ""
+        self.aviso_porta = ""
+
+    def _largura_texto(self, texto, fonte):
+        """Largura real de um texto na fonte, medida pelo próprio Canvas."""
+        item = self.create_text(-10000, -10000, text=texto, anchor="w", font=fonte)
+        bb = self.bbox(item)
+        self.delete(item)
+        return (bb[2] - bb[0]) if bb else 0
 
     def pintar(self, w, h):
         cy = h / 2
@@ -199,18 +250,49 @@ class BarraTopo(Tela):
         texto_titulo = TITULO
         if self.tema:
             texto_titulo += f"  •  {self.tema}"
-        self.create_text(x + s * 1.55 + 18, cy, text=texto_titulo, anchor="w",
-                         fill=Cor.TEXTO, font=F("titulo"))
+        item_titulo = self.create_text(
+            x + s * 1.55 + 18, cy, text=texto_titulo, anchor="w",
+            fill=Cor.TEXTO, font=F("titulo"),
+        )
+        bb_titulo = self.bbox(item_titulo)
+        x_min_status = (bb_titulo[2] if bb_titulo else 0) + 18
 
-        txt, cor = texto_status_serial(self.conexao, self.placa)
-        item = self.create_text(w - 6, cy - h * 0.16, text=txt, anchor="e",
-                                fill=Cor.SUAVE, font=F("pequena"))
-        bb = self.bbox(item)
+        txt, cor = texto_status_serial(
+            self.conexao, self.placa, aviso_porta=self.aviso_porta
+        )
+        fonte_status = F("pequena")
         r = 5 * min(ESCALA, 1.5)
-        self.create_oval(bb[0] - 14 - r, (bb[1] + bb[3]) / 2 - r,
-                         bb[0] - 14 + r, (bb[1] + bb[3]) / 2 + r, fill=cor, outline="")
-        self.create_text(w - 6, cy + h * 0.2, anchor="e", fill=Cor.APAGADO, font=F("pequena", 0.9),
-                         text="F11 tela cheia   Ctrl+R zerar   Ctrl+T temas   S som on/off")
+        largura_max = (w - 6) - x_min_status - (14 + 2 * r)
+        if largura_max > 0:
+            txt = truncar_texto(
+                txt,
+                largura_max,
+                lambda valor: self._largura_texto(valor, fonte_status),
+            )
+            if txt:
+                item = self.create_text(
+                    w - 6, cy - h * 0.16, text=txt, anchor="e",
+                    fill=Cor.SUAVE, font=fonte_status,
+                )
+                bb = self.bbox(item)
+                # Se a medição divergir, não desenha: melhor esconder do que
+                # sobrepor o título/placar.
+                if bb and bb[0] >= x_min_status:
+                    self.create_oval(
+                        bb[0] - 14 - r, (bb[1] + bb[3]) / 2 - r,
+                        bb[0] - 14 + r, (bb[1] + bb[3]) / 2 + r,
+                        fill=cor, outline="",
+                    )
+
+        # Linha de ajuda: em altura pequena não há espaço vertical para ela
+        # sem colidir com o título; nesse caso é omitida (o status continua).
+        if h >= 80:
+            y_ajuda = h - max(10, h * 0.12)
+            self.create_text(
+                w - 6, y_ajuda, anchor="e", fill=Cor.APAGADO,
+                font=F("pequena", 0.9),
+                text="F11 tela cheia   Ctrl+R zerar   Ctrl+T temas   S som on/off",
+            )
 
 
 class CartaoPlacar(Cartao):

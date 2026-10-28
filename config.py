@@ -52,6 +52,7 @@ BAUD_RATE_PADRAO = 9600
 PASTA_PERGUNTAS_PADRAO = "."        # relativa à pasta da aplicação
 ARQUIVO_PERGUNTAS_PADRAO = "conhecimentos_gerais.json"
 SOM_ATIVO_PADRAO = True
+VOLUME_AUDIO_PADRAO = 1.0
 CONTINUAR_AUTOMATICO_PADRAO = False
 
 # ─── Limites de validação ───
@@ -60,6 +61,8 @@ BAUD_MINIMO = 1200
 BAUD_MAXIMO = 115200
 TIMEOUT_PRONTO_MINIMO = 0.1
 TIMEOUT_PRONTO_MAXIMO = 30.0
+VOLUME_AUDIO_MINIMO = 0.0
+VOLUME_AUDIO_MAXIMO = 1.0
 NUM_EQUIPES_UI = 2  # a interface (e o Arduino) só usam 2 até a Etapa 5
 
 _SECOES = {
@@ -68,7 +71,7 @@ _SECOES = {
     "nomes_equipes": set(EQUIPES),
     "serial": {"porta", "baud_rate", "timeout_pronto"},
     "perguntas": {"pasta", "arquivo_padrao"},
-    "audio": {"ativo"},
+    "audio": {"ativo", "volume"},
     "persistencia": {"continuar_automatico"},
 }
 
@@ -94,6 +97,7 @@ class Configuracao:
     pasta_perguntas: str = ""
     arquivo_perguntas: str = ARQUIVO_PERGUNTAS_PADRAO
     som_ativo: bool = SOM_ATIVO_PADRAO
+    volume_audio: float = VOLUME_AUDIO_PADRAO
     continuar_automatico: bool = CONTINUAR_AUTOMATICO_PADRAO
     avisos: tuple[str, ...] = ()
     caminho_config: str | None = None
@@ -216,6 +220,7 @@ def carregar(caminho=None, diretorio_base=None) -> Configuracao:
     som_ativo = _ler_booleano(
         audio, "ativo", "audio.ativo", SOM_ATIVO_PADRAO, avisos,
     )
+    volume_audio = _ler_volume(audio, avisos)
     continuar_automatico = _ler_booleano(
         persistencia,
         "continuar_automatico",
@@ -237,6 +242,7 @@ def carregar(caminho=None, diretorio_base=None) -> Configuracao:
         pasta_perguntas=pasta_perguntas,
         arquivo_perguntas=arquivo_perguntas,
         som_ativo=som_ativo,
+        volume_audio=volume_audio,
         continuar_automatico=continuar_automatico,
         avisos=tuple(avisos),
         caminho_config=caminho,
@@ -267,7 +273,10 @@ def modelo_padrao() -> dict:
             "pasta": PASTA_PERGUNTAS_PADRAO,
             "arquivo_padrao": ARQUIVO_PERGUNTAS_PADRAO,
         },
-        "audio": {"ativo": SOM_ATIVO_PADRAO},
+        "audio": {
+            "ativo": SOM_ATIVO_PADRAO,
+            "volume": VOLUME_AUDIO_PADRAO,
+        },
         "persistencia": {
             "continuar_automatico": CONTINUAR_AUTOMATICO_PADRAO,
         },
@@ -368,6 +377,28 @@ def _ler_booleano(secao, chave, nome, padrao, avisos):
         )
         return padrao
     return valor
+
+
+def _ler_volume(secao, avisos):
+    chave = "volume"
+    nome = "audio.volume"
+    if chave not in secao:
+        return VOLUME_AUDIO_PADRAO
+    valor = secao[chave]
+    valido = (
+        not isinstance(valor, bool)
+        and isinstance(valor, (int, float))
+        and VOLUME_AUDIO_MINIMO <= valor <= VOLUME_AUDIO_MAXIMO
+    )
+    if not valido:
+        _aviso(
+            avisos,
+            f"{nome}: valor inválido {valor!r}; use número entre "
+            f"{VOLUME_AUDIO_MINIMO:g} e {VOLUME_AUDIO_MAXIMO:g}; "
+            f"usando {VOLUME_AUDIO_PADRAO:g}.",
+        )
+        return VOLUME_AUDIO_PADRAO
+    return float(valor)
 
 
 def _ler_timeout(secao, avisos):
@@ -511,5 +542,6 @@ BAUD_RATE = CONFIG.baud_rate
 PASTA_PERGUNTAS = CONFIG.pasta_perguntas
 ARQUIVO_PERGUNTAS = CONFIG.arquivo_perguntas
 SOM_ATIVO = CONFIG.som_ativo
+VOLUME_AUDIO = CONFIG.volume_audio
 CONTINUAR_AUTOMATICO = CONFIG.continuar_automatico
 AVISOS_CONFIG = CONFIG.avisos

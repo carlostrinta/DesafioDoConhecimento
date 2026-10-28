@@ -40,7 +40,9 @@ Dependências:
 - `pygame` — sons.
 
 Sem Arduino conectado o jogo inicia normalmente em **modo teclado**. Sem
-`pygame` instalado o jogo também inicia, mas sem som (aviso no log).
+`pygame` instalado o jogo também inicia, mas sem som (aviso no log). Os sons
+personalizados são opcionais: a pasta `sons/` pode estar vazia (veja
+[Pacote de sons](#pacote-de-sons-etapa-45)).
 
 ## Execução
 
@@ -171,6 +173,7 @@ Copy-Item config.exemplo.json config.json
 | `perguntas.pasta` | texto | `"."` | relativa à pasta da aplicação ou absoluta; se não existir, volta para a pasta da aplicação |
 | `perguntas.arquivo_padrao` | texto | `conhecimentos_gerais.json` | nome de arquivo `.json`, sem pasta |
 | `audio.ativo` | booleano | `true` | `true`/`false` (estado inicial do som) |
+| `audio.volume` | número | `1.0` | `0.0` a `1.0`; aplica-se aos sons externos e sintetizados (`0.0` mudo) |
 | `persistencia.continuar_automatico` | booleano | `false` | `true` retoma a partida salva sem o modal de confirmação |
 
 O que acontece com arquivo problemático:
@@ -213,7 +216,18 @@ com `WARNING` no log.
 O app usa `estado_partida.lock` para detectar duas instâncias na mesma pasta.
 A segunda instância **não é bloqueada** (requisito da Etapa 4.3), mas registra
 um `WARNING` avisando que as duas podem sobrescrever o estado. Travas órfãs de
-processos mortos são recuperadas na abertura seguinte.
+processos mortos são recuperadas na abertura seguinte. O caminho normal de
+fechamento (X, Esc nos modais e modal inicial) chama `fechar()` e **remove** o
+`estado_partida.lock`; o teste `tests/test_fechamento.py` usa uma trava real em
+`tmp_path` para provar isso.
+
+**Limitação conhecida (PID reaproveitado):** a trava guarda o PID do processo e
+considera o dono "vivo" enquanto esse PID existir. O Windows pode reutilizar o
+PID de um processo que morreu; nesse caso, uma abertura seguinte pode ver a
+trava como ativa e emitir um `WARNING` falso, sem bloquear o app. A trava é
+cooperativa e serve para avisar, não para garantir exclusão mútua. Se o aviso
+aparecer sem outra instância aberta, feche o app, apague
+`estado_partida.lock` e abra de novo.
 
 Ao abrir:
 
@@ -278,7 +292,7 @@ porta e a fila de placa são testadas com portas falsas em
 | `ui_selecao.py` | modal de escolha do banco de perguntas (widgets Tk clássicos) |
 | `serial_comm.py` | thread serial, detecção de porta, reconexão e fila de eventos |
 | `dispositivos.py` | lista única de VID/PID, prioridade e nome da placa (puro) |
-| `audio.py` | efeitos sonoros sintetizados (pygame opcional; sem ele fica mudo) |
+| `audio.py` | sons externos em `sons/` + fallback sintetizado (pygame opcional; sem ele fica mudo) |
 | `jogo.py` | regra de jogo pura: estado, placar e timer |
 | `perguntas.py` | modelo, carregador/validador, listagem e nomes de tema (puro) |
 | `persistencia.py` | estado da partida em JSON, hash, trava de instância e debounce (puro) |
@@ -335,6 +349,17 @@ porta e varre de novo a cada 3 s. A barra de status mostra a porta e a placa,
 por exemplo `Arduino conectado (COM7) · CH340/CH341 (clone Arduino)
 (1A86:7523)`.
 
+**Porta configurada que não existe (decisão da Etapa 4.4):** o app **continua
+tentando** a porta/par explícito primeiro e, se ele não estiver disponível,
+cai na **detecção automática** — mas não em silêncio. A primeira ausência gera
+um `WARNING` no log e um aviso persistente na barra de status:
+`Porta COM9 não encontrada; usando detecção automática.` Se uma placa for
+conectada em outra porta, o status mostra `Arduino conectado (COM5) · porta
+COM9 não encontrada`; quando a porta configurada aparece, o aviso é limpo. A
+mensagem é encurtada com reticências em janelas estreitas (teste em
+`tests/test_ui_componentes.py`). O aviso é emitido **uma vez por ausência**,
+não a cada varredura de 3 s.
+
 A **lista única de VID/PID** fica em `dispositivos.py`:
 
 | VID:PID | Nome exibido |
@@ -358,6 +383,28 @@ Além desses pares, os VIDs de compatibilidade `1B4F`, `239A`, `03EB`, `04D8`
 e `1209` são aceitos com qualquer PID; a lista e as prioridades não são
 duplicadas em `serial_comm.py` nem na UI.
 
+## Pacote de sons (Etapa 4.5)
+
+Os efeitos são **opcionais e externos**: o jogo procura os arquivos na pasta
+`sons/` ao lado do executável (rodando pelo fonte, na pasta do projeto). Se um
+arquivo não existir ou estiver corrompido, usa o efeito sintetizado
+equivalente e registra **um único `WARNING` por arquivo**; o app nunca cai por
+causa de áudio.
+
+- Formatos: **WAV PCM 16 bits** e **OGG Vorbis**; se os dois existirem, o WAV
+  tem preferência.
+- Nomes e durações sugeridas: [`sons/README.md`](sons/README.md).
+- Registro de autor/licença: [`sons/LICENCAS.md`](sons/LICENCAS.md).
+- Botões A–D têm sons distintos e devem ter **menos de 1 s**.
+- Volume geral em `audio.volume` (`0.0`–`1.0`), aplicado também ao fallback.
+- O mixer usa `pre_init` com buffer de **256** amostras (baixa latência) e
+  mantém `set_num_channels(4)`.
+- `vitoria`/`fim_partida` e `troca_tema` já estão mapeados; a tela de campeão
+  continua na Etapa 5. A troca de tema toca o som ao carregar um banco.
+
+Nenhum áudio é baixado ou incluído no repositório. A pasta `sons/` contém
+apenas a documentação; copie os arquivos licenciados para ela.
+
 ## Gerar o executável
 
 ```powershell
@@ -371,16 +418,19 @@ pasta do script, se o local não permitir escrita).
 
 Nada é empacotado dentro do `.exe` (`datas=[]` no `.spec`): os recursos são
 procurados na **pasta da aplicação** — a pasta do `.exe` quando congelado, ou a
-pasta do projeto rodando pelo fonte. Por isso os bancos de perguntas (e, no
-futuro, a pasta `sons/`) ficam sempre ao lado do executável. A chave
+pasta do projeto rodando pelo fonte. Por isso os bancos de perguntas, o
+`config.json` e a pasta `sons/` ficam sempre ao lado do executável. A chave
 `perguntas.pasta` permite manter os bancos numa subpasta, sem recompilar; se a
-pasta não existir, o app usa a pasta do executável.
+pasta não existir, o app usa a pasta do executável. O comentário no `.spec`
+lembra que `sons/` é externo e **não** deve entrar em `datas` (isso a colocaria
+em `_MEIPASS`, fora do alcance do usuário).
 
 **Pendência D6 (distribuição):** o `.exe` ainda não tem um script de
 empacotamento de pasta. A distribuição precisa sair com o executável, o
 `config.exemplo.json`, a pasta de perguntas (`perguntas.pasta` ou os JSONs ao
-lado do `.exe`) e o `README.md`. O script de empacotamento será feito depois da
-Etapa 4.4; até lá, copie esses itens manualmente para a pasta de distribuição.
+lado do `.exe`), a pasta `sons/` (com `README.md` e `LICENCAS.md`, mesmo sem
+áudio) e o `README.md`. O script de empacotamento será feito depois da Etapa
+4.5; até lá, copie esses itens manualmente para a pasta de distribuição.
 
 ## Roadmap (próximas etapas)
 

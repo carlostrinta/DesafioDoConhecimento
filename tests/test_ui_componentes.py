@@ -215,6 +215,65 @@ def capturar_componentes(mod):
         root.destroy()
 
 
+def test_truncar_texto_respeita_o_limite_e_preserva_texto_curto():
+    from ui_componentes import truncar_texto
+
+    assert truncar_texto("abc", 10, len) == "abc"
+    assert truncar_texto("abcdef", 5, len) == "abcd…"
+    assert truncar_texto("", 5, len) == ""
+    assert truncar_texto("abc", 0, len) == ""
+    assert truncar_texto("abc", 2, lambda _: 5) == ""
+
+
+def test_barra_topo_nao_sobrepoe_status_ao_titulo_em_janela_pequena():
+    import tkinter as tk
+
+    import ui_componentes as mod
+
+    try:
+        root = tk.Tk()
+    except tk.TclError as e:
+        pytest.skip(f"Tk indisponível: {e}")
+
+    original = mod.SERIAL_DISPONIVEL
+    try:
+        mod.SERIAL_DISPONIVEL = True
+        widget = mod.BarraTopo(root)
+        widget.place(x=0, y=0, width=760, height=64)
+        widget.conexao = "COM6"
+        widget.placa = "Arduino Uno (2341:0043)"
+        widget.aviso_porta = "COM9"
+        root.update_idletasks()
+        widget.pintar(760, 64)
+        root.update_idletasks()
+
+        textos = {}
+        for item in widget.find_all():
+            if widget.type(item) != "text":
+                continue
+            texto = widget.itemcget(item, "text")
+            textos[texto] = widget.bbox(item)
+
+        titulo = next(bb for txt, bb in textos.items() if txt.startswith(mod.TITULO))
+        status = next(
+            (bb for txt, bb in textos.items() if "Arduino conectado" in txt),
+            None,
+        )
+        ajuda = next(
+            (bb for txt, bb in textos.items() if "F11" in txt), None
+        )
+
+        assert status is not None, "status deveria caber truncado nesta largura"
+        assert status[0] >= titulo[2], "status invadiu o título"
+        assert status[2] <= 760 - 5, "status passou da borda direita"
+        assert 0 <= status[1] and status[3] <= 64
+        if ajuda is not None:
+            assert ajuda[1] >= titulo[3], "linha de ajuda colidiu com o título"
+    finally:
+        mod.SERIAL_DISPONIVEL = original
+        root.destroy()
+
+
 @pytest.mark.skipif(
     not GOLDEN_ATIVO,
     reason="golden visual é opt-in: defina DESAFIO_GOLDEN_UI=1",

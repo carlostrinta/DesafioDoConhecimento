@@ -58,6 +58,41 @@ class TestCandidatas:
         comm = criar_comm(queue.Queue(), modulo, porta_forcada="FFFF:0001")
         assert comm._candidatas() == ["COM5"]
 
+    def test_porta_configurada_ausente_avisa_uma_vez_na_fila(self):
+        modulo = ModuloSerialFalso()
+        modulo.portas = [Porta("COM5", "Arduino Uno", 0x2341, 0x0043)]
+        fila = queue.Queue()
+        comm = criar_comm(fila, modulo, porta_forcada="COM9")
+
+        assert comm._candidatas() == ["COM9", "COM5"]
+        assert comm._candidatas() == ["COM9", "COM5"]
+
+        itens = drenar(fila)
+        assert itens.count(("porta_ausente", "COM9")) == 1
+
+    def test_vid_pid_configurado_ausente_avisa_na_fila(self):
+        modulo = ModuloSerialFalso()
+        modulo.portas = [Porta("COM5", "Arduino Uno", 0x2341, 0x0043)]
+        fila = queue.Queue()
+        comm = criar_comm(fila, modulo, porta_forcada="FFFF:0001")
+
+        assert comm._candidatas() == ["COM5"]
+
+        assert drenar(fila).count(("porta_ausente", "FFFF:0001")) == 1
+
+    def test_aviso_de_porta_ausente_e_limpo_quando_ela_aparece(self):
+        modulo = ModuloSerialFalso()
+        modulo.portas = [Porta("COM5", "Arduino Uno", 0x2341, 0x0043)]
+        fila = queue.Queue()
+        comm = criar_comm(fila, modulo, porta_forcada="COM9")
+
+        comm._candidatas()
+        assert drenar(fila) == [("porta_ausente", "COM9")]
+
+        modulo.portas.append(Porta("COM9", "USB-SERIAL CH340", 0x1A86, 0x7523))
+        comm._candidatas()
+        assert drenar(fila) == [("porta_ausente", None)]
+
     def test_descricao_conhecida_tem_prioridade(self):
         modulo = ModuloSerialFalso()
         modulo.portas = [
@@ -129,6 +164,31 @@ class TestConexao:
             comm.rodando = False
             comm.fechar()
 
+    def test_vid_pid_explicito_conecta_antes_do_arduino_oficial(self):
+        """
+        Escolha explícita do usuário: com `1A86:7523` no config e um Arduino
+        oficial (2341:0043) presente, o CH340/COM7 é aberto e conectado; o
+        COM5 oficial nem chega a ser tentado.
+        """
+        modulo = ModuloSerialFalso()
+        modulo.portas = [
+            Porta("COM5", "USB Serial Device", 0x2341, 0x0043),
+            Porta("COM7", "USB-SERIAL CH340", 0x1A86, 0x7523),
+        ]
+        modulo.manda_pronto = {"COM5", "COM7"}
+        fila = queue.Queue()
+        comm = criar_comm(fila, modulo, porta_forcada="1A86:7523")
+
+        comm.iniciar()
+        try:
+            assert esperar(lambda: comm.serial is not None)
+            assert comm.serial.port == "COM7"
+            assert [aberta.port for aberta in modulo.abertas] == ["COM7"]
+            assert ("conexao", "COM7") in drenar(fila)
+        finally:
+            comm.rodando = False
+            comm.fechar()
+
     def test_avisa_placa_conhecida_na_fila(self):
         modulo = ModuloSerialFalso()
         modulo.portas = [Porta("COM7", "USB-SERIAL CH340", 0x1A86, 0x7523)]
@@ -145,6 +205,24 @@ class TestConexao:
                 "placa", "CH340/CH341 (clone Arduino) (1A86:7523)"
             ) in itens
             assert comm.placa_atual == "CH340/CH341 (clone Arduino) (1A86:7523)"
+        finally:
+            comm.rodando = False
+            comm.fechar()
+
+    def test_porta_configurada_ausente_cai_no_automatico_e_avisa(self):
+        modulo = ModuloSerialFalso()
+        modulo.portas = [Porta("COM5", "Arduino Uno", 0x2341, 0x0043)]
+        modulo.manda_pronto = {"COM5"}
+        fila = queue.Queue()
+        comm = criar_comm(fila, modulo, porta_forcada="COM9")
+
+        comm.iniciar()
+        try:
+            assert esperar(lambda: comm.serial is not None)
+            assert comm.serial.port == "COM5"
+            itens = drenar(fila)
+            assert ("porta_ausente", "COM9") in itens
+            assert ("conexao", "COM5") in itens
         finally:
             comm.rodando = False
             comm.fechar()

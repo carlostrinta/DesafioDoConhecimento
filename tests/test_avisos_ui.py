@@ -5,9 +5,12 @@ O modulo `desafio` importa tkinter, pyserial e pygame (opcionais); aqui so
 usamos funcoes puras de formatacao, entao nenhuma janela e criada.
 """
 
+import queue
+
 import pytest
 
 desafio = pytest.importorskip("desafio")
+ui_componentes = pytest.importorskip("ui_componentes")
 
 
 class TestMensagemIgnoradas:
@@ -82,3 +85,52 @@ def test_drenar_fila_entrega_porta_e_placa_para_a_barra():
     app.drenar_fila()
     assert app.topo.conexao is None
     assert app.topo.placa == ""
+
+
+def test_barra_de_status_avisa_porta_configurada_ausente():
+    from ui_componentes import texto_status_serial
+
+    texto, cor = texto_status_serial(
+        None, "", disponivel=True, aviso_porta="COM9"
+    )
+
+    assert "COM9" in texto
+    assert "não encontrada" in texto
+    assert "detecção automática" in texto
+    assert cor == ui_componentes.Cor.AVISO
+
+
+def test_barra_de_status_mostra_fallback_quando_conectou_em_outra_porta():
+    from ui_componentes import texto_status_serial
+
+    texto, _ = texto_status_serial(
+        "COM5", "", disponivel=True, aviso_porta="COM9"
+    )
+
+    assert "COM5" in texto
+    assert "COM9" in texto
+    assert "não encontrada" in texto
+
+
+def test_drenar_fila_entrega_aviso_de_porta_ausente_para_a_barra():
+    class TopoFalso:
+        aviso_porta = ""
+        desenhos = 0
+
+        def desenhar(self):
+            self.desenhos += 1
+
+    app = object.__new__(desafio.DueloDeConhecimento)
+    app.fila = queue.Queue()
+    app.fila.put(("porta_ausente", "COM9"))
+    app.topo = TopoFalso()
+    app.rodando = False
+
+    app.drenar_fila()
+
+    assert app.topo.aviso_porta == "COM9"
+    assert app.topo.desenhos == 1
+
+    app.fila.put(("porta_ausente", None))
+    app.drenar_fila()
+    assert app.topo.aviso_porta == ""
