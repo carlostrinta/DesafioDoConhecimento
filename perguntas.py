@@ -12,9 +12,12 @@ continua na UI.
 from __future__ import annotations
 
 import json
+import logging
 import os
 
 from dataclasses import dataclass, field
+
+log = logging.getLogger("desafio.perguntas")
 
 
 @dataclass
@@ -120,6 +123,7 @@ def ler_banco_perguntas(
             )
         except Exception as e:
             carga.ignoradas.append(f"Pergunta #{i} ignorada: {e}")
+            log.warning("Pergunta #%d ignorada em %s: %s", i, nome_arquivo, e)
 
     return carga
 
@@ -181,7 +185,7 @@ def inspecionar_arquivo_perguntas(caminho):
             "categorias": sorted(categorias),
         }
     except Exception as e:
-        print(f"Erro ao inspecionar {caminho}: {e}")
+        log.warning("Erro ao inspecionar %s: %s", caminho, e)
         return None
 
 
@@ -199,7 +203,7 @@ def listar_arquivos_perguntas(diretorio_base):
             if f.lower().endswith(".json"):
                 candidatos.append(os.path.join(diretorio_base, f))
     except Exception as e:
-        print(f"Erro ao listar pasta base {diretorio_base}: {e}")
+        log.warning("Erro ao listar pasta base %s: %s", diretorio_base, e)
 
     # Também inspeciona subpasta 'perguntas' caso exista
     subpasta = os.path.join(diretorio_base, "perguntas")

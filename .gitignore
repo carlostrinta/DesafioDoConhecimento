@@ -16,6 +16,7 @@ DesafioV1/
 
 # Logs / Estado salvo
 *.log
+logs/
 estado_partida.json
 config.json
 

@@ -14,11 +14,14 @@ ao protótipo v2.2 (bytes WAV verificados por sha256 em tests/test_audio.py).
 from __future__ import annotations
 
 import io
+import logging
 import math
 import struct
 import wave
 
 from jogo import FASE_AGUARDANDO, FASE_RESPONDENDO
+
+log = logging.getLogger("desafio.audio")
 
 
 def _gerar_wav(notas, taxa=22050, volume=0.55):
@@ -86,10 +89,10 @@ class Som:
             self._canal = pygame.mixer.Channel(0)
             self.disponivel = True
 
-            print("[SOM] Sistema de áudio inicializado.")
+            log.info("[SOM] Sistema de áudio inicializado.")
 
         except Exception as e:
-            print(f"[SOM] Não foi possível inicializar pygame.mixer: {e}")
+            log.warning("[SOM] Não foi possível inicializar pygame.mixer: %s", e)
             self.ativo = False
 
     def _wav(self, notas):
@@ -123,7 +126,7 @@ class Som:
             self._canal.stop()
             self._canal.play(som)
         except Exception as e:
-            print(f"[SOM] Erro em tocar_ja: {e}")
+            log.warning("[SOM] Erro em tocar_ja: %s", e)
 
     def tocar(self, *notas):
         """Compatibilidade: efeito de baixa prioridade."""
@@ -135,7 +138,7 @@ class Som:
             if not self._canal.get_busy():
                 self._canal.play(som)
         except Exception as e:
-            print(f"[SOM] Erro em tocar: {e}")
+            log.warning("[SOM] Erro em tocar: %s", e)
 
     def parar(self):
         """Encerra a reprodução e libera o mixer."""
@@ -145,7 +148,7 @@ class Som:
                 self._pygame.mixer.quit()
                 self.disponivel = False
         except Exception as e:
-            print(f"[SOM] Erro ao encerrar: {e}")
+            log.warning("[SOM] Erro ao encerrar: %s", e)
 
     # ---------- Sons específicos do jogo ----------
 

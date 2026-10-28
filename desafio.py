@@ -15,10 +15,10 @@ Atalhos de teclado (modo simulação, funcionam junto com o Arduino):
     Ctrl+R     zerar o placar
 """
 
+import logging
 import math
 import os
 import queue
-import traceback
 import tkinter as tk
 from tkinter import messagebox
 
@@ -69,8 +69,10 @@ from ui_componentes import (
 )
 from ui_selecao import ModalSelecaoPerguntas
 
+log = logging.getLogger("desafio")
+
 if not SERIAL_DISPONIVEL:
-    print("AVISO: pyserial não instalado. Modo teclado ativo.")
+    log.warning("pyserial não instalado. Modo teclado ativo.")
 
 # =========================================================
 # CONFIGURAÇÕES
@@ -149,7 +151,7 @@ class DueloDeConhecimento:
 
         self.rodando = True
         self.fila = queue.Queue()
-        self.serial_comm = ComunicacaoSerial(self.fila)
+        self.serial_comm = ComunicacaoSerial(self.fila, log=log.debug)
 
         # Ícone da janela principal
         ico_path = caminho_recurso("desafio.ico")
@@ -254,13 +256,22 @@ class DueloDeConhecimento:
         self.tema_atual = carga.tema
         self.erro_carga = carga.erro
         if carga.erro:
-            print(carga.erro)
-        for linha in carga.ignoradas:
-            print(linha)
+            log.error("%s", carga.erro)
 
         self.jogo.recarregar_perguntas(carga.perguntas)
-        print(f"[{self.tema_atual}] {len(carga.perguntas)} perguntas carregadas de {nome_arquivo}.")
-        # Aviso na tela (o detalhe de cada pergunta vai para o log na Etapa 4.1)
+        log.info(
+            "[%s] %d perguntas carregadas de %s.",
+            self.tema_atual,
+            len(carga.perguntas),
+            nome_arquivo,
+        )
+        if carga.ignoradas:
+            log.warning(
+                "%d pergunta(s) ignorada(s) em %s (detalhes acima).",
+                len(carga.ignoradas),
+                nome_arquivo,
+            )
+        # Aviso na tela; o detalhe de cada pergunta ignorada fica no log.
         self._aviso_carga = mensagem_ignoradas(len(carga.ignoradas), nome_arquivo)
 
         if hasattr(self, "topo"):
@@ -591,7 +602,7 @@ class DueloDeConhecimento:
                         self.topo.conexao = valor
                         self.topo.desenhar()
                 except Exception:
-                    traceback.print_exc()
+                    log.exception("Falha ao processar item da fila serial")
         except queue.Empty:
             pass
         if self.rodando:
@@ -599,8 +610,9 @@ class DueloDeConhecimento:
 
     def processar_evento(self, evento):
         # Mapeamento linha-da-serial -> ação é uma função pura (protocolo.py)
+        log.debug("Evento serial recebido: %s", evento)
         if evento == "PRONTO":
-            print("Arduino reiniciado.")
+            log.info("Arduino reiniciado.")
         self._despachar(mapear_evento_arduino(evento, self.jogo))
 
     # -----------------------------------------------------

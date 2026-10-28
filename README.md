@@ -40,7 +40,7 @@ Dependências:
 - `pygame` — sons.
 
 Sem Arduino conectado o jogo inicia normalmente em **modo teclado**. Sem
-`pygame` instalado o jogo também inicia, mas sem som (aviso no console).
+`pygame` instalado o jogo também inicia, mas sem som (aviso no log).
 
 ## Execução
 
@@ -54,6 +54,33 @@ primeira execução, pede o tema (arquivo de perguntas).
 > `desafio.py` contém apenas a interface (a classe `DueloDeConhecimento`); ele
 > **não é** um entrypoint. Rodá-lo direto imprime `Use: python main.py` e sai
 > com código 1, em vez de terminar em silêncio.
+
+Para ver o log detalhado também no console:
+
+```powershell
+python main.py --debug
+```
+
+## Logs
+
+O jogo grava tudo em **`logs/desafio.log`**, na pasta da aplicação (ao lado do
+`.exe`; rodando pelo fonte, na pasta do projeto). Se não houver permissão de
+escrita ali, o arquivo vai para a pasta do script.
+
+- Rotação automática: no máximo **1 MB por arquivo** e **3 backups**
+  (`desafio.log.1` … `desafio.log.3`).
+- Sem `--debug`, **nada** é impresso no console; o arquivo recebe `INFO`,
+  `WARNING` e `ERROR`.
+- Com `--debug`, o console mostra também `DEBUG` (portas seriais, cada evento
+  recebido etc.).
+- O nível pode ser trocado por `DESAFIO_LOG_NIVEL` (`DEBUG`, `INFO`, `WARNING`
+  ou `ERROR`); o padrão é `INFO` (`DEBUG` com `--debug`).
+- Cada **pergunta ignorada** na carga do banco é registrada com o número, o
+  arquivo e o motivo; a tela mostra apenas o resumo.
+- Exceções não tratadas (globais e em callbacks do Tk) vão com traceback para o
+  log; o usuário vê uma mensagem curta com o caminho do arquivo.
+
+A pasta `logs/` não é versionada (veja `.gitignore`).
 
 ## Controles de teclado
 
@@ -148,13 +175,16 @@ python -m pytest tests/test_ui_componentes.py -q
   subprocesso com `DESAFIO_AUTO_FECHAR=1` (a janela se fecha após 1 s) e exige
   código de saída 0.
 
-O teste de `desafio.py` é headless: apenas confere o aviso e o código 1.
+O teste de `desafio.py` é headless: apenas confere o aviso e o código 1. O
+logging (rotação, níveis, fallback e captura de exceções) é testado em
+`tests/test_logging.py`, também sem abrir janela.
 
 ## Estrutura do projeto
 
 | Arquivo | Papel |
 | --- | --- |
-| `main.py` | ponto de entrada: monta a janela e inicia o loop do Tk |
+| `main.py` | ponto de entrada: logging, monta a janela e inicia o loop do Tk |
+| `logging_conf.py` | log rotativo em `logs/`, níveis e captura de exceções |
 | `desafio.py` | interface tkinter: telas, teclado e ligação com o jogo |
 | `ui_componentes.py` | componentes Canvas: paleta, tipografia e widgets visuais (sem lógica de jogo) |
 | `ui_selecao.py` | modal de escolha do banco de perguntas (widgets Tk clássicos) |
@@ -213,7 +243,9 @@ pyinstaller "Desafio do Conhecimento.spec"
 ```
 
 O `.exe` sai em `dist/`. Ele **não** é versionado (veja `.gitignore`); os
-arquivos JSON de perguntas precisam ficar ao lado do executável.
+arquivos JSON de perguntas precisam ficar ao lado do executável. Na primeira
+execução, a pasta `logs/` é criada ali mesmo (ou na pasta do script, se o local
+não permitir escrita).
 
 Nada é empacotado dentro do `.exe` (`datas=[]` no `.spec`): os recursos são
 procurados na **pasta da aplicação** — a pasta do `.exe` quando congelado, ou a
@@ -252,7 +284,7 @@ depois a **Etapa 5**.
 - `config.json` ainda não é lido (Etapa 4.2) — os tempos estão em `config.py`.
 - `eletrotecnica.json` e `radiologia.json` têm só 20 perguntas: o baralho
   reinicia rápido (pendência da Etapa 4).
-- Sem log em arquivo e sem retomada automática de partida (Etapa 4).
+- Sem retomada automática de partida (Etapa 4).
 - O firmware usa `delay()` no bipe e será revisado junto com o protocolo v2.
 - **Pendência de hardware:** validar com clone **CH340**; se o `PRONTO`
   demorar mais de 3 s após o reset por DTR, aumentar o timeout (tornar
