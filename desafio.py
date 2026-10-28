@@ -169,6 +169,10 @@ class DueloDeConhecimento:
             nomes_equipes=dict(NOMES_EQUIPES),
         )
 
+        # Avisa (sem bloquear) se já houver outra instância usando esta pasta.
+        self._trava = persistencia.TravaInstancia()
+        self._trava.adquirir()
+
         # Estado salvo é lido antes da interface; a decisão de continuar é
         # tomada em `_iniciar_fluxo_inicial`, depois que a janela existe.
         self._resultado_salvo = persistencia.carregar(
@@ -338,6 +342,7 @@ class DueloDeConhecimento:
                     self.root,
                     self._partida_salva.resumo,
                     self._escolher_partida_inicial,
+                    ao_fechar=self.fechar,
                 )
             return
 
@@ -434,6 +439,7 @@ class DueloDeConhecimento:
             permitir_cancelar=True,
             inicial=inicial,
             diretorio=diretorio,
+            ao_sair=self.fechar,
         )
 
     def proxima_pergunta(self, forcar=False):
@@ -700,11 +706,12 @@ class DueloDeConhecimento:
         self._reiniciar_loop_timer()
         self._mostrar_aviso_carga()
 
-        # Mudanças relevantes para continuar a partida. O debounce evita
-        # gravar a cada tecla/evento repetido.
-        if any(
-            ev.startswith("pontuou:")
-            or ev in ("proxima_pergunta", "reiniciou_placar", "reiniciou_banco")
+        # Mudanças relevantes para continuar a partida. Pontuação é gravada
+        # na hora (o operador pode fechar logo depois); o resto usa debounce.
+        if any(ev.startswith("pontuou:") for ev in eventos):
+            self._salvador.pedir_imediato()
+        elif any(
+            ev in ("proxima_pergunta", "reiniciou_placar", "reiniciou_banco")
             for ev in eventos
         ):
             self._salvador.pedir()
@@ -739,7 +746,12 @@ class DueloDeConhecimento:
                     if tipo == "evento":
                         self.processar_evento(valor)
                     elif tipo == "conexao":
+                        if valor is None:
+                            self.topo.placa = ""
                         self.topo.conexao = valor
+                        self.topo.desenhar()
+                    elif tipo == "placa":
+                        self.topo.placa = valor or ""
                         self.topo.desenhar()
                 except Exception:
                     log.exception("Falha ao processar item da fila serial")
@@ -812,10 +824,15 @@ class DueloDeConhecimento:
 
     def fechar(self):
         # Fechar normalmente preserva a partida: grava o que estiver pendente.
+        # Na tela "Continuar partida salva?" ainda não há jogo/arquivo atual,
+        # então este flush é no-op e não sobrescreve o estado salvo.
         self._salvador.executar_agora()
         self.rodando = False
         self.serial_comm.parar()
         self.som.parar()
+        trava = getattr(self, "_trava", None)
+        if trava is not None:
+            trava.liberar()
         self.root.destroy()
 
 

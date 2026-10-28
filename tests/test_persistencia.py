@@ -3,6 +3,8 @@
 import errno
 import json
 import logging
+import os
+import time
 from pathlib import Path
 
 import pytest
@@ -109,6 +111,8 @@ class TestGravacao:
         assert dados["arquivo"] == "banco.json"
         assert dados["total_perguntas"] == len(jogo.perguntas_base)
         assert dados["jogo"]["ordem"] == jogo.to_dict()["ordem"]
+        assert len(dados["hash_perguntas"]) == 64
+        int(dados["hash_perguntas"], 16)  # hexadecimal válido
 
     @pytest.mark.parametrize("codigo", [errno.ENOSPC, errno.EACCES])
     def test_falha_de_gravacao_nao_derruba_nem_deixa_tmp(
@@ -250,6 +254,19 @@ class TestCarga:
         assert "versão" in resultado.motivo
         assert logs_persistencia.mensagens
 
+    def test_estado_da_versao_1_e_recusado(self, tmp_path, logs_persistencia):
+        _, _, estado = _salvar_estado(tmp_path)
+        dados = _dados_estado(estado)
+        dados["versao"] = 1
+        del dados["hash_perguntas"]
+        estado.write_text(json.dumps(dados), encoding="utf-8")
+
+        resultado = persistencia.carregar(str(tmp_path), caminho=str(estado))
+
+        assert resultado.partida is None
+        assert "versão" in resultado.motivo
+        assert logs_persistencia.mensagens
+
     def test_tema_removido(self, tmp_path, logs_persistencia):
         banco, _, estado = _salvar_estado(tmp_path)
         banco.unlink()
@@ -258,6 +275,22 @@ class TestCarga:
 
         assert resultado.partida is None
         assert "não existe mais" in resultado.motivo
+        assert logs_persistencia.mensagens
+
+    def test_hash_do_banco_alterado_invalida_o_estado(
+        self, tmp_path, logs_persistencia
+    ):
+        banco, _, estado = _salvar_estado(tmp_path)
+        dados_banco = json.loads(banco.read_text(encoding="utf-8"))
+        dados_banco[0]["pergunta"] = "Pergunta alterada?"
+        banco.write_text(
+            json.dumps(dados_banco, ensure_ascii=False), encoding="utf-8"
+        )
+
+        resultado = persistencia.carregar(str(tmp_path), caminho=str(estado))
+
+        assert resultado.partida is None
+        assert "hash" in resultado.motivo.lower()
         assert logs_persistencia.mensagens
 
     def test_total_de_perguntas_diferente(self, tmp_path, logs_persistencia):
@@ -309,6 +342,33 @@ class TestCarga:
 
 
 class TestAgendador:
+    def test_valor_do_debounce_e_abaixo_de_um_segundo(self):
+        assert persistencia.ATRASO_SALVAMENTO_MS == 500
+        assert 0 < persistencia.ATRASO_SALVAMENTO_MS < 1000
+
+    def test_pedir_imediato_cancela_debounce_e_grava_na_hora(self):
+        agendados = []
+        cancelados = []
+        salvos = []
+
+        def agendar(atraso, funcao):
+            agendados.append((atraso, funcao))
+            return len(agendados)
+
+        agendador = persistencia.AgendadorSalvamento(
+            lambda: salvos.append("salvo"),
+            agendar,
+            cancelados.append,
+        )
+
+        agendador.pedir()
+        agendador.pedir_imediato()
+
+        assert agendados == [(persistencia.ATRASO_SALVAMENTO_MS, agendados[0][1])]
+        assert cancelados == [1]
+        assert salvos == ["salvo"]
+        assert agendador.pendente is False
+
     def test_debounce_cancela_anterior_e_grava_uma_vez(self):
         agendados = []
         cancelados = []
@@ -345,3 +405,69 @@ class TestAgendador:
         assert cancelados == [1, 3]
         assert salvos == ["salvo", "salvo"]
         assert agendador.pendente is False
+class TestTravaInstancia:
+    def test_primeira_adquire_e_segunda_avisa(
+        self, tmp_path, logs_persistencia
+    ):
+        caminho = tmp_path / persistencia.NOME_TRAVA
+        primeira = persistencia.TravaInstancia(diretorio_base=str(tmp_path))
+        segunda = persistencia.TravaInstancia(diretorio_base=str(tmp_path))
+
+        assert primeira.adquirir() is True
+        assert primeira.ativa is True
+        assert caminho.exists()
+        assert caminho.read_text(encoding="ascii").strip() == str(os.getpid())
+
+        assert segunda.adquirir() is False
+        assert segunda.ativa is False
+        assert any("Outra instância" in m for m in logs_persistencia.mensagens)
+
+        # A segunda instância não pode remover a trava da primeira.
+        segunda.liberar()
+        assert caminho.exists()
+
+        primeira.liberar()
+        assert not caminho.exists()
+
+    def test_trava_orfa_de_processo_morto_e_recuperada(
+        self, tmp_path, logs_persistencia, monkeypatch
+    ):
+        caminho = tmp_path / persistencia.NOME_TRAVA
+        caminho.write_text("999999\n", encoding="ascii")
+        os.utime(caminho, (time.time() - 60, time.time() - 60))
+        monkeypatch.setattr(persistencia, "_pid_ativo", lambda pid: False)
+
+        trava = persistencia.TravaInstancia(diretorio_base=str(tmp_path))
+
+        assert trava.adquirir() is True
+        assert trava.ativa is True
+        assert not logs_persistencia.mensagens
+        trava.liberar()
+        assert not caminho.exists()
+
+    def test_arquivo_recente_sem_pid_nao_e_roubado(
+        self, tmp_path, logs_persistencia
+    ):
+        caminho = tmp_path / persistencia.NOME_TRAVA
+        caminho.write_text("", encoding="ascii")
+
+        trava = persistencia.TravaInstancia(diretorio_base=str(tmp_path))
+
+        assert trava.adquirir() is False
+        assert any("Outra instância" in m for m in logs_persistencia.mensagens)
+        trava.liberar()
+        assert caminho.exists()
+        caminho.unlink()
+
+
+def test_gitignore_ignora_estado_tmp_e_trava():
+    raiz = Path(__file__).resolve().parent.parent
+    linhas = {
+        linha.strip()
+        for linha in (raiz / ".gitignore").read_text(encoding="utf-8").splitlines()
+        if linha.strip() and not linha.lstrip().startswith("#")
+    }
+
+    assert "estado_partida.json" in linhas
+    assert "*.tmp" in linhas
+    assert "estado_partida.lock" in linhas

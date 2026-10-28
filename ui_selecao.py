@@ -34,6 +34,7 @@ class ModalSelecaoPerguntas(tk.Toplevel):
         permitir_cancelar=True,
         inicial=False,
         diretorio=None,
+        ao_sair=None,
     ):
         super().__init__(parent)
         self.parent = parent
@@ -43,6 +44,7 @@ class ModalSelecaoPerguntas(tk.Toplevel):
         self.permitir_cancelar = permitir_cancelar
         self.inicial = inicial
         self.diretorio = diretorio or obter_diretorio_base()
+        self.ao_sair = ao_sair
 
         self.title("Duelo de Conhecimento — Escolha de Tema")
         self.configure(bg=Cor.FUNDO)
@@ -461,18 +463,33 @@ class ModalSelecaoPerguntas(tk.Toplevel):
             cb(escolhido)
 
     def _cancelar(self):
+        if self.inicial:
+            self._fechar_inicial()
+            return
         self._limpar_mousewheel()
         self.destroy()
 
-    def _ao_fechar(self):
+    def _fechar_inicial(self):
+        """Fecha o seletor inicial e sai pelo mesmo caminho do X da janela."""
+        if not messagebox.askyesno(
+            "Sair", "Deseja fechar o Duelo de Conhecimento?", parent=self
+        ):
+            return
         self._limpar_mousewheel()
-        if self.inicial:
-            # Modal inicial: fechar a janela = sair do app
-            if messagebox.askyesno("Sair", "Deseja fechar o Duelo de Conhecimento?", parent=self):
-                self.parent.destroy()
+        self.destroy()
+        if self.ao_sair is not None:
+            self.ao_sair()
         else:
-            # Modal durante o jogo: apenas fecha o modal
-            self.destroy()
+            self.parent.destroy()
+
+    def _ao_fechar(self):
+        if self.inicial:
+            # Modal inicial: X também passa pelo fechamento central (flush/trava).
+            self._fechar_inicial()
+            return
+        # Modal durante o jogo: apenas fecha o modal.
+        self._limpar_mousewheel()
+        self.destroy()
 
 
 class ModalContinuarPartida(tk.Toplevel):
@@ -483,11 +500,12 @@ class ModalContinuarPartida(tk.Toplevel):
     True = Continuar, False = Nova partida.
     """
 
-    def __init__(self, parent, resumo, ao_escolher):
+    def __init__(self, parent, resumo, ao_escolher, ao_fechar=None):
         super().__init__(parent)
         self.parent = parent
         self.resumo = str(resumo or "")
         self.ao_escolher = ao_escolher
+        self.ao_fechar = ao_fechar
         self._respondido = False
 
         self.title("Duelo de Conhecimento — Partida salva")
@@ -502,13 +520,13 @@ class ModalContinuarPartida(tk.Toplevel):
                 pass
 
         self.transient(parent)
-        self.protocol("WM_DELETE_WINDOW", lambda: self._escolher(False))
+        self.protocol("WM_DELETE_WINDOW", self._fechar_sem_alterar)
         self._construir_ui()
         self._centralizar(560, 360)
 
         self.bind("<Return>", lambda e: self._escolher(True))
         self.bind("<KP_Enter>", lambda e: self._escolher(True))
-        self.bind("<Escape>", lambda e: self._escolher(False))
+        self.bind("<Escape>", lambda e: self._fechar_sem_alterar())
         self.grab_set()
         self.focus_force()
 
@@ -616,3 +634,17 @@ class ModalContinuarPartida(tk.Toplevel):
         self.destroy()
         if callback:
             callback(bool(continuar))
+
+    def _fechar_sem_alterar(self):
+        """X/Esc aqui saem sem apagar nem sobrescrever a partida salva."""
+        if self._respondido:
+            return
+        self._respondido = True
+        callback = self.ao_fechar
+        try:
+            self.grab_release()
+        except tk.TclError:
+            pass
+        self.destroy()
+        if callback:
+            callback()

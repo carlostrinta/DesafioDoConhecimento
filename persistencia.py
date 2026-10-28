@@ -13,9 +13,12 @@ tempo cheio.
 
 from __future__ import annotations
 
+import atexit
+import hashlib
 import json
 import logging
 import os
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable
@@ -26,8 +29,9 @@ from recursos import obter_diretorio_base
 
 log = logging.getLogger("desafio.persistencia")
 
-VERSAO_FORMATO = 1
+VERSAO_FORMATO = 2
 NOME_ARQUIVO = "estado_partida.json"
+NOME_TRAVA = "estado_partida.lock"
 ATRASO_SALVAMENTO_MS = 500
 
 
@@ -85,6 +89,15 @@ def _remover_arquivo_silencioso(caminho: str) -> None:
         pass
 
 
+def hash_arquivo(caminho: str) -> str:
+    """SHA-256 do banco de perguntas, lido em blocos."""
+    resumo = hashlib.sha256()
+    with open(caminho, "rb") as arquivo:
+        for bloco in iter(lambda: arquivo.read(1024 * 1024), b""):
+            resumo.update(bloco)
+    return resumo.hexdigest()
+
+
 def _gravar(dados: dict[str, Any], caminho: str) -> bool:
     """Grava `.tmp` e troca com `os.replace`; nunca levanta OSError."""
     temporario = caminho + ".tmp"
@@ -106,9 +119,16 @@ def _gravar(dados: dict[str, Any], caminho: str) -> bool:
         return False
 
 
-def montar_estado(jogo: Jogo, tema: str, arquivo: str) -> dict[str, Any]:
+def montar_estado(
+    jogo: Jogo,
+    tema: str,
+    arquivo: str,
+    *,
+    hash_perguntas: str | None = None,
+) -> dict[str, Any]:
     """Monta o dicionário versionado que vai para o JSON."""
     caminho = os.path.abspath(str(arquivo)) if arquivo else ""
+    resumo = hash_perguntas if hash_perguntas is not None else hash_arquivo(caminho)
     return {
         "versao": VERSAO_FORMATO,
         "salvo_em": datetime.now().astimezone().isoformat(timespec="seconds"),
@@ -116,6 +136,7 @@ def montar_estado(jogo: Jogo, tema: str, arquivo: str) -> dict[str, Any]:
         "arquivo": os.path.basename(caminho),
         "caminho_perguntas": caminho,
         "total_perguntas": len(jogo.perguntas_base),
+        "hash_perguntas": resumo,
         "jogo": jogo.to_dict(),
     }
 
@@ -142,7 +163,22 @@ def salvar(
     if jogo.estado.indice_pergunta < 1:
         return None
 
-    dados = montar_estado(jogo, tema, arquivo)
+    try:
+        hash_perguntas = hash_arquivo(os.path.abspath(str(arquivo)))
+    except OSError as exc:
+        log.warning(
+            "Não foi possível ler o banco de perguntas %s para salvar o estado: %s",
+            arquivo,
+            exc,
+        )
+        return None
+
+    dados = montar_estado(
+        jogo,
+        tema,
+        arquivo,
+        hash_perguntas=hash_perguntas,
+    )
 
     if caminho:
         alvo = os.path.abspath(caminho)
@@ -201,6 +237,12 @@ def _inteiro(valor: Any) -> int | None:
     if isinstance(valor, bool) or not isinstance(valor, int):
         return None
     return valor
+
+
+def _hash_valido(valor: Any) -> bool:
+    if not isinstance(valor, str) or len(valor) != 64:
+        return False
+    return all(caractere in "0123456789abcdefABCDEF" for caractere in valor)
 
 
 def resumo_partida(dados: dict[str, Any]) -> str:
@@ -326,6 +368,10 @@ def _validar_e_montar(
     if total is None or total < 1:
         return _falha("estado sem o total de perguntas", caminho_estado)
 
+    hash_salvo = dados.get("hash_perguntas")
+    if not _hash_valido(hash_salvo):
+        return _falha("estado sem hash válido do banco de perguntas", caminho_estado)
+
     num_salvo = _inteiro(jogo_dados.get("num_equipes", 2))
     if num_salvo not in (2, 3, 4):
         return _falha("número de equipes inválido no estado", caminho_estado)
@@ -381,6 +427,20 @@ def _validar_e_montar(
         return _falha(
             f"o banco '{arquivo}' tem {len(carga.perguntas)} pergunta(s), "
             f"mas o estado salvo tem {total}",
+            caminho_estado,
+        )
+
+    try:
+        hash_atual = hash_arquivo(caminho_banco)
+    except OSError as exc:
+        return _falha(
+            f"não foi possível verificar o hash do banco '{arquivo}': {exc}",
+            caminho_estado,
+        )
+    if hash_atual.lower() != hash_salvo.lower():
+        return _falha(
+            f"o banco '{arquivo}' mudou desde o salvamento (hash diferente); "
+            "começando uma partida nova",
             caminho_estado,
         )
 
@@ -457,3 +517,156 @@ class AgendadorSalvamento:
             self._cancelar(self._job)
             self._job = None
         self._salvar()
+
+    def pedir_imediato(self) -> None:
+        """Grava agora, sem esperar o debounce (usado ao pontuar)."""
+        self.executar_agora()
+
+
+# ─────────────────────────────────────────────────────────
+# Aviso de duas instâncias na mesma pasta
+# ─────────────────────────────────────────────────────────
+def _pid_ativo(pid: int) -> bool:
+    """True se o processo parece existir (usado para detectar trava órfã)."""
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        try:
+            import ctypes
+
+            processo = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
+            if processo:
+                ctypes.windll.kernel32.CloseHandle(processo)
+                return True
+            # ERROR_ACCESS_DENIED: existe, mas não podemos consultar.
+            return ctypes.windll.kernel32.GetLastError() == 5
+        except Exception:
+            return True
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+
+
+def _pid_do_arquivo(caminho: str) -> int | None:
+    try:
+        with open(caminho, "r", encoding="ascii") as arquivo:
+            return int(arquivo.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
+class TravaInstancia:
+    """
+    Trava cooperativa baseada em `estado_partida.lock`.
+
+    Não impede a segunda instância de abrir (o requisito é avisar), mas deixa
+    um WARNING no log para o operador saber que dois processos podem disputar
+    `estado_partida.json`. A trava é removida no fechamento normal; um arquivo
+    órfão de processo morto é recuperado na próxima abertura.
+    """
+
+    def __init__(
+        self,
+        *,
+        diretorio_base: str | None = None,
+        caminho: str | None = None,
+    ):
+        self._diretorio_base = diretorio_base
+        self._caminho = os.path.abspath(caminho) if caminho else None
+        self._ativo = False
+        self._pid = os.getpid()
+
+    @property
+    def ativa(self) -> bool:
+        return self._ativo
+
+    @property
+    def caminho(self) -> str | None:
+        return self._caminho
+
+    def _candidatos(self) -> list[str]:
+        if self._caminho:
+            return [self._caminho]
+        return [
+            os.path.join(pasta, NOME_TRAVA)
+            for pasta in diretorios_candidatos(self._diretorio_base)
+        ]
+
+    def _trava_ativa(self, caminho: str) -> bool:
+        pid = _pid_do_arquivo(caminho)
+        if pid is not None:
+            return _pid_ativo(pid)
+        # Arquivo recém-criado sem PID ainda pode estar sendo escrito.
+        try:
+            return time.time() - os.path.getmtime(caminho) < 5.0
+        except OSError:
+            return False
+
+    def _tentar(self, caminho: str) -> str:
+        for _ in range(2):
+            try:
+                descritor = os.open(
+                    caminho,
+                    os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                )
+            except FileExistsError:
+                if self._trava_ativa(caminho):
+                    log.warning(
+                        "Outra instância do Duelo de Conhecimento já está "
+                        "aberta nesta pasta (%s). Duas instâncias podem "
+                        "sobrescrever o estado da partida.",
+                        os.path.dirname(caminho),
+                    )
+                    return "ativa"
+                _remover_arquivo_silencioso(caminho)
+                continue
+            except OSError as exc:
+                log.warning(
+                    "Não foi possível criar a trava de instância em %s: %s",
+                    caminho,
+                    exc,
+                )
+                return "erro"
+            try:
+                os.write(descritor, f"{self._pid}\n".encode("ascii"))
+            except OSError as exc:
+                os.close(descritor)
+                _remover_arquivo_silencioso(caminho)
+                log.warning(
+                    "Não foi possível gravar a trava de instância em %s: %s",
+                    caminho,
+                    exc,
+                )
+                return "erro"
+            else:
+                os.close(descritor)
+            return "ok"
+        return "erro"
+
+    def adquirir(self) -> bool:
+        if self._ativo:
+            return True
+        for caminho in self._candidatos():
+            resultado = self._tentar(caminho)
+            if resultado == "ok":
+                self._caminho = caminho
+                self._ativo = True
+                atexit.register(self.liberar)
+                return True
+            if resultado == "ativa":
+                return False
+        return False
+
+    def liberar(self) -> None:
+        if not self._ativo:
+            return
+        caminho = self._caminho
+        self._ativo = False
+        if caminho and _pid_do_arquivo(caminho) == self._pid:
+            _remover_arquivo_silencioso(caminho)

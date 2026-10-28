@@ -193,14 +193,27 @@ O que acontece com arquivo problemático:
 
 O jogo grava **`estado_partida.json`** ao lado do executável (rodando pelo
 fonte, na pasta do projeto). Se essa pasta não for gravável, usa a pasta do
-script. A gravação é atômica: escreve `estado_partida.json.tmp` e troca com
+script. A gravação é atômica: escreve um arquivo `*.tmp` e troca com
 `os.replace`; uma falha de disco/permissão não derruba o app (fica um
-`WARNING` no log).
+`WARNING` no log). `estado_partida.json`, `*.tmp` e `estado_partida.lock`
+estão no `.gitignore`.
 
 São salvos: versão do formato, tema e arquivo de perguntas, placar por equipe,
-nomes, índice/rodada e a ordem do baralho. O estado é atualizado após
-pontuação, nova pergunta, troca de tema e ao zerar o placar, com debounce de
-0,5 s. Fechar normalmente também grava o que estiver pendente.
+nomes, índice/rodada, a ordem do baralho e o **hash SHA-256 do banco de
+perguntas**. A pontuação é gravada **imediatamente** (sem debounce, para não
+perder o ponto se o app fechar em seguida). Nova pergunta, troca de tema e
+zerar o placar usam debounce de **0,5 s**; fechar pelo X, pelo Esc dos modais
+ou pelo seletor inicial também faz o flush do que estiver pendente.
+
+O hash detecta alteração no conteúdo do banco mesmo quando a quantidade de
+perguntas continua igual. O formato atual é a **versão 2**; estados da versão
+1 (sem hash) ou de versão desconhecida são recusados e geram partida nova,
+com `WARNING` no log.
+
+O app usa `estado_partida.lock` para detectar duas instâncias na mesma pasta.
+A segunda instância **não é bloqueada** (requisito da Etapa 4.3), mas registra
+um `WARNING` avisando que as duas podem sobrescrever o estado. Travas órfãs de
+processos mortos são recuperadas na abertura seguinte.
 
 Ao abrir:
 
@@ -209,9 +222,11 @@ Ao abrir:
 - com `persistencia.continuar_automatico: true`, a partida é retomada sem o
   modal;
 - **Nova partida** apaga o estado salvo e abre o seletor de temas;
-- estado ausente, vazio, corrompido, com versão desconhecida, tema removido ou
-  quantidade de perguntas diferente → `WARNING` no log, aviso na tela e
-  partida nova (o app nunca quebra).
+- fechar o modal de continuar pelo X ou pelo Esc **não apaga nem sobrescreve**
+  a partida salva: o app apenas encerra;
+- estado ausente, vazio, corrompido, com versão desconhecida, tema removido,
+  quantidade de perguntas diferente ou hash diferente → `WARNING` no log,
+  aviso na tela e partida nova (o app nunca quebra).
 
 A pergunta atual volta em **AGUARDANDO com o tempo cheio**. Fase intermediária
 e tempo restante **não** são restaurados de propósito.
@@ -245,8 +260,12 @@ logging (rotação, níveis, fallback e captura de exceções) é testado em
 `tests/test_logging.py`, também sem abrir janela. A configuração (leitura,
 validação, fallback e caso do `.exe` congelado) fica em `tests/test_config.py`.
 A persistência (ida e volta, gravação atômica, falha de disco/permissão,
-estado inválido e debounce) fica em `tests/test_persistencia.py` e
-`tests/test_jogo_persistencia.py`; nenhum desses testes abre janela.
+estado inválido, hash, trava de instância e debounce), o fechamento dos modais
+e a lista de VID/PID ficam em `tests/test_persistencia.py`,
+`tests/test_jogo_persistencia.py`, `tests/test_fechamento.py` e
+`tests/test_dispositivos.py`; nenhum desses testes abre janela. A seleção de
+porta e a fila de placa são testadas com portas falsas em
+`tests/test_serial_comm.py`.
 
 ## Estrutura do projeto
 
@@ -258,10 +277,11 @@ estado inválido e debounce) fica em `tests/test_persistencia.py` e
 | `ui_componentes.py` | componentes Canvas: paleta, tipografia e widgets visuais (sem lógica de jogo) |
 | `ui_selecao.py` | modal de escolha do banco de perguntas (widgets Tk clássicos) |
 | `serial_comm.py` | thread serial, detecção de porta, reconexão e fila de eventos |
+| `dispositivos.py` | lista única de VID/PID, prioridade e nome da placa (puro) |
 | `audio.py` | efeitos sonoros sintetizados (pygame opcional; sem ele fica mudo) |
 | `jogo.py` | regra de jogo pura: estado, placar e timer |
 | `perguntas.py` | modelo, carregador/validador, listagem e nomes de tema (puro) |
-| `persistencia.py` | estado da partida em JSON, gravação atômica e debounce (puro) |
+| `persistencia.py` | estado da partida em JSON, hash, trava de instância e debounce (puro) |
 | `recursos.py` | pasta da aplicação (código-fonte ou `.exe`) — puro |
 | `protocolo.py` | tradução pura entre linhas da serial e ações/eventos |
 | `config.py` | lê e valida `config.json`; expõe os valores em uso e os avisos |
@@ -297,15 +317,46 @@ PC → Arduino:
 O protocolo **não muda** sem aprovação: a tabela acima é a referência
 congelada da v1. A versão 2 (4 equipes, `VERSAO 2`) será definida na Etapa 5.
 
-**Como o app escolhe a porta (3.4-B):** só entram na varredura portas com
-VID/PID de Arduino (2341, 2A03) ou de adaptador USB-serial conhecido (CH340/
-CH341, CP210x, FTDI, PL2303 e compatíveis) ou, sem VID/PID, com descrição de
-Arduino/CH340. Portas Bluetooth/virtuais (VID/PID `None`) ficam de fora. A
-porta só é considerada conectada depois de receber `PRONTO` dentro de
+**Como o app escolhe a porta (Etapa 4.4):** a regra é aplicada nesta ordem:
+
+1. `serial.porta` no `config.json`, quando for `COMx` ou `VID:PID`
+   (ex.: `1A86:7523`) — a porta/par indicado é tentado primeiro;
+2. VID oficial de Arduino (`2341` ou `2A03`);
+3. par VID:PID exato da tabela abaixo (inclui o clone CH340/CH341);
+4. outro PID de um VID de adaptador compatível;
+5. descrição que contenha `arduino`, `ch340` ou `ch341`.
+
+Dentro da mesma faixa, a ordem de enumeração do sistema é preservada. Portas
+Bluetooth/virtuais sem VID/PID ficam de fora. A escolha é registrada em
+`DEBUG` no log (`[SERIAL]`), com a porta, a placa e a prioridade. A porta só é
+considerada conectada depois de receber `PRONTO` dentro de
 `serial.timeout_pronto` (padrão 3 s); enquanto isso não acontece, o app fecha a
-porta e varre de novo a cada 3 s. `serial.porta` (config.json) pode ser `auto`,
-`COMx` ou `VID:PID` (ex.: `1A86:7523`); a porta indicada é tentada primeiro,
-mas também precisa do `PRONTO`.
+porta e varre de novo a cada 3 s. A barra de status mostra a porta e a placa,
+por exemplo `Arduino conectado (COM7) · CH340/CH341 (clone Arduino)
+(1A86:7523)`.
+
+A **lista única de VID/PID** fica em `dispositivos.py`:
+
+| VID:PID | Nome exibido |
+| --- | --- |
+| `2341:0043` | Arduino Uno |
+| `2341:0001` | Arduino Uno (bootloader) |
+| `2341:0243` | Arduino Uno WiFi |
+| `2341:0042` | Arduino Mega 2560 |
+| `2341:0010` | Arduino Mega 2560 (bootloader) |
+| `2341:8036` | Arduino Leonardo |
+| `2341:8037` | Arduino Micro |
+| `2A03:0043` | Arduino Uno (arduino.org) |
+| `2A03:0042` | Arduino Mega 2560 (arduino.org) |
+| `1A86:7523` | **CH340/CH341 (clone Arduino)** |
+| `1A86:5523` | CH341 (clone) |
+| `10C4:EA60` | CP2102 |
+| `0403:6001` | FTDI FT232R |
+| `067B:2303` | PL2303 |
+
+Além desses pares, os VIDs de compatibilidade `1B4F`, `239A`, `03EB`, `04D8`
+e `1209` são aceitos com qualquer PID; a lista e as prioridades não são
+duplicadas em `serial_comm.py` nem na UI.
 
 ## Gerar o executável
 
@@ -324,6 +375,12 @@ pasta do projeto rodando pelo fonte. Por isso os bancos de perguntas (e, no
 futuro, a pasta `sons/`) ficam sempre ao lado do executável. A chave
 `perguntas.pasta` permite manter os bancos numa subpasta, sem recompilar; se a
 pasta não existir, o app usa a pasta do executável.
+
+**Pendência D6 (distribuição):** o `.exe` ainda não tem um script de
+empacotamento de pasta. A distribuição precisa sair com o executável, o
+`config.exemplo.json`, a pasta de perguntas (`perguntas.pasta` ou os JSONs ao
+lado do `.exe`) e o `README.md`. O script de empacotamento será feito depois da
+Etapa 4.4; até lá, copie esses itens manualmente para a pasta de distribuição.
 
 ## Roadmap (próximas etapas)
 
