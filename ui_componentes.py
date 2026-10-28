@@ -168,10 +168,23 @@ class Cartao(Tela):
         pass
 
 
+def texto_status_serial(conexao, placa="", disponivel=None):
+    """Texto e cor da barra de status; função pura para facilitar testes."""
+    if disponivel is None:
+        disponivel = SERIAL_DISPONIVEL
+    if not disponivel:
+        return "pyserial não instalado. Modo teclado ativo.", Cor.AVISO
+    if conexao:
+        detalhe = f" · {placa}" if placa else ""
+        return f"Arduino conectado ({conexao}){detalhe}", Cor.CERTO
+    return "Arduino não conectado. Modo teclado ativo.", Cor.AVISO
+
+
 class BarraTopo(Tela):
     def __init__(self, master, **kw):
         super().__init__(master, **kw)
         self.conexao = None
+        self.placa = ""
         self.tema = ""
 
     def pintar(self, w, h):
@@ -189,12 +202,7 @@ class BarraTopo(Tela):
         self.create_text(x + s * 1.55 + 18, cy, text=texto_titulo, anchor="w",
                          fill=Cor.TEXTO, font=F("titulo"))
 
-        if not SERIAL_DISPONIVEL:
-            txt, cor = "pyserial não instalado. Modo teclado ativo.", Cor.AVISO
-        elif self.conexao:
-            txt, cor = f"Arduino conectado ({self.conexao})", Cor.CERTO
-        else:
-            txt, cor = "Arduino não conectado. Modo teclado ativo.", Cor.AVISO
+        txt, cor = texto_status_serial(self.conexao, self.placa)
         item = self.create_text(w - 6, cy - h * 0.16, text=txt, anchor="e",
                                 fill=Cor.SUAVE, font=F("pequena"))
         bb = self.bbox(item)

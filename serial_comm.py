@@ -16,11 +16,19 @@ padrões de `config.py`: reconexão a cada 3 s, leitura de 0,1 s e handshake
 from __future__ import annotations
 
 import queue
-import re
 import threading
 import time
 
 from config import BAUD_RATE, PORTA_FORCADA, TIMEOUT_PRONTO
+from dispositivos import (
+    PALAVRAS_CONHECIDAS,
+    VIDS_CONHECIDOS,
+    descricao_placa,
+    porta_conhecida,
+    prioridade_porta,
+    rotulo_prioridade,
+    separar_vid_pid,
+)
 
 try:
     import serial as _serial_padrao
@@ -31,21 +39,10 @@ except ImportError:  # pragma: no cover - depende do ambiente
 
 SERIAL_DISPONIVEL = _serial_padrao is not None and _list_ports_padrao is not None
 
-# ─── Quem pode ser o Arduino ───
-# Placas Arduino oficiais: 2341 = Arduino SA, 2A03 = Arduino.org.
-# Adaptadores USB-serial comuns: 1A86 = CH340/CH341, 10C4 = CP210x,
-# 0403 = FTDI, 067B = PL2303. Compatíveis: SparkFun, Adafruit, Atmel,
-# Microchip e pid.codes.
-# Portas sem VID/PID (Bluetooth, virtuais) NUNCA entram: era o furo que
-# fazia o app "conectar" na COM4 do Bluetooth.
-VIDS_CONHECIDOS = frozenset({
-    0x2341, 0x2A03,
-    0x1A86, 0x10C4, 0x0403, 0x067B,
-    0x1B4F, 0x239A, 0x03EB, 0x04D8, 0x1209,
-})
-
-# Descrições aceitas quando o driver não informa VID/PID.
-PALAVRAS_CONHECIDAS = ("arduino", "ch340", "ch341")
+# A lista de VID/PID e as regras de prioridade ficam em `dispositivos.py`.
+# `VIDS_CONHECIDOS`/`porta_conhecida` continuam disponíveis aqui para
+# compatibilidade com quem já importava este módulo.
+_separar_vid_pid = separar_vid_pid
 
 INTERVALO_RECONEXAO = 3.0   # s entre varreduras enquanto não há conexão
 TIMEOUT_LEITURA = 0.1       # s do readline (não bloqueia a thread por muito tempo)
@@ -53,26 +50,6 @@ TIMEOUT_HANDSHAKE = TIMEOUT_PRONTO  # s esperando "PRONTO" depois de abrir a por
 TIMEOUT_ESCRITA = 0.5       # s do write (driver sem par não trava a UI)
 TIMEOUT_PARADA = 1.0        # s esperando a thread terminar em parar()
 TIMEOUT_FECHAMENTO = 0.5    # s esperando write+close em parar()
-
-_RE_VID_PID = re.compile(r"^([0-9A-Fa-f]{4}):([0-9A-Fa-f]{4})$")
-
-
-def _separar_vid_pid(valor):
-    """Converte "1A86:7523" em (0x1A86, 0x7523); None se não for VID:PID."""
-    if not isinstance(valor, str):
-        return None
-    casado = _RE_VID_PID.match(valor.strip())
-    if not casado:
-        return None
-    return int(casado.group(1), 16), int(casado.group(2), 16)
-
-
-def porta_conhecida(porta):
-    """True se a porta tem cara de Arduino/adaptador USB-serial."""
-    if porta.vid in VIDS_CONHECIDOS:
-        return True
-    descricao = (porta.description or "").lower()
-    return any(k in descricao for k in PALAVRAS_CONHECIDAS)
 
 
 class ComunicacaoSerial:
@@ -82,6 +59,7 @@ class ComunicacaoSerial:
     Mensagens na fila (mesmo formato do protótipo):
         ("conexao", "COM6")  -> conectou
         ("conexao", None)    -> caiu
+        ("placa", "Arduino Uno (2341:0043)")  -> nome para a barra de status
         ("evento", "BTN_A")  -> linha recebida do Arduino
     """
 
@@ -118,6 +96,8 @@ class ComunicacaoSerial:
         self.disponivel = modulo is not None and listar is not None
 
         self.serial = None
+        self.placa_atual = ""
+        self._info_portas = {}
         self._parar = threading.Event()
         self._parar.set()  # parado até iniciar()
         self._thread = None
@@ -161,6 +141,7 @@ class ComunicacaoSerial:
             t.join(timeout)
 
         s, self.serial = self.serial, None
+        self.placa_atual = ""
         if s is not None:
             self._encerrar_porta(s)
 
@@ -185,6 +166,7 @@ class ComunicacaoSerial:
     def fechar(self):
         """Fecha a porta (não mexe na thread; use `parar()` para encerrar)."""
         s, self.serial = self.serial, None
+        self.placa_atual = ""
         try:
             if s:
                 s.close()
@@ -196,32 +178,65 @@ class ComunicacaoSerial:
     # -----------------------------------------------------
     def _candidatas(self):
         portas = list(self._listar_portas())
+        self._info_portas = {p.device: p for p in portas}
         self.log("\n=== PORTAS SERIAIS DETECTADAS ===")
         for p in portas:
-            self.log(f"  {p.device} | descrição: {p.description}")
+            vid = getattr(p, "vid", None)
+            pid = getattr(p, "pid", None)
+            if vid is not None and pid is not None:
+                identificacao = f"VID:PID {vid:04X}:{pid:04X}"
+            else:
+                identificacao = "sem VID:PID"
+            self.log(
+                f"  {p.device} | {getattr(p, 'description', '')} | "
+                f"{identificacao} | {rotulo_prioridade(p)}"
+            )
         self.log("=================================\n")
 
-        lista = []
+        forcadas = []
         if self.porta_forcada:
-            vid_pid = _separar_vid_pid(self.porta_forcada)
+            vid_pid = separar_vid_pid(self.porta_forcada)
             if vid_pid:
-                casadas = [
+                forcadas = [
                     p.device for p in portas if (p.vid, p.pid) == vid_pid
                 ]
-                if not casadas:
+                if not forcadas:
                     self.log(
-                        f"✗ Nenhuma porta com VID:PID {self.porta_forcada}"
+                        f"!! Nenhuma porta com VID:PID {self.porta_forcada}"
                     )
-                lista += casadas
             else:
-                lista.append(self.porta_forcada)
-        lista += [p.device for p in portas if porta_conhecida(p)]
+                forcadas = [self.porta_forcada]
+
+        conhecidas = []
+        for ordem, p in enumerate(portas):
+            prioridade = prioridade_porta(p)
+            if prioridade is not None:
+                conhecidas.append((prioridade, ordem, p.device))
+        # Regra: oficial > VID:PID exato > adaptador > descricao. Em cada
+        # faixa, preserva a ordem em que o sistema enumerou as portas.
+        conhecidas.sort(key=lambda item: (item[0], item[1]))
+
+        lista = list(forcadas)
+        lista += [device for _, _, device in conhecidas]
 
         vistas, unicas = set(), []
         for porta in lista:
             if porta not in vistas:
                 vistas.add(porta)
                 unicas.append(porta)
+
+        if unicas:
+            self.log(
+                "Regra de escolha: forcada > oficial > VID:PID conhecido > "
+                "adaptador > descricao"
+            )
+            for indice, porta in enumerate(unicas, 1):
+                info = self._info_portas.get(porta)
+                nome = descricao_placa(info) or "sem metadados"
+                rotulo = "forcada" if porta in forcadas else rotulo_prioridade(info)
+                self.log(f"  {indice}. {porta} | {nome} | prioridade={rotulo}")
+        else:
+            self.log("Nenhuma porta candidata (Arduino/adaptador) encontrada.")
         return unicas
 
     def _tentar_conectar(self, porta):
@@ -253,7 +268,10 @@ class ComunicacaoSerial:
                 linha = s.readline().decode(errors="ignore").strip()
                 if linha == "PRONTO":
                     self.serial = s
-                    self.log(f"✓ Conectado em {porta}")
+                    info = self._info_portas.get(porta)
+                    self.placa_atual = descricao_placa(info)
+                    detalhe = f" - {self.placa_atual}" if self.placa_atual else ""
+                    self.log(f"✓ Conectado em {porta}{detalhe}")
                     # Avisa a UI (reacende o LED se a rodada está em andamento).
                     self.fila.put(("evento", "PRONTO"))
                     return True
@@ -290,6 +308,8 @@ class ComunicacaoSerial:
                     for porta in self._candidatas():
                         if self._tentar_conectar(porta):
                             self.fila.put(("conexao", porta))
+                            if self.placa_atual:
+                                self.fila.put(("placa", self.placa_atual))
                             break
                 self._parar.wait(0.2)
                 continue
@@ -300,5 +320,6 @@ class ComunicacaoSerial:
                     self.fila.put(("evento", linha))
             except Exception as e:
                 self.log(f"[ERRO SERIAL] {e} — tentando reconectar")
+                self.placa_atual = ""
                 self.fechar()
                 self.fila.put(("conexao", None))

@@ -328,7 +328,7 @@ congelada da v1. A versão 2 (4 equipes, `VERSAO 2`) será definida na Etapa 5.
 
 Dentro da mesma faixa, a ordem de enumeração do sistema é preservada. Portas
 Bluetooth/virtuais sem VID/PID ficam de fora. A escolha é registrada em
-`DEBUG` no log (`[SERIAL]`), com a porta, a placa e a prioridade. A porta só é
+`DEBUG` no log, com a porta, a placa e a prioridade. A porta só é
 considerada conectada depois de receber `PRONTO` dentro de
 `serial.timeout_pronto` (padrão 3 s); enquanto isso não acontece, o app fecha a
 porta e varre de novo a cada 3 s. A barra de status mostra a porta e a placa,

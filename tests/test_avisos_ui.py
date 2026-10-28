@@ -32,3 +32,53 @@ class TestMensagemIgnoradas:
             desafio.mensagem_ignoradas(2, "tema.json")
             == "2 perguntas ignoradas em tema.json."
         )
+
+
+def test_barra_de_status_mostra_porta_e_placa():
+    from ui_componentes import texto_status_serial
+
+    texto, _ = texto_status_serial(
+        "COM7", "CH340/CH341 (clone Arduino) (1A86:7523)", disponivel=True
+    )
+
+    assert "COM7" in texto
+    assert "CH340/CH341" in texto
+    assert "1A86:7523" in texto
+
+
+def test_barra_de_status_sem_conexao_nao_mostra_placa():
+    from ui_componentes import texto_status_serial
+
+    texto, _ = texto_status_serial(None, "", disponivel=True)
+
+    assert "não conectado" in texto
+
+
+def test_drenar_fila_entrega_porta_e_placa_para_a_barra():
+    import queue
+
+    class TopoFalso:
+        conexao = None
+        placa = ""
+        desenhos = 0
+
+        def desenhar(self):
+            self.desenhos += 1
+
+    app = object.__new__(desafio.DueloDeConhecimento)
+    app.fila = queue.Queue()
+    app.fila.put(("conexao", "COM7"))
+    app.fila.put(("placa", "CH340/CH341 (clone Arduino) (1A86:7523)"))
+    app.topo = TopoFalso()
+    app.rodando = False
+
+    app.drenar_fila()
+
+    assert app.topo.conexao == "COM7"
+    assert app.topo.placa == "CH340/CH341 (clone Arduino) (1A86:7523)"
+    assert app.topo.desenhos == 2
+
+    app.fila.put(("conexao", None))
+    app.drenar_fila()
+    assert app.topo.conexao is None
+    assert app.topo.placa == ""

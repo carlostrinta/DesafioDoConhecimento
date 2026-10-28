@@ -1,9 +1,10 @@
 """
-Testes de `serial_comm.py` (Etapas 3.4-A/B/C).
+Testes de `serial_comm.py` (Etapas 3.4-A/B/C e 4.4).
 
 A 3.4-A foi só movimentação (comportamento idêntico à v2.1). A 3.4-B corrigiu
 o D1 (VID/PID + handshake PRONTO + sem fallback). A 3.4-C corrigiu o D2
-(evento de parada, timeouts de leitura/escrita, fechamento seguro).
+(evento de parada, timeouts de leitura/escrita, fechamento seguro). A 4.4
+centralizou a lista de VID/PID e a regra de prioridade.
 
 Nada aqui abre porta real: `ModuloSerialFalso` substitui o pyserial.
 """
@@ -74,7 +75,24 @@ class TestCandidatas:
             Porta("COM8", "Arduino Mega 2560", 0x2341, 0x0042),
         ]
         comm = criar_comm(queue.Queue(), modulo)
-        assert comm._candidatas() == ["COM5", "COM7", "COM8"]
+        # Oficiais primeiro; o CH340 fica depois dos Arduinos oficiais.
+        assert comm._candidatas() == ["COM5", "COM8", "COM7"]
+
+    def test_regra_de_escolha_e_logada_com_porta_falsa(self):
+        modulo = ModuloSerialFalso()
+        modulo.portas = [
+            Porta("COM5", "USB Serial Device", 0x2341, 0x0043),
+            Porta("COM7", "USB-SERIAL CH340", 0x1A86, 0x7523),
+            Porta("COM8", "Arduino Mega 2560", 0x2341, 0x0042),
+        ]
+        logs = []
+        comm = criar_comm(queue.Queue(), modulo, log=logs.append)
+
+        assert comm._candidatas() == ["COM5", "COM8", "COM7"]
+        texto = "\n".join(logs)
+        assert "Regra de escolha" in texto
+        assert "prioridade=oficial" in texto
+        assert "prioridade=VID:PID conhecido" in texto
 
     def test_porta_sem_vid_pid_nao_e_candidata(self):
         """D1: Bluetooth (VID/PID None) nunca vira candidata."""
@@ -107,6 +125,26 @@ class TestConexao:
             itens = drenar(fila)
             assert ("conexao", "COM6") in itens
             assert ("evento", "PRONTO") in itens
+        finally:
+            comm.rodando = False
+            comm.fechar()
+
+    def test_avisa_placa_conhecida_na_fila(self):
+        modulo = ModuloSerialFalso()
+        modulo.portas = [Porta("COM7", "USB-SERIAL CH340", 0x1A86, 0x7523)]
+        modulo.manda_pronto = {"COM7"}
+        fila = queue.Queue()
+        comm = criar_comm(fila, modulo)
+
+        comm.iniciar()
+        try:
+            assert esperar(lambda: comm.serial is not None)
+            itens = drenar(fila)
+            assert ("conexao", "COM7") in itens
+            assert (
+                "placa", "CH340/CH341 (clone Arduino) (1A86:7523)"
+            ) in itens
+            assert comm.placa_atual == "CH340/CH341 (clone Arduino) (1A86:7523)"
         finally:
             comm.rodando = False
             comm.fechar()
