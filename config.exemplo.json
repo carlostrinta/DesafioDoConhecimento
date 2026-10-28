@@ -1,8 +1,11 @@
 {
-  "_aviso": "Este arquivo é um template. As chaves ainda não são lidas pelo código (passam a valer na Etapa 4.2). Copie para config.json e edite conforme necessário.",
   "tempos": {
     "tempo_pergunta": 30,
     "tempo_resposta": 15
+  },
+  "jogo": {
+    "num_equipes": 2,
+    "pontuar_apos_tempo": false
   },
   "nomes_equipes": {
     "A": "Competidor A",
@@ -10,40 +13,16 @@
     "C": "Competidor C",
     "D": "Competidor D"
   },
-  "cores_equipes": {
-    "A": "#3BA3FF",
-    "B": "#FF8F3F",
-    "C": "#2BD99F",
-    "D": "#FFD166"
-  },
   "serial": {
-    "baud_rate": 9600,
     "porta": "auto",
-    "vid_pid_conhecidos": [
-      "2341:0043",
-      "1A86:7523",
-      "10C4:EA60",
-      "0403:6001"
-    ]
+    "baud_rate": 9600,
+    "timeout_pronto": 3.0
   },
   "perguntas": {
-    "pasta": "perguntas",
+    "pasta": ".",
     "arquivo_padrao": "conhecimentos_gerais.json"
-  },
-  "jogo": {
-    "modo": "livre",
-    "alvo_pontos": 3,
-    "pontuar_apos_tempo": false,
-    "num_equipes": 2
   },
   "audio": {
     "ativo": true
-  },
-  "interface": {
-    "tela_cheia": true,
-    "escala_maxima": 2.2
-  },
-  "persistencia": {
-    "continuar_automatico": false
   }
 }

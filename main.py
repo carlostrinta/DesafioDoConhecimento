@@ -20,11 +20,17 @@ import tkinter as tk
 import logging_conf
 
 
-def iniciar(app_cls, debug=False):
+def iniciar(app_cls=None, debug=False):
     """Configura o log, monta a raiz, instancia a aplicação e roda o loop."""
     logger = logging_conf.configurar(debug=debug)
     logging_conf.instalar_excepthook()
     logger.info("Iniciando aplicação (debug=%s)", debug)
+
+    # Import tardio: o config.json só é lido depois de o log estar pronto.
+    if app_cls is None:
+        from desafio import DueloDeConhecimento
+
+        app_cls = DueloDeConhecimento
 
     root = tk.Tk()
     root.report_callback_exception = (
@@ -56,9 +62,7 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
 
-    from desafio import DueloDeConhecimento
-
-    return iniciar(DueloDeConhecimento, debug=args.debug)
+    return iniciar(debug=args.debug)
 
 
 if __name__ == "__main__":

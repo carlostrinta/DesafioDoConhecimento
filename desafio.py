@@ -26,12 +26,16 @@ import ui_componentes
 from audio import Som
 from config import (
     ARQUIVO_PERGUNTAS,
+    CONFIG,
     NOMES_EQUIPES,
     NUM_EQUIPES,
+    PASTA_PERGUNTAS,
     PONTUAR_APOS_TEMPO,
+    SOM_ATIVO,
     TEMPO_PERGUNTA,
     TEMPO_RESPOSTA,
     TITULO,
+    texto_avisos,
 )
 from jogo import (
     Jogo,
@@ -54,7 +58,7 @@ from perguntas import (
     listar_arquivos_perguntas,
 )
 from protocolo import comandos_para_arduino, mapear_evento_arduino
-from recursos import caminho_recurso, obter_diretorio_base
+from recursos import caminho_recurso
 from serial_comm import SERIAL_DISPONIVEL, ComunicacaoSerial
 from ui_componentes import (
     BarraTempo,
@@ -76,8 +80,8 @@ if not SERIAL_DISPONIVEL:
 
 # =========================================================
 # CONFIGURAÇÕES
-# Os valores (título, equipes, tempos, serial) ficam em config.py.
-# Este módulo ainda NÃO lê config.json — isso entra na Etapa 4.2.
+# Os valores (título, equipes, tempos, serial) vêm de config.py, que lê e
+# valida o config.json na Etapa 4.2.
 # =========================================================
 NOME_A = NOMES_EQUIPES["A"]
 NOME_B = NOMES_EQUIPES["B"]
@@ -106,6 +110,27 @@ def mensagem_ignoradas(quantidade, nome_arquivo):
         return None
     substantivo = "pergunta ignorada" if quantidade == 1 else "perguntas ignoradas"
     return f"{quantidade} {substantivo} em {nome_arquivo}."
+
+
+def escolher_arquivo_inicial(arquivos, arquivo_atual, pasta, arquivo_padrao):
+    """
+    Item pré-selecionado no seletor de temas.
+
+    Prioridade: arquivo atual da partida, arquivo padrão do `config.json` e,
+    por fim, o primeiro da lista. Devolve None se não houver arquivos.
+    """
+    if arquivo_atual:
+        alvo = os.path.abspath(arquivo_atual)
+        for arq in arquivos:
+            if os.path.abspath(arq["caminho"]) == alvo:
+                return arq
+
+    alvo = os.path.abspath(os.path.join(pasta, arquivo_padrao))
+    for arq in arquivos:
+        if os.path.abspath(arq["caminho"]) == alvo:
+            return arq
+
+    return arquivos[0] if arquivos else None
 
 
 # =========================================================
@@ -162,7 +187,7 @@ class DueloDeConhecimento:
                 pass
 
         # ---------- Áudio ----------
-        self.som = Som()
+        self.som = Som(ativo=SOM_ATIVO)
         self._ultimo_seg_tick = None
 
         # ---------- Inicialização ----------
@@ -181,6 +206,8 @@ class DueloDeConhecimento:
         self.root.bind("<F2>", lambda e: self.abrir_seletor_tema(inicial=False))
         self.root.bind("<Configure>", self._ao_redimensionar)
         self.root.protocol("WM_DELETE_WINDOW", self.fechar)
+
+        self._avisar_config()
 
         self.root.after(20, self.drenar_fila)
         self.render()
@@ -242,7 +269,7 @@ class DueloDeConhecimento:
     def carregar_perguntas(self, caminho=None, nome_tema=None):
         self._cancelar_job_timer()
         if caminho is None:
-            caminho = caminho_recurso(ARQUIVO_PERGUNTAS)
+            caminho = os.path.join(PASTA_PERGUNTAS, ARQUIVO_PERGUNTAS)
 
         self.arquivo_atual = caminho
         nome_arquivo = os.path.basename(caminho)
@@ -283,17 +310,12 @@ class DueloDeConhecimento:
         if self._job_timer:
             self._cancelar_job_timer()
 
-        diretorio = obter_diretorio_base()
+        diretorio = PASTA_PERGUNTAS
         arquivos = listar_arquivos_perguntas(diretorio)
 
-        atual = None
-        if self.arquivo_atual:
-            for arq in arquivos:
-                if os.path.abspath(arq["caminho"]) == os.path.abspath(self.arquivo_atual):
-                    atual = arq
-                    break
-        if atual is None and arquivos:
-            atual = arquivos[0]
+        atual = escolher_arquivo_inicial(
+            arquivos, self.arquivo_atual, PASTA_PERGUNTAS, ARQUIVO_PERGUNTAS
+        )
 
         def ao_confirmar(info_escolhida):
             if not info_escolhida:
@@ -436,6 +458,17 @@ class DueloDeConhecimento:
         self.aviso = texto
         self._job_aviso = self.root.after(3500, self._expirar_aviso)
         self.render()
+
+    def _avisar_config(self):
+        """Mostra uma vez os problemas do config.json (detalhe fica no log).
+
+        No modo `DESAFIO_AUTO_FECHAR` (teste/smoke) o diálogo é omitido para o
+        fechamento automático não ficar preso esperando um clique.
+        """
+        if CONFIG.avisos and not os.environ.get("DESAFIO_AUTO_FECHAR"):
+            messagebox.showwarning(
+                TITULO, texto_avisos(CONFIG.avisos), parent=self.root
+            )
 
     def _expirar_aviso(self):
         self._job_aviso = None

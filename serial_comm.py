@@ -8,17 +8,19 @@ chama `enviar()`.
 Sem tkinter aqui. O `pyserial` é opcional: sem ele, `disponivel` fica False e
 `iniciar()` não faz nada (o jogo segue no modo teclado).
 
-Os parâmetros de tempo são injetáveis apenas para teste; a interface usa os
-padrões (reconexão a cada 3 s, leitura de 0,1 s, handshake de 3 s).
+Os parâmetros de tempo são injetáveis apenas para teste. A interface usa os
+padrões de `config.py`: reconexão a cada 3 s, leitura de 0,1 s e handshake
+`PRONTO` configurável em `serial.timeout_pronto` (padrão 3 s).
 """
 
 from __future__ import annotations
 
 import queue
+import re
 import threading
 import time
 
-from config import BAUD_RATE, PORTA_FORCADA
+from config import BAUD_RATE, PORTA_FORCADA, TIMEOUT_PRONTO
 
 try:
     import serial as _serial_padrao
@@ -47,10 +49,22 @@ PALAVRAS_CONHECIDAS = ("arduino", "ch340", "ch341")
 
 INTERVALO_RECONEXAO = 3.0   # s entre varreduras enquanto não há conexão
 TIMEOUT_LEITURA = 0.1       # s do readline (não bloqueia a thread por muito tempo)
-TIMEOUT_HANDSHAKE = 3.0     # s esperando "PRONTO" depois de abrir a porta
+TIMEOUT_HANDSHAKE = TIMEOUT_PRONTO  # s esperando "PRONTO" depois de abrir a porta
 TIMEOUT_ESCRITA = 0.5       # s do write (driver sem par não trava a UI)
 TIMEOUT_PARADA = 1.0        # s esperando a thread terminar em parar()
 TIMEOUT_FECHAMENTO = 0.5    # s esperando write+close em parar()
+
+_RE_VID_PID = re.compile(r"^([0-9A-Fa-f]{4}):([0-9A-Fa-f]{4})$")
+
+
+def _separar_vid_pid(valor):
+    """Converte "1A86:7523" em (0x1A86, 0x7523); None se não for VID:PID."""
+    if not isinstance(valor, str):
+        return None
+    casado = _RE_VID_PID.match(valor.strip())
+    if not casado:
+        return None
+    return int(casado.group(1), 16), int(casado.group(2), 16)
 
 
 def porta_conhecida(porta):
@@ -189,7 +203,18 @@ class ComunicacaoSerial:
 
         lista = []
         if self.porta_forcada:
-            lista.append(self.porta_forcada)
+            vid_pid = _separar_vid_pid(self.porta_forcada)
+            if vid_pid:
+                casadas = [
+                    p.device for p in portas if (p.vid, p.pid) == vid_pid
+                ]
+                if not casadas:
+                    self.log(
+                        f"✗ Nenhuma porta com VID:PID {self.porta_forcada}"
+                    )
+                lista += casadas
+            else:
+                lista.append(self.porta_forcada)
         lista += [p.device for p in portas if porta_conhecida(p)]
 
         vistas, unicas = set(), []

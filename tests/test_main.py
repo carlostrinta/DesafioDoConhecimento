@@ -135,7 +135,9 @@ def test_main_aceita_debug(monkeypatch):
     monkeypatch.setattr(
         main,
         "iniciar",
-        lambda app_cls, debug=False: chamadas.update(debug=debug, app=app_cls),
+        lambda app_cls=None, debug=False: chamadas.update(
+            debug=debug, app=app_cls
+        ),
     )
 
     main.main(["--debug"])

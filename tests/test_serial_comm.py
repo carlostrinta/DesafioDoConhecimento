@@ -39,6 +39,24 @@ class TestCandidatas:
         comm = criar_comm(queue.Queue(), modulo, porta_forcada="COM9")
         assert comm._candidatas() == ["COM9", "COM6"]
 
+    def test_porta_forcada_por_vid_pid_vem_primeiro(self):
+        """config.json aceita VID:PID além de COMx; casa a porta certa."""
+        modulo = ModuloSerialFalso()
+        modulo.portas = [
+            Porta("COM5", "USB Serial Device", 0x2341, 0x0043),
+            Porta("COM7", "USB-SERIAL CH340", 0x1A86, 0x7523),
+        ]
+        comm = criar_comm(queue.Queue(), modulo, porta_forcada="1a86:7523")
+        assert comm._candidatas() == ["COM7", "COM5"]
+
+    def test_vid_pid_sem_porta_correspondente_cai_nas_conhecidas(self):
+        modulo = ModuloSerialFalso()
+        modulo.portas = [
+            Porta("COM5", "USB Serial Device", 0x2341, 0x0043),
+        ]
+        comm = criar_comm(queue.Queue(), modulo, porta_forcada="FFFF:0001")
+        assert comm._candidatas() == ["COM5"]
+
     def test_descricao_conhecida_tem_prioridade(self):
         modulo = ModuloSerialFalso()
         modulo.portas = [

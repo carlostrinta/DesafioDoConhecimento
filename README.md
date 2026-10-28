@@ -126,9 +126,9 @@ carregador único do projeto):
 - `correta`: índice inteiro válido dentro de `alternativas`;
 - campo `tema`/`titulo` no objeto define o nome do tema (opcional).
 
-Perguntas inválidas são **ignoradas** e o motivo vai para o console; a
-interface mostra um aviso como `1 pergunta ignorada em tema.json.` e continua
-carregando as demais.
+Perguntas inválidas são **ignoradas** e o motivo (arquivo, número e causa) vai
+para o log; a interface mostra um aviso como `1 pergunta ignorada em tema.json.`
+e continua carregando as demais.
 
 Bancos incluídos: `conhecimentos_gerais.json` (97 perguntas),
 `eletrotecnica.json` (20) e `radiologia.json` (20).
@@ -140,16 +140,47 @@ Bancos incluídos: `conhecimentos_gerais.json` (97 perguntas),
 > e/ou avisar na tela quando o tema escolhido for curto para o número de
 > equipes/alvo de pontos.
 
-## Configuração — `config.exemplo.json` (ainda **não** é lido)
+## Configuração — `config.json` (Etapa 4.2)
 
-> ⚠️ Nesta versão **nenhum campo de `config.exemplo.json`/`config.json` é
-> lido pelo código**. O arquivo é só um **modelo** do que será configurável
-> (tempos, nomes e cores das equipes, serial, modo de jogo, `num_equipes`).
-> Os valores em uso continuam **fixos em `config.py`**: 30 s por pergunta,
-> 15 s para responder, 2 equipes nos botões e placar.
->
-> Copiar o modelo para `config.json` ou editá-lo **não muda nada** no jogo. A
-> leitura de verdade entra na **Etapa 4.2**.
+O jogo lê **`config.json`** ao lado do executável (rodando pelo fonte, na pasta
+do projeto). Se não existir ali, procura na pasta do script; se também não
+houver, usa os padrões históricos — o comportamento fica **idêntico** ao da
+versão anterior. O jogo **nunca falha** por causa da configuração.
+
+Para começar, copie o modelo:
+
+```powershell
+Copy-Item config.exemplo.json config.json
+```
+
+> Opcional: `python -c "import config; config.criar_config_exemplo()"` cria o
+> `config.json` a partir do exemplo (não sobrescreve um arquivo existente).
+
+| Chave | Tipo | Padrão | Regra |
+| --- | --- | --- | --- |
+| `tempos.tempo_pergunta` | inteiro (s) | `30` | `> 0` |
+| `tempos.tempo_resposta` | inteiro (s) | `15` | `> 0` |
+| `jogo.num_equipes` | inteiro | `2` | `2` a `4`; `3`/`4` avisam e a UI usa `2` até a Etapa 5 |
+| `jogo.pontuar_apos_tempo` | booleano | `false` | `true`/`false` |
+| `nomes_equipes.A` … `.D` | texto | `Competidor A` … `D` | 1 a 24 caracteres, não vazio |
+| `serial.porta` | texto | `"auto"` | `auto`, `COMx` ou `VID:PID` (ex.: `1A86:7523`) |
+| `serial.baud_rate` | inteiro | `9600` | `1200` a `115200` |
+| `serial.timeout_pronto` | número (s) | `3.0` | `0.1` a `30` |
+| `perguntas.pasta` | texto | `"."` | relativa à pasta da aplicação ou absoluta; se não existir, volta para a pasta da aplicação |
+| `perguntas.arquivo_padrao` | texto | `conhecimentos_gerais.json` | nome de arquivo `.json`, sem pasta |
+| `audio.ativo` | booleano | `true` | `true`/`false` (estado inicial do som) |
+
+O que acontece com arquivo problemático:
+
+- **Chave desconhecida** → `WARNING` no log e a chave é ignorada (sem aviso na
+  tela).
+- **Valor inválido** (tipo ou faixa) → volta ao padrão, com `WARNING` no log e
+  um aviso único na tela ao abrir o jogo.
+- **JSON corrompido/vazio** ou raiz que não é objeto → padrões + aviso na tela;
+  o app continua abrindo.
+- **Arquivo ausente** → padrões, sem erro.
+- `config.json` é local e **não** é versionado (veja `.gitignore`); o modelo
+  versionado é `config.exemplo.json`.
 
 ## Testes
 
@@ -177,7 +208,8 @@ python -m pytest tests/test_ui_componentes.py -q
 
 O teste de `desafio.py` é headless: apenas confere o aviso e o código 1. O
 logging (rotação, níveis, fallback e captura de exceções) é testado em
-`tests/test_logging.py`, também sem abrir janela.
+`tests/test_logging.py`, também sem abrir janela. A configuração (leitura,
+validação, fallback e caso do `.exe` congelado) fica em `tests/test_config.py`.
 
 ## Estrutura do projeto
 
@@ -194,10 +226,10 @@ logging (rotação, níveis, fallback e captura de exceções) é testado em
 | `perguntas.py` | modelo, carregador/validador, listagem e nomes de tema (puro) |
 | `recursos.py` | pasta da aplicação (código-fonte ou `.exe`) — puro |
 | `protocolo.py` | tradução pura entre linhas da serial e ações/eventos |
-| `config.py` | constantes atuais (tempos, equipes, serial) — **ainda não lê JSON** |
+| `config.py` | lê e valida `config.json`; expõe os valores em uso e os avisos |
 | `tests/` | suíte pytest |
 | `duelo_arduino.ino/` | firmware do Arduino (protocolo v1) |
-| `config.exemplo.json` | modelo de configuração — **ainda não é lido** (Etapa 4.2) |
+| `config.exemplo.json` | modelo versionado da configuração (copie para `config.json`) |
 | `Desafio do Conhecimento.spec` | receita de build com PyInstaller |
 | `ROTEIRO_SERIAL_HARDWARE.md` | checklist de validação com Arduino real |
 
@@ -231,10 +263,11 @@ congelada da v1. A versão 2 (4 equipes, `VERSAO 2`) será definida na Etapa 5.
 VID/PID de Arduino (2341, 2A03) ou de adaptador USB-serial conhecido (CH340/
 CH341, CP210x, FTDI, PL2303 e compatíveis) ou, sem VID/PID, com descrição de
 Arduino/CH340. Portas Bluetooth/virtuais (VID/PID `None`) ficam de fora. A
-porta só é considerada conectada depois de receber `PRONTO` em até 3 s;
-enquanto isso não acontece, o app fecha a porta e varre de novo a cada 3 s.
-`PORTA_FORCADA` (config.py) continua sendo tentada primeiro, mas também
-precisa do `PRONTO`.
+porta só é considerada conectada depois de receber `PRONTO` dentro de
+`serial.timeout_pronto` (padrão 3 s); enquanto isso não acontece, o app fecha a
+porta e varre de novo a cada 3 s. `serial.porta` (config.json) pode ser `auto`,
+`COMx` ou `VID:PID` (ex.: `1A86:7523`); a porta indicada é tentada primeiro,
+mas também precisa do `PRONTO`.
 
 ## Gerar o executável
 
@@ -243,14 +276,16 @@ pyinstaller "Desafio do Conhecimento.spec"
 ```
 
 O `.exe` sai em `dist/`. Ele **não** é versionado (veja `.gitignore`); os
-arquivos JSON de perguntas precisam ficar ao lado do executável. Na primeira
-execução, a pasta `logs/` é criada ali mesmo (ou na pasta do script, se o local
-não permitir escrita).
+arquivos JSON de perguntas e, se usado, o `config.json` precisam ficar ao lado
+do executável. Na primeira execução, a pasta `logs/` é criada ali mesmo (ou na
+pasta do script, se o local não permitir escrita).
 
 Nada é empacotado dentro do `.exe` (`datas=[]` no `.spec`): os recursos são
 procurados na **pasta da aplicação** — a pasta do `.exe` quando congelado, ou a
 pasta do projeto rodando pelo fonte. Por isso os bancos de perguntas (e, no
-futuro, a pasta `sons/`) ficam sempre ao lado do executável.
+futuro, a pasta `sons/`) ficam sempre ao lado do executável. A chave
+`perguntas.pasta` permite manter os bancos numa subpasta, sem recompilar; se a
+pasta não existir, o app usa a pasta do executável.
 
 ## Roadmap (próximas etapas)
 
@@ -280,15 +315,16 @@ depois a **Etapa 5**.
 
 ## Limitações conhecidas (em evolução)
 
-- A interface ainda mostra **2 equipes**; a lógica já suporta 2, 3 ou 4.
-- `config.json` ainda não é lido (Etapa 4.2) — os tempos estão em `config.py`.
+- A interface ainda mostra **2 equipes**; a lógica já suporta 2, 3 ou 4. Se
+  `jogo.num_equipes` for 3 ou 4, o app avisa e continua com 2 até a Etapa 5.
+- `config.json` ainda não cobre cores, modo de jogo nem alvo de pontos.
 - `eletrotecnica.json` e `radiologia.json` têm só 20 perguntas: o baralho
   reinicia rápido (pendência da Etapa 4).
 - Sem retomada automática de partida (Etapa 4).
 - O firmware usa `delay()` no bipe e será revisado junto com o protocolo v2.
 - **Pendência de hardware:** validar com clone **CH340**; se o `PRONTO`
-  demorar mais de 3 s após o reset por DTR, aumentar o timeout (tornar
-  configurável na 4.2).
+  demorar mais de 3 s após o reset por DTR, aumentar
+  `serial.timeout_pronto` no `config.json` (padrão 3 s).
 - A validação com hardware real usou uma **Mega 2560** (VID `2341:0042`).
   A Etapa 5 deve validar o mapeamento de pinos do firmware em uma **Uno** e
   documentar a diferença Mega × Uno.
