@@ -44,6 +44,16 @@ def test_main_monta_e_inicia_o_loop(monkeypatch):
     assert chamadas["loop"] is True
 
 
-def test_desafio_nao_monta_a_aplicacao():
-    fonte = (RAIZ / "desafio.py").read_text(encoding="utf-8")
-    assert 'if __name__ == "__main__"' not in fonte
+def test_desafio_executado_diretamente_orienta_o_entrypoint():
+    """`python desafio.py` não monta nada: avisa e sai com erro."""
+    saida = subprocess.run(
+        [sys.executable, "desafio.py"],
+        capture_output=True,
+        text=True,
+        cwd=str(RAIZ),
+        timeout=30,
+    )
+
+    assert saida.returncode == 1, saida.stderr
+    assert "Use: python main.py" in saida.stdout
+    assert "Traceback" not in saida.stderr

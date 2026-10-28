@@ -664,3 +664,13 @@ class DueloDeConhecimento:
         self.som.parar()
         self.root.destroy()
 
+
+# -----------------------------------------------------
+# ENTRADA ERRADA
+# Este arquivo é só a interface; a montagem fica em main.py.
+# Rodá-lo direto antes terminava em silêncio (código 0), parecendo sucesso.
+# -----------------------------------------------------
+if __name__ == "__main__":
+    print("Use: python main.py")
+    raise SystemExit(1)
+

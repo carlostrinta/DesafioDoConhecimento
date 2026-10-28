@@ -48,8 +48,12 @@ Sem Arduino conectado o jogo inicia normalmente em **modo teclado**. Sem
 python main.py
 ```
 
-O aplicativo abre em tela cheia. Na primeira execução ele pede o tema
-(arquivo de perguntas).
+O ponto de entrada é **`main.py`**. O aplicativo abre em tela cheia e, na
+primeira execução, pede o tema (arquivo de perguntas).
+
+> `desafio.py` contém apenas a interface (a classe `DueloDeConhecimento`); ele
+> **não é** um entrypoint. Rodá-lo direto imprime `Use: python main.py` e sai
+> com código 1, em vez de terminar em silêncio.
 
 ## Controles de teclado
 
