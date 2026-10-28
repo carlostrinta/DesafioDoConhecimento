@@ -52,6 +52,7 @@ BAUD_RATE_PADRAO = 9600
 PASTA_PERGUNTAS_PADRAO = "."        # relativa à pasta da aplicação
 ARQUIVO_PERGUNTAS_PADRAO = "conhecimentos_gerais.json"
 SOM_ATIVO_PADRAO = True
+CONTINUAR_AUTOMATICO_PADRAO = False
 
 # ─── Limites de validação ───
 MAX_NOME_EQUIPE = 24
@@ -68,6 +69,7 @@ _SECOES = {
     "serial": {"porta", "baud_rate", "timeout_pronto"},
     "perguntas": {"pasta", "arquivo_padrao"},
     "audio": {"ativo"},
+    "persistencia": {"continuar_automatico"},
 }
 
 _RE_COM = re.compile(r"^COM\d+$", re.IGNORECASE)
@@ -92,6 +94,7 @@ class Configuracao:
     pasta_perguntas: str = ""
     arquivo_perguntas: str = ARQUIVO_PERGUNTAS_PADRAO
     som_ativo: bool = SOM_ATIVO_PADRAO
+    continuar_automatico: bool = CONTINUAR_AUTOMATICO_PADRAO
     avisos: tuple[str, ...] = ()
     caminho_config: str | None = None
     encontrado: bool = False
@@ -168,6 +171,7 @@ def carregar(caminho=None, diretorio_base=None) -> Configuracao:
     serial = _secao(dados, "serial", avisos)
     perguntas = _secao(dados, "perguntas", avisos)
     audio = _secao(dados, "audio", avisos)
+    persistencia = _secao(dados, "persistencia", avisos)
 
     tempo_pergunta = _ler_inteiro(
         tempos, "tempo_pergunta", "tempos.tempo_pergunta",
@@ -201,8 +205,23 @@ def carregar(caminho=None, diretorio_base=None) -> Configuracao:
     timeout_pronto = _ler_timeout(serial, avisos)
     pasta_perguntas = _resolver_pasta(perguntas, base, avisos)
     arquivo_perguntas = _ler_arquivo(perguntas, avisos)
+    caminho_padrao = os.path.join(pasta_perguntas, arquivo_perguntas)
+    if not os.path.isfile(caminho_padrao):
+        log.warning(
+            "perguntas.arquivo_padrao %r não existe em %s; "
+            "o seletor de temas será aberto.",
+            arquivo_perguntas,
+            pasta_perguntas,
+        )
     som_ativo = _ler_booleano(
         audio, "ativo", "audio.ativo", SOM_ATIVO_PADRAO, avisos,
+    )
+    continuar_automatico = _ler_booleano(
+        persistencia,
+        "continuar_automatico",
+        "persistencia.continuar_automatico",
+        CONTINUAR_AUTOMATICO_PADRAO,
+        avisos,
     )
 
     return Configuracao(
@@ -218,6 +237,7 @@ def carregar(caminho=None, diretorio_base=None) -> Configuracao:
         pasta_perguntas=pasta_perguntas,
         arquivo_perguntas=arquivo_perguntas,
         som_ativo=som_ativo,
+        continuar_automatico=continuar_automatico,
         avisos=tuple(avisos),
         caminho_config=caminho,
         encontrado=encontrado,
@@ -248,6 +268,9 @@ def modelo_padrao() -> dict:
             "arquivo_padrao": ARQUIVO_PERGUNTAS_PADRAO,
         },
         "audio": {"ativo": SOM_ATIVO_PADRAO},
+        "persistencia": {
+            "continuar_automatico": CONTINUAR_AUTOMATICO_PADRAO,
+        },
     }
 
 
@@ -428,14 +451,27 @@ def _resolver_pasta(secao, base, avisos):
     texto = os.path.expanduser(valor.strip())
     caminho = texto if os.path.isabs(texto) else os.path.join(base, texto)
     caminho = os.path.abspath(caminho)
-    if not os.path.isdir(caminho):
+    if not _pasta_utilizavel(caminho):
         _aviso(
             avisos,
-            f"perguntas.pasta: pasta não encontrada ({caminho}); usando a "
-            "pasta da aplicação.",
+            f"perguntas.pasta: pasta não encontrada ou sem permissão "
+            f"({caminho}); usando a pasta da aplicação.",
         )
         return base
     return caminho
+
+
+def _pasta_utilizavel(caminho):
+    """True se a pasta existe, pode ser lida e listada (checagem real)."""
+    try:
+        if not os.path.isdir(caminho):
+            return False
+        if not os.access(caminho, os.R_OK | os.X_OK):
+            return False
+        os.listdir(caminho)
+    except OSError:
+        return False
+    return True
 
 
 def _ler_arquivo(secao, avisos):
@@ -475,4 +511,5 @@ BAUD_RATE = CONFIG.baud_rate
 PASTA_PERGUNTAS = CONFIG.pasta_perguntas
 ARQUIVO_PERGUNTAS = CONFIG.arquivo_perguntas
 SOM_ATIVO = CONFIG.som_ativo
+CONTINUAR_AUTOMATICO = CONFIG.continuar_automatico
 AVISOS_CONFIG = CONFIG.avisos

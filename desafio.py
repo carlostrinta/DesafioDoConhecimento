@@ -22,11 +22,13 @@ import queue
 import tkinter as tk
 from tkinter import messagebox
 
+import persistencia
 import ui_componentes
 from audio import Som
 from config import (
     ARQUIVO_PERGUNTAS,
     CONFIG,
+    CONTINUAR_AUTOMATICO,
     NOMES_EQUIPES,
     NUM_EQUIPES,
     PASTA_PERGUNTAS,
@@ -71,7 +73,7 @@ from ui_componentes import (
     Rodape,
     escolher_fonte,
 )
-from ui_selecao import ModalSelecaoPerguntas
+from ui_selecao import ModalContinuarPartida, ModalSelecaoPerguntas
 
 log = logging.getLogger("desafio")
 
@@ -167,12 +169,30 @@ class DueloDeConhecimento:
             nomes_equipes=dict(NOMES_EQUIPES),
         )
 
+        # Estado salvo é lido antes da interface; a decisão de continuar é
+        # tomada em `_iniciar_fluxo_inicial`, depois que a janela existe.
+        self._resultado_salvo = persistencia.carregar(
+            PASTA_PERGUNTAS,
+            nomes_equipes=dict(NOMES_EQUIPES),
+            tempo_pergunta=TEMPO_PERGUNTA,
+            tempo_resposta=TEMPO_RESPOSTA,
+            pontuar_apos_tempo=PONTUAR_APOS_TEMPO,
+            num_equipes=NUM_EQUIPES,
+        )
+        self._partida_salva = self._resultado_salvo.partida
+        self._motivo_estado = self._resultado_salvo.motivo
+
         self.aviso = None
         self._aviso_carga = None
 
         self._job_timer = None
         self._job_aviso = None
         self._job_escala = None
+        self._salvador = persistencia.AgendadorSalvamento(
+            self._salvar_estado,
+            self.root.after,
+            self.root.after_cancel,
+        )
 
         self.rodando = True
         self.fila = queue.Queue()
@@ -212,8 +232,8 @@ class DueloDeConhecimento:
         self.root.after(20, self.drenar_fila)
         self.render()
 
-        # Abre o seletor de temas na inicialização da aplicação
-        self.root.after(100, lambda: self.abrir_seletor_tema(inicial=True))
+        # Decide entre continuar a partida salva ou abrir o seletor de temas.
+        self.root.after(100, self._iniciar_fluxo_inicial)
 
     # -----------------------------------------------------
     # LEITURA DO ESTADO (compatibilidade: a UI antiga continua
@@ -305,6 +325,83 @@ class DueloDeConhecimento:
             self.topo.tema = self.tema_atual
             self.topo.desenhar()
 
+    # -----------------------------------------------------
+    # PARTIDA SALVA (Etapa 4.3)
+    # -----------------------------------------------------
+    def _iniciar_fluxo_inicial(self):
+        if self._partida_salva is not None:
+            if CONTINUAR_AUTOMATICO:
+                log.info("Continuando partida salva automaticamente.")
+                self._aplicar_partida_salva(self._partida_salva)
+            else:
+                ModalContinuarPartida(
+                    self.root,
+                    self._partida_salva.resumo,
+                    self._escolher_partida_inicial,
+                )
+            return
+
+        if self._motivo_estado:
+            self._avisar_estado_invalido()
+            persistencia.remover_estado()
+            self._motivo_estado = ""
+
+        self.abrir_seletor_tema(inicial=True)
+
+    def _avisar_estado_invalido(self):
+        log.warning(
+            "Partida salva não pôde ser continuada: %s", self._motivo_estado
+        )
+        if not os.environ.get("DESAFIO_AUTO_FECHAR"):
+            messagebox.showwarning(
+                TITULO,
+                "Não foi possível continuar a partida salva:\n\n"
+                f"{self._motivo_estado}\n\n"
+                "Iniciando uma nova partida.",
+                parent=self.root,
+            )
+
+    def _escolher_partida_inicial(self, continuar):
+        if continuar and self._partida_salva is not None:
+            self._aplicar_partida_salva(self._partida_salva)
+            return
+
+        persistencia.remover_estado()
+        self._partida_salva = None
+        self.abrir_seletor_tema(inicial=True)
+
+    def _aplicar_partida_salva(self, partida):
+        self.jogo = partida.jogo
+        self.arquivo_atual = partida.caminho_perguntas
+        self.tema_atual = partida.tema
+        self.erro_carga = ""
+        self._aviso_carga = None
+        self._ultimo_seg_tick = None
+
+        if hasattr(self, "topo"):
+            self.topo.tema = self.tema_atual
+            self.topo.desenhar()
+
+        self.render()
+        self._atualizar_barra()
+        self._reiniciar_loop_timer()
+        log.info(
+            "Partida salva continuada: tema=%s, rodada=%d.",
+            self.tema_atual,
+            self.numero,
+        )
+
+    def _salvar_estado(self):
+        if not self.arquivo_atual:
+            return
+        caminho = persistencia.salvar(
+            self.jogo,
+            self.tema_atual,
+            self.arquivo_atual,
+        )
+        if caminho:
+            log.debug("Estado da partida salvo em %s.", caminho)
+
     def abrir_seletor_tema(self, inicial=False):
         """Abre a tela modal para escolha de tema/arquivo de perguntas."""
         if self._job_timer:
@@ -335,7 +432,8 @@ class DueloDeConhecimento:
             arquivo_atual=atual,
             ao_confirmar=ao_confirmar,
             permitir_cancelar=True,
-            inicial=inicial
+            inicial=inicial,
+            diretorio=diretorio,
         )
 
     def proxima_pergunta(self, forcar=False):
@@ -602,6 +700,15 @@ class DueloDeConhecimento:
         self._reiniciar_loop_timer()
         self._mostrar_aviso_carga()
 
+        # Mudanças relevantes para continuar a partida. O debounce evita
+        # gravar a cada tecla/evento repetido.
+        if any(
+            ev.startswith("pontuou:")
+            or ev in ("proxima_pergunta", "reiniciou_placar", "reiniciou_banco")
+            for ev in eventos
+        ):
+            self._salvador.pedir()
+
     def _mostrar_aviso_carga(self):
         if self._aviso_carga:
             texto, self._aviso_carga = self._aviso_carga, None
@@ -704,6 +811,8 @@ class DueloDeConhecimento:
             self.abrir_seletor_tema(inicial=False)
 
     def fechar(self):
+        # Fechar normalmente preserva a partida: grava o que estiver pendente.
+        self._salvador.executar_agora()
         self.rodando = False
         self.serial_comm.parar()
         self.som.parar()

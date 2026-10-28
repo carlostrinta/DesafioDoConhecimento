@@ -25,7 +25,16 @@ class ModalSelecaoPerguntas(tk.Toplevel):
     Janela modal para escolha do arquivo de perguntas (tema / tecnologia) na inicialização
     ou durante a execução do jogo.
     """
-    def __init__(self, parent, lista_arquivos, arquivo_atual=None, ao_confirmar=None, permitir_cancelar=True, inicial=False):
+    def __init__(
+        self,
+        parent,
+        lista_arquivos,
+        arquivo_atual=None,
+        ao_confirmar=None,
+        permitir_cancelar=True,
+        inicial=False,
+        diretorio=None,
+    ):
         super().__init__(parent)
         self.parent = parent
         self.lista_arquivos = list(lista_arquivos)
@@ -33,6 +42,7 @@ class ModalSelecaoPerguntas(tk.Toplevel):
         self.ao_confirmar = ao_confirmar
         self.permitir_cancelar = permitir_cancelar
         self.inicial = inicial
+        self.diretorio = diretorio or obter_diretorio_base()
 
         self.title("Duelo de Conhecimento — Escolha de Tema")
         self.configure(bg=Cor.FUNDO)
@@ -239,7 +249,7 @@ class ModalSelecaoPerguntas(tk.Toplevel):
             ).pack(anchor="w")
             tk.Label(
                 vazio,
-                text="Coloque arquivos .json na pasta da aplicação (ex: eletrotecnica.json, radiologia.json)\nou use o botão 'Procurar outro (.json)...' abaixo.",
+                text="Coloque arquivos .json na pasta de perguntas configurada (ex: eletrotecnica.json, radiologia.json)\nou use o botão 'Procurar outro (.json)...' abaixo.",
                 font=("Segoe UI", 9),
                 fg=Cor.SUAVE,
                 bg=Cor.PAINEL,
@@ -428,8 +438,7 @@ class ModalSelecaoPerguntas(tk.Toplevel):
             self._selecionar_indice(encontrado_idx)
 
     def _atualizar_lista(self):
-        diretorio = obter_diretorio_base()
-        self.lista_arquivos = listar_arquivos_perguntas(diretorio)
+        self.lista_arquivos = listar_arquivos_perguntas(self.diretorio)
         self._reconstruir_cards()
         if self.lista_arquivos:
             self._selecionar_indice(0)
@@ -464,3 +473,146 @@ class ModalSelecaoPerguntas(tk.Toplevel):
         else:
             # Modal durante o jogo: apenas fecha o modal
             self.destroy()
+
+
+class ModalContinuarPartida(tk.Toplevel):
+    """
+    Modal inicial da Etapa 4.3: continuar a partida salva ou começar outra.
+
+    Só apresentação. A escolha volta pelo callback `ao_escolher(bool)`:
+    True = Continuar, False = Nova partida.
+    """
+
+    def __init__(self, parent, resumo, ao_escolher):
+        super().__init__(parent)
+        self.parent = parent
+        self.resumo = str(resumo or "")
+        self.ao_escolher = ao_escolher
+        self._respondido = False
+
+        self.title("Duelo de Conhecimento — Partida salva")
+        self.configure(bg=Cor.FUNDO)
+        self.resizable(False, False)
+
+        ico_path = caminho_recurso("desafio.ico")
+        if os.path.exists(ico_path):
+            try:
+                self.iconbitmap(ico_path)
+            except Exception:
+                pass
+
+        self.transient(parent)
+        self.protocol("WM_DELETE_WINDOW", lambda: self._escolher(False))
+        self._construir_ui()
+        self._centralizar(560, 360)
+
+        self.bind("<Return>", lambda e: self._escolher(True))
+        self.bind("<KP_Enter>", lambda e: self._escolher(True))
+        self.bind("<Escape>", lambda e: self._escolher(False))
+        self.grab_set()
+        self.focus_force()
+
+    def _construir_ui(self):
+        topo = tk.Frame(self, bg=Cor.PAINEL, padx=24, pady=16)
+        topo.pack(side="top", fill="x")
+        tk.Label(
+            topo,
+            text="Continuar partida salva?",
+            font=("Segoe UI", 16, "bold"),
+            fg=Cor.TEXTO,
+            bg=Cor.PAINEL,
+            anchor="w",
+        ).pack(fill="x")
+        tk.Label(
+            topo,
+            text="Encontramos uma partida interrompida.",
+            font=("Segoe UI", 10),
+            fg=Cor.SUAVE,
+            bg=Cor.PAINEL,
+            anchor="w",
+        ).pack(fill="x", pady=(4, 0))
+
+        tk.Frame(self, bg=Cor.BORDA, height=2).pack(fill="x")
+
+        corpo = tk.Frame(self, bg=Cor.FUNDO, padx=28, pady=22)
+        corpo.pack(fill="both", expand=True)
+        tk.Label(
+            corpo,
+            text=self.resumo,
+            font=("Segoe UI", 11),
+            fg=Cor.TEXTO,
+            bg=Cor.FUNDO,
+            justify="left",
+            anchor="w",
+        ).pack(fill="x", anchor="w")
+
+        tk.Frame(self, bg=Cor.BORDA, height=2).pack(fill="x")
+
+        rodape = tk.Frame(self, bg=Cor.PAINEL, padx=20, pady=14)
+        rodape.pack(side="bottom", fill="x")
+
+        btn_nova = tk.Button(
+            rodape,
+            text="Nova partida",
+            font=("Segoe UI", 10, "bold"),
+            bg="#231A26",
+            fg=Cor.ERRO,
+            activebackground="#3D1D28",
+            activeforeground="#FF8599",
+            relief="flat",
+            bd=0,
+            padx=18,
+            pady=9,
+            cursor="hand2",
+            command=lambda: self._escolher(False),
+        )
+        btn_nova.pack(side="left")
+
+        btn_continuar = tk.Button(
+            rodape,
+            text="Continuar",
+            font=("Segoe UI", 11, "bold"),
+            bg=Cor.A,
+            fg=Cor.FUNDO,
+            activebackground="#5CB7FF",
+            activeforeground=Cor.FUNDO,
+            relief="flat",
+            bd=0,
+            padx=24,
+            pady=9,
+            cursor="hand2",
+            command=lambda: self._escolher(True),
+        )
+        btn_continuar.pack(side="right")
+        btn_continuar.focus_set()
+
+    def _centralizar(self, largura, altura):
+        self.update_idletasks()
+        try:
+            px = self.parent.winfo_rootx()
+            py = self.parent.winfo_rooty()
+            pw = self.parent.winfo_width()
+            ph = self.parent.winfo_height()
+            if pw > 100 and ph > 100:
+                x = px + (pw - largura) // 2
+                y = py + (ph - altura) // 2
+            else:
+                x = (self.winfo_screenwidth() - largura) // 2
+                y = (self.winfo_screenheight() - altura) // 2
+        except Exception:
+            x = (self.winfo_screenwidth() - largura) // 2
+            y = (self.winfo_screenheight() - altura) // 2
+        self.geometry(f"{largura}x{altura}+{max(0, x)}+{max(0, y)}")
+
+    def _escolher(self, continuar):
+        if self._respondido:
+            return
+        self._respondido = True
+        callback = self.ao_escolher
+        try:
+            self.grab_release()
+        except tk.TclError:
+            pass
+        self.destroy()
+        if callback:
+            callback(bool(continuar))

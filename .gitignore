@@ -19,6 +19,7 @@ DesafioV1/
 *.log
 logs/
 estado_partida.json
+estado_partida.json.tmp
 config.json
 
 # Configuração local (versione config.exemplo.json)

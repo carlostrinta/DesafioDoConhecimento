@@ -49,7 +49,9 @@ python main.py
 ```
 
 O ponto de entrada é **`main.py`**. O aplicativo abre em tela cheia e, na
-primeira execução, pede o tema (arquivo de perguntas).
+primeira execução, pede o tema (arquivo de perguntas). Se houver uma partida
+salva, pergunta antes se você quer continuá-la (veja
+[Persistência da partida](#persistência-da-partida-etapa-43)).
 
 > `desafio.py` contém apenas a interface (a classe `DueloDeConhecimento`); ele
 > **não é** um entrypoint. Rodá-lo direto imprime `Use: python main.py` e sai
@@ -169,6 +171,7 @@ Copy-Item config.exemplo.json config.json
 | `perguntas.pasta` | texto | `"."` | relativa à pasta da aplicação ou absoluta; se não existir, volta para a pasta da aplicação |
 | `perguntas.arquivo_padrao` | texto | `conhecimentos_gerais.json` | nome de arquivo `.json`, sem pasta |
 | `audio.ativo` | booleano | `true` | `true`/`false` (estado inicial do som) |
+| `persistencia.continuar_automatico` | booleano | `false` | `true` retoma a partida salva sem o modal de confirmação |
 
 O que acontece com arquivo problemático:
 
@@ -179,8 +182,39 @@ O que acontece com arquivo problemático:
 - **JSON corrompido/vazio** ou raiz que não é objeto → padrões + aviso na tela;
   o app continua abrindo.
 - **Arquivo ausente** → padrões, sem erro.
+- **`perguntas.pasta` inexistente ou sem permissão** → `WARNING` no log, aviso
+  na tela e uso da pasta da aplicação.
+- **`perguntas.arquivo_padrao` inexistente** → `WARNING` no log; o seletor de
+  temas abre normalmente, sem tela vazia.
 - `config.json` é local e **não** é versionado (veja `.gitignore`); o modelo
   versionado é `config.exemplo.json`.
+
+## Persistência da partida (Etapa 4.3)
+
+O jogo grava **`estado_partida.json`** ao lado do executável (rodando pelo
+fonte, na pasta do projeto). Se essa pasta não for gravável, usa a pasta do
+script. A gravação é atômica: escreve `estado_partida.json.tmp` e troca com
+`os.replace`; uma falha de disco/permissão não derruba o app (fica um
+`WARNING` no log).
+
+São salvos: versão do formato, tema e arquivo de perguntas, placar por equipe,
+nomes, índice/rodada e a ordem do baralho. O estado é atualizado após
+pontuação, nova pergunta, troca de tema e ao zerar o placar, com debounce de
+0,5 s. Fechar normalmente também grava o que estiver pendente.
+
+Ao abrir:
+
+- com estado válido, aparece o modal **“Continuar partida salva?”** com o
+  tema, o placar e a rodada, e os botões **Continuar** / **Nova partida**;
+- com `persistencia.continuar_automatico: true`, a partida é retomada sem o
+  modal;
+- **Nova partida** apaga o estado salvo e abre o seletor de temas;
+- estado ausente, vazio, corrompido, com versão desconhecida, tema removido ou
+  quantidade de perguntas diferente → `WARNING` no log, aviso na tela e
+  partida nova (o app nunca quebra).
+
+A pergunta atual volta em **AGUARDANDO com o tempo cheio**. Fase intermediária
+e tempo restante **não** são restaurados de propósito.
 
 ## Testes
 
@@ -210,6 +244,9 @@ O teste de `desafio.py` é headless: apenas confere o aviso e o código 1. O
 logging (rotação, níveis, fallback e captura de exceções) é testado em
 `tests/test_logging.py`, também sem abrir janela. A configuração (leitura,
 validação, fallback e caso do `.exe` congelado) fica em `tests/test_config.py`.
+A persistência (ida e volta, gravação atômica, falha de disco/permissão,
+estado inválido e debounce) fica em `tests/test_persistencia.py` e
+`tests/test_jogo_persistencia.py`; nenhum desses testes abre janela.
 
 ## Estrutura do projeto
 
@@ -224,6 +261,7 @@ validação, fallback e caso do `.exe` congelado) fica em `tests/test_config.py`
 | `audio.py` | efeitos sonoros sintetizados (pygame opcional; sem ele fica mudo) |
 | `jogo.py` | regra de jogo pura: estado, placar e timer |
 | `perguntas.py` | modelo, carregador/validador, listagem e nomes de tema (puro) |
+| `persistencia.py` | estado da partida em JSON, gravação atômica e debounce (puro) |
 | `recursos.py` | pasta da aplicação (código-fonte ou `.exe`) — puro |
 | `protocolo.py` | tradução pura entre linhas da serial e ações/eventos |
 | `config.py` | lê e valida `config.json`; expõe os valores em uso e os avisos |
@@ -320,7 +358,8 @@ depois a **Etapa 5**.
 - `config.json` ainda não cobre cores, modo de jogo nem alvo de pontos.
 - `eletrotecnica.json` e `radiologia.json` têm só 20 perguntas: o baralho
   reinicia rápido (pendência da Etapa 4).
-- Sem retomada automática de partida (Etapa 4).
+- A partida salva retoma a pergunta atual em `AGUARDANDO`; fase e tempo
+  restante não são restaurados.
 - O firmware usa `delay()` no bipe e será revisado junto com o protocolo v2.
 - **Pendência de hardware:** validar com clone **CH340**; se o `PRONTO`
   demorar mais de 3 s após o reset por DTR, aumentar

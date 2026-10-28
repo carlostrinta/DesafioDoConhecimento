@@ -19,6 +19,7 @@ import pytest
 
 import config
 from jogo import TODAS_EQUIPES, Jogo
+from perguntas import listar_arquivos_perguntas
 
 RAIZ = Path(__file__).resolve().parent.parent
 
@@ -99,6 +100,7 @@ class TestModuloConfig:
         assert config.PASTA_PERGUNTAS == config.CONFIG.pasta_perguntas
         assert config.ARQUIVO_PERGUNTAS == config.CONFIG.arquivo_perguntas
         assert config.SOM_ATIVO is config.CONFIG.som_ativo
+        assert config.CONTINUAR_AUTOMATICO is config.CONFIG.continuar_automatico
         assert config.AVISOS_CONFIG == config.CONFIG.avisos
 
 
@@ -124,6 +126,7 @@ class TestSemArquivo:
         assert cfg.pasta_perguntas == str(tmp_path)
         assert cfg.arquivo_perguntas == "conhecimentos_gerais.json"
         assert cfg.som_ativo is True
+        assert cfg.continuar_automatico is False
 
     def test_comportamento_identico_sem_config_json(self, tmp_path):
         """O Jogo montado com os defaults não muda em relação à versão 4.1."""
@@ -168,10 +171,12 @@ class TestLeitura:
                     "arquivo_padrao": "meu_banco.json",
                 },
                 "audio": {"ativo": False},
+                "persistencia": {"continuar_automatico": True},
             },
         )
 
         assert cfg.avisos == ()
+        assert cfg.continuar_automatico is True
         assert cfg.tempo_pergunta == 45
         assert cfg.tempo_resposta == 20
         assert cfg.pontuar_apos_tempo is True
@@ -278,6 +283,8 @@ class TestValidacao:
             ({"perguntas": {"arquivo_padrao": "sub/x.json"}}, "arquivo_perguntas", "conhecimentos_gerais.json"),
             ({"perguntas": {"arquivo_padrao": "x.txt"}}, "arquivo_perguntas", "conhecimentos_gerais.json"),
             ({"perguntas": {"arquivo_padrao": 10}}, "arquivo_perguntas", "conhecimentos_gerais.json"),
+            ({"persistencia": {"continuar_automatico": "sim"}}, "continuar_automatico", False),
+            ({"persistencia": {"continuar_automatico": 0}}, "continuar_automatico", False),
         ],
     )
     def test_valor_invalido_volta_ao_padrao(
@@ -304,7 +311,8 @@ class TestValidacao:
 
         assert cfg.nomes_equipes == config.NOMES_EQUIPES_PADRAO
         assert len(cfg.avisos) == 4
-        assert len(logs_config.mensagens) == 4
+        mensagens_nomes = [m for m in logs_config.mensagens if "nomes_equipes" in m]
+        assert len(mensagens_nomes) == 4
 
     def test_nomes_validos_sao_aparados(self, tmp_path):
         cfg = _carregar(
@@ -333,15 +341,23 @@ class TestValidacao:
         assert cfg.porta_serial == esperado
         assert cfg.avisos == ()
 
-    def test_num_equipes_3_ou_4_avisa_e_mantem_ui_com_2(
-        self, tmp_path, logs_config
+    @pytest.mark.parametrize("pedido", [3, 4])
+    def test_num_equipes_3_ou_4_gera_um_unico_aviso_e_mantem_ui_com_2(
+        self, tmp_path, logs_config, pedido
     ):
-        for pedido in (3, 4):
-            cfg = _carregar(tmp_path, {"jogo": {"num_equipes": pedido}})
+        cfg = _carregar(tmp_path, {"jogo": {"num_equipes": pedido}})
 
-            assert cfg.num_equipes == 2
-            assert cfg.num_equipes_configurado == pedido
-            assert any("Etapa 5" in aviso for aviso in cfg.avisos)
+        assert cfg.num_equipes == 2
+        assert cfg.num_equipes_configurado == pedido
+        avisos_num_equipes = [
+            aviso for aviso in cfg.avisos if "num_equipes" in aviso
+        ]
+        assert len(avisos_num_equipes) == 1
+        assert len(cfg.avisos) == 1
+        assert "Etapa 5" in avisos_num_equipes[0]
+
+        jogo = Jogo([], num_equipes=cfg.num_equipes)
+        assert jogo.equipes_ativas == ("A", "B")
 
     @pytest.mark.parametrize("pedido", [2, 3, 4])
     def test_num_equipes_na_faixa_e_aceito(self, tmp_path, pedido):
@@ -383,6 +399,64 @@ class TestPerguntas:
 
         assert cfg.pasta_perguntas == str(tmp_path)
         assert cfg.avisos
+
+    def test_pasta_sem_permissao_volta_para_a_base(
+        self, tmp_path, monkeypatch
+    ):
+        pasta = tmp_path / "sem_permissao"
+        pasta.mkdir()
+        original = config.os.access
+        alvo = config.os.path.abspath(str(pasta))
+
+        def acesso(caminho, modo):
+            if config.os.path.abspath(caminho) == alvo:
+                return False
+            return original(caminho, modo)
+
+        monkeypatch.setattr(config.os, "access", acesso)
+        cfg = _carregar(tmp_path, {"perguntas": {"pasta": str(pasta)}})
+
+        assert cfg.pasta_perguntas == str(tmp_path)
+        assert any("sem permissão" in aviso for aviso in cfg.avisos)
+
+    def test_arquivo_padrao_inexistente_cai_no_seletor_com_outro_tema(
+        self, tmp_path, logs_config
+    ):
+        (tmp_path / "outro.json").write_text(
+            json.dumps(
+                [
+                    {
+                        "pergunta": "P?",
+                        "alternativas": ["a", "b"],
+                        "correta": 0,
+                    }
+                ]
+            ),
+            encoding="utf-8",
+        )
+        cfg = _carregar(
+            tmp_path, {"perguntas": {"arquivo_padrao": "nao_existe.json"}}
+        )
+
+        assert cfg.arquivo_perguntas == "nao_existe.json"
+        assert cfg.avisos == ()
+        assert any(
+            "nao_existe.json" in mensagem and "não existe" in mensagem
+            for mensagem in logs_config.mensagens
+        )
+
+        arquivos = listar_arquivos_perguntas(str(tmp_path))
+        assert [arq["arquivo"] for arq in arquivos] == ["outro.json"]
+
+        desafio = pytest.importorskip("desafio")
+        escolhido = desafio.escolher_arquivo_inicial(
+            arquivos,
+            None,
+            cfg.pasta_perguntas,
+            cfg.arquivo_perguntas,
+        )
+        assert escolhido is not None
+        assert escolhido["arquivo"] == "outro.json"
 
     def test_caminho_padrao_junta_pasta_e_arquivo(self, tmp_path):
         cfg = _carregar(tmp_path, {"perguntas": {"arquivo_padrao": "x.json"}})

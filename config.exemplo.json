@@ -24,5 +24,8 @@
   },
   "audio": {
     "ativo": true
+  },
+  "persistencia": {
+    "continuar_automatico": false
   }
 }

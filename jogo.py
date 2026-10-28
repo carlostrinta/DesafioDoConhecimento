@@ -62,6 +62,22 @@ TIMER_MOTIVO_TEMPO_ESGOTADO = "tempo_esgotado"
 PREFIXO_RECUSA = "recusado:"
 
 
+def _ordem_valida(ordem, total: int) -> bool:
+    """True se `ordem` é uma permutação de range(total)."""
+    if total <= 0:
+        return isinstance(ordem, list) and not ordem
+    if not isinstance(ordem, list) or len(ordem) != total:
+        return False
+    vistos = set()
+    for indice in ordem:
+        if isinstance(indice, bool) or not isinstance(indice, int):
+            return False
+        if not 0 <= indice < total or indice in vistos:
+            return False
+        vistos.add(indice)
+    return True
+
+
 @dataclass
 class EstadoRodada:
     fase: int = FASE_AGUARDANDO
@@ -299,31 +315,107 @@ class Jogo:
             self.timer_rotulo = "Tempo esgotado"
 
     # ─── Persistência ───
+    def _ordem_do_baralho(self) -> list[int]:
+        """Índices da ordem atual em relação a `perguntas_base`."""
+        posicoes = {id(q): i for i, q in enumerate(self.perguntas_base)}
+        ordem = [posicoes.get(id(q)) for q in self.perguntas]
+        if any(indice is None for indice in ordem):
+            return list(range(len(self.perguntas)))
+        return ordem
+
     def to_dict(self) -> dict[str, Any]:
+        """
+        Estado mínimo para continuar a partida.
+
+        Não inclui fase, quem apertou nem o timer: a Etapa 4.3 restaura a
+        pergunta atual em AGUARDANDO com o tempo cheio.
+        """
         return {
             "placar": dict(self.placar),
             "num_equipes": self.num_equipes,
+            "nomes_equipes": dict(self.nomes_equipes),
+            "tempo_pergunta": self.tempo_pergunta,
+            "tempo_resposta": self.tempo_resposta,
+            "pontuar_apos_tempo": self.pontuar_apos_tempo,
             "indice_pergunta": self.estado.indice_pergunta,
             "numero_pergunta": self.estado.numero_pergunta,
-            "fase": self.estado.fase,
-            "quem_apertou": self.estado.quem_apertou,
-            "tempo_estourou": self.estado.tempo_estourou,
+            "ordem": self._ordem_do_baralho(),
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any], perguntas: list[Pergunta], **kwargs) -> "Jogo":
-        jogo = cls(perguntas, num_equipes=data.get("num_equipes", 2), **kwargs)
-        jogo.placar = dict(data.get("placar", {eq: 0 for eq in jogo.equipes_ativas}))
-        jogo.estado.indice_pergunta = data.get("indice_pergunta", 0)
-        jogo.estado.numero_pergunta = data.get("numero_pergunta", 0)
-        # Regra da Etapa 4.3: não restaura timer nem fase intermediária
+        """
+        Reconstrói o jogo a partir de `to_dict()`.
+
+        Restaura placar, nomes, índice, rodada e a ordem do baralho. A fase
+        sempre volta para AGUARDANDO e o timer reinicia cheio.
+        """
+        dados = data if isinstance(data, dict) else {}
+
+        num_equipes = dados.get("num_equipes", 2)
+        if (
+            isinstance(num_equipes, bool)
+            or not isinstance(num_equipes, int)
+            or num_equipes not in (2, 3, 4)
+        ):
+            num_equipes = 2
+
+        nomes = dados.get("nomes_equipes")
+        if "nomes_equipes" not in kwargs and isinstance(nomes, dict):
+            limpos = {eq: f"Competidor {eq}" for eq in TODAS_EQUIPES}
+            for eq in TODAS_EQUIPES:
+                valor = nomes.get(eq)
+                if isinstance(valor, str) and valor.strip():
+                    limpos[eq] = valor.strip()
+            kwargs["nomes_equipes"] = limpos
+
+        for chave in ("tempo_pergunta", "tempo_resposta"):
+            if chave not in kwargs:
+                valor = dados.get(chave)
+                if isinstance(valor, int) and not isinstance(valor, bool) and valor > 0:
+                    kwargs[chave] = valor
+        if "pontuar_apos_tempo" not in kwargs:
+            valor = dados.get("pontuar_apos_tempo")
+            if isinstance(valor, bool):
+                kwargs["pontuar_apos_tempo"] = valor
+
+        jogo = cls(perguntas, num_equipes=num_equipes, **kwargs)
+
+        ordem = dados.get("ordem")
+        if _ordem_valida(ordem, len(perguntas)):
+            jogo.perguntas = [perguntas[i] for i in ordem]
+
+        placar = dados.get("placar")
+        if isinstance(placar, dict):
+            for eq in jogo.equipes_ativas:
+                valor = placar.get(eq, 0)
+                if isinstance(valor, bool) or not isinstance(valor, int) or valor < 0:
+                    valor = 0
+                jogo.placar[eq] = valor
+        else:
+            jogo.placar = {eq: 0 for eq in jogo.equipes_ativas}
+
+        indice = dados.get("indice_pergunta", 0)
+        if isinstance(indice, bool) or not isinstance(indice, int):
+            indice = 0
+        indice = max(0, min(indice, len(jogo.perguntas)))
+        numero = dados.get("numero_pergunta", 0)
+        if isinstance(numero, bool) or not isinstance(numero, int) or numero < 0:
+            numero = 0
+
+        jogo.estado.indice_pergunta = indice
+        jogo.estado.numero_pergunta = numero
+        # Regra da Etapa 4.3: não restaura timer nem fase intermediária.
         jogo.estado.fase = FASE_AGUARDANDO
         jogo.estado.quem_apertou = None
         jogo.estado.tempo_estourou = False
+        jogo.estado.pergunta_atual = (
+            jogo.perguntas[indice - 1]
+            if 1 <= indice <= len(jogo.perguntas)
+            else None
+        )
         jogo._parar_timer()
         jogo.timer_rotulo = ""
         jogo.timer_cor = ""
-        if 0 < jogo.estado.indice_pergunta <= len(jogo.perguntas):
-            jogo.estado.pergunta_atual = jogo.perguntas[jogo.estado.indice_pergunta - 1]
         jogo._iniciar_timer(jogo.tempo_pergunta, "Tempo para apertar", "")
         return jogo
