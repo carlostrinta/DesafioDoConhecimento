@@ -239,6 +239,13 @@ depois a **Etapa 5**.
 - Vale também para a primeira pergunta e para a partida restaurada.
 - Sem mudança de firmware nem de protocolo serial.
 
+### Melhorias futuras (sem etapa definida)
+
+- **Renomear `desafio.py`** para um nome que reflita seu papel (ex.:
+  `ui_jogo.py`): hoje o arquivo contém a classe `DueloDeConhecimento` e toda a
+  interface, mas o nome sugere um ponto de entrada. A troca precisa acompanhar
+  imports, `.spec` de build e testes.
+
 ## Limitações conhecidas (em evolução)
 
 - A interface ainda mostra **2 equipes**; a lógica já suporta 2, 3 ou 4.
