@@ -53,6 +53,7 @@ PASTA_PERGUNTAS_PADRAO = "."        # relativa à pasta da aplicação
 ARQUIVO_PERGUNTAS_PADRAO = "conhecimentos_gerais.json"
 SOM_ATIVO_PADRAO = True
 VOLUME_AUDIO_PADRAO = 1.0
+BUFFER_AUDIO_PADRAO = 512
 CONTINUAR_AUTOMATICO_PADRAO = False
 
 # ─── Limites de validação ───
@@ -63,6 +64,8 @@ TIMEOUT_PRONTO_MINIMO = 0.1
 TIMEOUT_PRONTO_MAXIMO = 30.0
 VOLUME_AUDIO_MINIMO = 0.0
 VOLUME_AUDIO_MAXIMO = 1.0
+BUFFER_AUDIO_MINIMO = 128
+BUFFER_AUDIO_MAXIMO = 2048
 NUM_EQUIPES_UI = 2  # a interface (e o Arduino) só usam 2 até a Etapa 5
 
 _SECOES = {
@@ -71,7 +74,7 @@ _SECOES = {
     "nomes_equipes": set(EQUIPES),
     "serial": {"porta", "baud_rate", "timeout_pronto"},
     "perguntas": {"pasta", "arquivo_padrao"},
-    "audio": {"ativo", "volume"},
+    "audio": {"ativo", "volume", "buffer"},
     "persistencia": {"continuar_automatico"},
 }
 
@@ -98,10 +101,16 @@ class Configuracao:
     arquivo_perguntas: str = ARQUIVO_PERGUNTAS_PADRAO
     som_ativo: bool = SOM_ATIVO_PADRAO
     volume_audio: float = VOLUME_AUDIO_PADRAO
+    buffer_audio: int = BUFFER_AUDIO_PADRAO
     continuar_automatico: bool = CONTINUAR_AUTOMATICO_PADRAO
     avisos: tuple[str, ...] = ()
     caminho_config: str | None = None
     encontrado: bool = False
+
+    @property
+    def buffer(self) -> int:
+        """Alias curto para `buffer_audio` (nome da chave no config.json)."""
+        return self.buffer_audio
 
     @property
     def caminho_perguntas_padrao(self) -> str:
@@ -221,6 +230,11 @@ def carregar(caminho=None, diretorio_base=None) -> Configuracao:
         audio, "ativo", "audio.ativo", SOM_ATIVO_PADRAO, avisos,
     )
     volume_audio = _ler_volume(audio, avisos)
+    buffer_audio = _ler_inteiro(
+        audio, "buffer", "audio.buffer",
+        BUFFER_AUDIO_PADRAO, avisos,
+        minimo=BUFFER_AUDIO_MINIMO, maximo=BUFFER_AUDIO_MAXIMO,
+    )
     continuar_automatico = _ler_booleano(
         persistencia,
         "continuar_automatico",
@@ -243,6 +257,7 @@ def carregar(caminho=None, diretorio_base=None) -> Configuracao:
         arquivo_perguntas=arquivo_perguntas,
         som_ativo=som_ativo,
         volume_audio=volume_audio,
+        buffer_audio=buffer_audio,
         continuar_automatico=continuar_automatico,
         avisos=tuple(avisos),
         caminho_config=caminho,
@@ -276,6 +291,7 @@ def modelo_padrao() -> dict:
         "audio": {
             "ativo": SOM_ATIVO_PADRAO,
             "volume": VOLUME_AUDIO_PADRAO,
+            "buffer": BUFFER_AUDIO_PADRAO,
         },
         "persistencia": {
             "continuar_automatico": CONTINUAR_AUTOMATICO_PADRAO,
@@ -543,5 +559,6 @@ PASTA_PERGUNTAS = CONFIG.pasta_perguntas
 ARQUIVO_PERGUNTAS = CONFIG.arquivo_perguntas
 SOM_ATIVO = CONFIG.som_ativo
 VOLUME_AUDIO = CONFIG.volume_audio
+BUFFER_AUDIO = CONFIG.buffer_audio
 CONTINUAR_AUTOMATICO = CONFIG.continuar_automatico
 AVISOS_CONFIG = CONFIG.avisos

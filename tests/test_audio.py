@@ -48,6 +48,11 @@ class FakeSound:
     def set_volume(self, valor):
         self.volume = valor
 
+    def get_length(self):
+        if self.dados == b"LONGO":
+            return 6.0
+        return 0.5
+
 
 class FakeCanal:
     def __init__(self):
@@ -282,8 +287,8 @@ class TestPacoteDeSons:
     ):
         (pasta_sons / "nova_pergunta.wav").write_bytes(b"CORROMPIDO")
 
-        som = audio.Som(diretorio_sons=str(pasta_sons))
         with caplog.at_level(logging.WARNING, logger="desafio.audio"):
+            som = audio.Som(diretorio_sons=str(pasta_sons))
             som.nova_pergunta()
             som.nova_pergunta()
 
@@ -295,6 +300,57 @@ class TestPacoteDeSons:
             if "inválido/corrompido" in registro.getMessage()
         ]
         assert len(avisos) == 1
+
+    def test_arquivos_existentes_sao_precarregados_uma_vez(
+        self, pygame_falso, pasta_sons
+    ):
+        (pasta_sons / "nova_pergunta.wav").write_bytes(b"externo")
+        (pasta_sons / "botao_a.wav").write_bytes(b"externo")
+
+        som = audio.Som(diretorio_sons=str(pasta_sons))
+
+        assert set(som._cache_arquivos) == {"nova_pergunta", "botao_a"}
+        assert all(som._cache_arquivos[nome] is not None for nome in som._cache_arquivos)
+        assert len(pygame_falso.mixer.sons) == 2
+
+        for _ in range(3):
+            som.nova_pergunta()
+            som.apertou("A")
+
+        assert len(pygame_falso.mixer.sons) == 2, "o disco/Sound não pode ser relido"
+
+    def test_arquivo_acima_de_cinco_megabytes_usa_fallback(
+        self, pygame_falso, pasta_sons, caplog, monkeypatch
+    ):
+        (pasta_sons / "nova_pergunta.wav").write_bytes(b"externo")
+        monkeypatch.setattr(
+            audio.os.path,
+            "getsize",
+            lambda _caminho: audio.LIMITE_ARQUIVO_BYTES + 1,
+        )
+
+        with caplog.at_level(logging.WARNING, logger="desafio.audio"):
+            som = audio.Som(diretorio_sons=str(pasta_sons))
+            som.nova_pergunta()
+
+        assert som._cache_arquivos["nova_pergunta"] is None
+        assert all(som_fake.arquivo is None for som_fake in pygame_falso.mixer.sons)
+        assert any("limite" in r.getMessage() and "MB" in r.getMessage()
+                   for r in caplog.records)
+
+    def test_arquivo_acima_de_cinco_segundos_usa_fallback(
+        self, pygame_falso, pasta_sons, caplog
+    ):
+        (pasta_sons / "nova_pergunta.wav").write_bytes(b"LONGO")
+
+        with caplog.at_level(logging.WARNING, logger="desafio.audio"):
+            som = audio.Som(diretorio_sons=str(pasta_sons))
+            som.nova_pergunta()
+
+        assert som._cache_arquivos["nova_pergunta"] is None
+        assert pygame_falso.mixer.sons[0].dados == b"LONGO"
+        assert any("limite" in r.getMessage() and " s" in r.getMessage()
+                   for r in caplog.records)
 
     def test_volume_configuravel_chega_aos_sons_externos_e_sintetizados(
         self, pygame_falso, pasta_sons
@@ -384,21 +440,36 @@ class TestSemPygame:
 
 
 class TestPygameFalso:
-    def test_inicializacao_do_mixer_com_pre_init_de_baixa_latencia(
+    def test_inicializacao_do_mixer_usa_buffer_padrao_512(
         self, pygame_falso
     ):
         som = audio.Som()
         assert som.disponivel is True
         assert som.ativo is True
+        assert som.buffer == 512
         assert pygame_falso.mixer.pre_init_kwargs == {
             "frequency": 22050,
             "size": -16,
             "channels": 1,
-            "buffer": 256,
+            "buffer": 512,
         }
         assert pygame_falso.mixer.init_kwargs == {}
         assert pygame_falso.mixer.num_channels == 4
         assert 0 in pygame_falso.mixer.canais  # Channel(0)
+
+    @pytest.mark.parametrize("valor", [128, 1024, 2048])
+    def test_buffer_configuravel_chega_ao_pre_init(self, pygame_falso, valor):
+        som = audio.Som(buffer=valor)
+
+        assert som.buffer == valor
+        assert pygame_falso.mixer.pre_init_kwargs["buffer"] == valor
+
+    @pytest.mark.parametrize("valor", [127, 2049, "512", True, None])
+    def test_buffer_invalido_direto_volta_ao_padrao(self, pygame_falso, valor):
+        som = audio.Som(buffer=valor)
+
+        assert som.buffer == 512
+        assert pygame_falso.mixer.pre_init_kwargs["buffer"] == 512
 
     def test_tocar_ja_corta_o_anterior_e_toca(self, pygame_falso):
         som = audio.Som()

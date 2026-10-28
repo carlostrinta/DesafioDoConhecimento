@@ -174,6 +174,7 @@ Copy-Item config.exemplo.json config.json
 | `perguntas.arquivo_padrao` | texto | `conhecimentos_gerais.json` | nome de arquivo `.json`, sem pasta |
 | `audio.ativo` | booleano | `true` | `true`/`false` (estado inicial do som) |
 | `audio.volume` | número | `1.0` | `0.0` a `1.0`; aplica-se aos sons externos e sintetizados (`0.0` mudo) |
+| `audio.buffer` | inteiro | `512` | `128` a `2048` amostras; buffer do mixer (menor = menos latência) |
 | `persistencia.continuar_automatico` | booleano | `false` | `true` retoma a partida salva sem o modal de confirmação |
 
 O que acontece com arquivo problemático:
@@ -387,20 +388,25 @@ duplicadas em `serial_comm.py` nem na UI.
 
 Os efeitos são **opcionais e externos**: o jogo procura os arquivos na pasta
 `sons/` ao lado do executável (rodando pelo fonte, na pasta do projeto). Se um
-arquivo não existir ou estiver corrompido, usa o efeito sintetizado
-equivalente e registra **um único `WARNING` por arquivo**; o app nunca cai por
-causa de áudio.
+arquivo não existir, estiver corrompido, passar de **5 segundos** ou de
+**5 MB**, usa o efeito sintetizado equivalente e registra **um único
+`WARNING` por arquivo**; o app nunca cai por causa de áudio.
 
+- Os arquivos existentes são carregados **uma vez na abertura** e mantidos em
+  memória como objetos `Sound`; cada evento reutiliza o cache e **não lê o
+  disco de novo**.
 - Formatos: **WAV PCM 16 bits** e **OGG Vorbis**; se os dois existirem, o WAV
   tem preferência.
 - Nomes e durações sugeridas: [`sons/README.md`](sons/README.md).
 - Registro de autor/licença: [`sons/LICENCAS.md`](sons/LICENCAS.md).
 - Botões A–D têm sons distintos e devem ter **menos de 1 s**.
 - Volume geral em `audio.volume` (`0.0`–`1.0`), aplicado também ao fallback.
-- O mixer usa `pre_init` com buffer de **256** amostras (baixa latência) e
-  mantém `set_num_channels(4)`.
-- `vitoria`/`fim_partida` e `troca_tema` já estão mapeados; a tela de campeão
-  continua na Etapa 5. A troca de tema toca o som ao carregar um banco.
+- O mixer usa `pre_init` com buffer de **512** amostras por padrão (ajustável
+  em `audio.buffer`, `128`–`2048`) e mantém `set_num_channels(4)`.
+- **O evento de vitória/fim de partida só dispara na Etapa 5.** O som
+  `vitoria` já está mapeado, mas o jogo atual não o dispara; a tela de campeão
+  e o fluxo de fim de partida pertencem àquela etapa. A troca de tema toca o
+  som ao carregar um banco.
 
 Nenhum áudio é baixado ou incluído no repositório. A pasta `sons/` contém
 apenas a documentação; copie os arquivos licenciados para ela.

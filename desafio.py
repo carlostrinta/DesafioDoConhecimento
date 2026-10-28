@@ -27,6 +27,7 @@ import ui_componentes
 from audio import Som
 from config import (
     ARQUIVO_PERGUNTAS,
+    BUFFER_AUDIO,
     CONFIG,
     CONTINUAR_AUTOMATICO,
     NOMES_EQUIPES,
@@ -212,7 +213,11 @@ class DueloDeConhecimento:
                 pass
 
         # ---------- Áudio ----------
-        self.som = Som(ativo=SOM_ATIVO, volume=VOLUME_AUDIO)
+        self.som = Som(
+            ativo=SOM_ATIVO,
+            volume=VOLUME_AUDIO,
+            buffer=BUFFER_AUDIO,
+        )
         self._ultimo_seg_tick = None
 
         # ---------- Inicialização ----------

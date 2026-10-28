@@ -10,8 +10,11 @@ existir, ele usa o efeito sintetizado equivalente e registra um único
 1. Coloque os arquivos nesta pasta com os nomes exatos da tabela abaixo.
 2. Use **WAV PCM 16 bits** ou **OGG Vorbis**; se os dois existirem, o WAV tem
    preferência.
-3. Reinicie o jogo depois de trocar/adicionar arquivos.
+3. Reinicie o jogo depois de trocar/adicionar arquivos: os arquivos existentes
+   são carregados **uma vez na abertura** e ficam em memória.
 4. O volume geral vem de `audio.volume` no `config.json` (`0.0` a `1.0`).
+5. Cada arquivo pode ter no máximo **5 segundos** e **5 MB**. Acima disso, o
+   jogo registra um `WARNING` e usa o som sintetizado.
 
 Formatos recomendados:
 
@@ -38,9 +41,10 @@ Formatos recomendados:
 | Vitória / fim de partida | `vitoria.wav` ou `.ogg` | 1–3 s | Também usado por `fim_partida()`. |
 | Troca de tema | `troca_tema.wav` ou `.ogg` | 0,3–1 s | Tocado ao carregar um tema. |
 
-> A tela de campeão e o fluxo completo de fim de partida ainda pertencem à
-> Etapa 5. O som de vitória já fica mapeado para quando essa tela chamar
-> `Som.vitoria()` ou `Som.fim_partida()`.
+> **Vitória/fim de partida só dispara na Etapa 5.** A tela de campeão e o
+> fluxo de fim de partida ainda não existem; o arquivo `vitoria` já fica
+> mapeado para quando essa tela chamar `Som.vitoria()` ou
+> `Som.fim_partida()`.
 
 ## Onde conseguir sons livres
 

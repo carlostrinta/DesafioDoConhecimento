@@ -24,7 +24,8 @@
   },
   "audio": {
     "ativo": true,
-    "volume": 1.0
+    "volume": 1.0,
+    "buffer": 512
   },
   "persistencia": {
     "continuar_automatico": false

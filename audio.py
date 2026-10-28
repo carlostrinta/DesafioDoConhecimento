@@ -8,10 +8,12 @@ todas as chamadas viram no-op — o jogo continua, apenas sem som.
 
 A pasta `sons/` fica ao lado do executável (rodando pelo fonte, na pasta do
 projeto). Para cada evento, o app procura o nome-base de `ARQUIVOS_SOM` com
-`.wav` e depois com `.ogg`; se o arquivo não existir ou estiver corrompido,
-usa o efeito sintetizado equivalente e registra um único WARNING por arquivo.
-Os bytes dos efeitos sintetizados continuam idênticos aos da v2.2 (ver
-tests/test_audio.py).
+`.wav` e depois com `.ogg`; se o arquivo não existir, estiver corrompido, passar
+de 5 s ou de 5 MB, usa o efeito sintetizado equivalente e registra um único
+WARNING por arquivo. Os arquivos existentes são carregados **uma vez na
+abertura** e mantidos em memória; os eventos seguintes só reutilizam o objeto
+`Sound`, sem ler o disco de novo. Os bytes dos efeitos sintetizados continuam
+idênticos aos da v2.2 (ver tests/test_audio.py).
 """
 
 from __future__ import annotations
@@ -30,6 +32,16 @@ log = logging.getLogger("desafio.audio")
 
 PASTA_SONS = "sons"
 EXTENSOES_SOM = (".wav", ".ogg")
+
+# Limites de segurança para arquivos externos. Acima disso, o arquivo é
+# ignorado e o evento cai no fallback sintetizado.
+LIMITE_ARQUIVO_BYTES = 5 * 1024 * 1024  # 5 MB
+LIMITE_ARQUIVO_SEGUNDOS = 5.0
+
+# Buffer do mixer (amostras). O config.json pode ajustar em audio.buffer.
+BUFFER_SOM_PADRAO = 512
+BUFFER_SOM_MINIMO = 128
+BUFFER_SOM_MAXIMO = 2048
 
 # Nome-base de cada evento. A extensão (.wav ou .ogg) é resolvida em
 # `_localizar_arquivo`; WAV tem preferência quando os dois existem.
@@ -98,6 +110,15 @@ def _normalizar_volume(valor):
     return max(0.0, min(1.0, numero))
 
 
+def _normalizar_buffer(valor):
+    """Buffer do mixer em 128..2048 amostras; inválido vira 512."""
+    if isinstance(valor, bool) or not isinstance(valor, int):
+        return BUFFER_SOM_PADRAO
+    if not BUFFER_SOM_MINIMO <= valor <= BUFFER_SOM_MAXIMO:
+        return BUFFER_SOM_PADRAO
+    return valor
+
+
 class Som:
     """
     Identidade sonora do Duelo de Conhecimento.
@@ -114,10 +135,11 @@ class Som:
         "G5": 783.99, "A5": 880.00, "C6": 1046.50,
     }
 
-    def __init__(self, ativo=True, volume=1.0, diretorio_sons=None):
+    def __init__(self, ativo=True, volume=1.0, diretorio_sons=None, buffer=BUFFER_SOM_PADRAO):
         self.ativo = bool(ativo)
         self.disponivel = False
         self.volume = _normalizar_volume(volume)
+        self.buffer = _normalizar_buffer(buffer)
         self._pygame = None
         self._canal = None
         self._cache = {}
@@ -142,7 +164,7 @@ class Som:
                 frequency=22050,
                 size=-16,
                 channels=1,
-                buffer=256,
+                buffer=self.buffer,
             )
             pygame.mixer.init()
             pygame.mixer.set_num_channels(4)
@@ -155,6 +177,7 @@ class Som:
                 "[SOM] Sistema de áudio inicializado (pasta de sons: %s).",
                 self._pasta_sons,
             )
+            self._precarregar_arquivos()
 
         except Exception as e:
             log.warning("[SOM] Não foi possível inicializar pygame.mixer: %s", e)
@@ -205,12 +228,13 @@ class Som:
         self._avisos_emitidos.add(chave)
         log.warning("[SOM] %s", mensagem)
 
-    def _som_externo(self, evento):
+    def _carregar_arquivo_evento(self, evento):
         """
-        Sound do arquivo do evento, ou None para usar o sintetizado.
+        Carrega (uma única vez) o arquivo externo de um evento.
 
-        Arquivo ausente, sem permissão ou inválido nunca levanta exceção: fica
-        um WARNING (uma vez por arquivo) e o evento cai no fallback.
+        O resultado fica em `_cache_arquivos`, inclusive `None` para arquivo
+        ausente/inválido/fora dos limites. Assim, cada evento consulta o
+        cache e nunca relê o disco. Devolve o `Sound` ou `None`.
         """
         if evento in self._cache_arquivos:
             return self._cache_arquivos[evento]
@@ -231,7 +255,37 @@ class Som:
             return None
 
         try:
+            tamanho = os.path.getsize(caminho)
+            if tamanho > LIMITE_ARQUIVO_BYTES:
+                self._avisar_uma_vez(
+                    nome_base,
+                    f"Arquivo {caminho} tem {tamanho / (1024 * 1024):.1f} MB "
+                    f"(limite {LIMITE_ARQUIVO_BYTES / (1024 * 1024):.0f} MB); "
+                    "usando o som sintetizado.",
+                )
+                self._cache_arquivos[evento] = None
+                return None
+
             som = self._pygame.mixer.Sound(file=caminho)
+
+            # `Sound.get_length()` existe no pygame real; o fake dos testes
+            # pode não tê-lo, então a checagem é opcional.
+            medir_duracao = getattr(som, "get_length", None)
+            if callable(medir_duracao):
+                try:
+                    duracao = float(medir_duracao())
+                except Exception:
+                    duracao = 0.0
+                if duracao > LIMITE_ARQUIVO_SEGUNDOS:
+                    self._avisar_uma_vez(
+                        nome_base,
+                        f"Arquivo {caminho} dura {duracao:.1f} s "
+                        f"(limite {LIMITE_ARQUIVO_SEGUNDOS:g} s); "
+                        "usando o som sintetizado.",
+                    )
+                    self._cache_arquivos[evento] = None
+                    return None
+
             self._aplicar_volume(som)
             self._cache_arquivos[evento] = som
             log.info("[SOM] Usando arquivo externo: %s", caminho)
@@ -244,6 +298,32 @@ class Som:
             )
             self._cache_arquivos[evento] = None
             return None
+
+    def _precarregar_arquivos(self):
+        """Carrega em memória todos os arquivos existentes de `sons/`."""
+        existentes = 0
+        for evento in ARQUIVOS_SOM:
+            nome_base = ARQUIVOS_SOM[evento]
+            if not self._localizar_arquivo(nome_base):
+                continue
+            self._carregar_arquivo_evento(evento)
+            existentes += 1
+        if existentes:
+            log.info(
+                "[SOM] %d arquivo(s) externo(s) pré-carregado(s) em memória.",
+                existentes,
+            )
+
+    def _som_externo(self, evento):
+        """
+        Sound do arquivo do evento, ou None para usar o sintetizado.
+
+        A primeira consulta carrega o arquivo (feita normalmente na abertura);
+        as seguintes usam apenas o cache. Arquivo ausente, sem permissão,
+        inválido ou fora dos limites nunca levanta exceção: fica um WARNING
+        (uma vez por arquivo) e o evento cai no fallback.
+        """
+        return self._carregar_arquivo_evento(evento)
 
     # -----------------------------------------------------
     # Reprodução
