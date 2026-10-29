@@ -24,6 +24,14 @@ def raiz_tk():
     root.destroy()
 
 
+@pytest.fixture(autouse=True)
+def restaurar_escala():
+    """Evita que a escala escolhida aqui vaze para o golden visual."""
+    original = mod.ESCALA
+    yield
+    mod.definir_escala(original)
+
+
 def _textos(barra):
     return {
         barra.itemcget(item, "text"): barra.bbox(item)

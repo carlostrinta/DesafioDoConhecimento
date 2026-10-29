@@ -506,6 +506,22 @@ class TestD2Encerramento:
         assert comm.serial is None
         assert not comm._thread.is_alive()
 
+    def test_parar_no_v2_nao_manda_reset(self):
+        modulo = ModuloSerialFalso()
+        modulo.portas = [Porta("COM6", "Arduino Uno")]
+        modulo.manda_pronto = {"COM6"}
+        comm = criar_comm(queue.Queue(), modulo)
+        comm.definir_protocolo("v2")
+        comm.iniciar()
+        assert esperar(lambda: comm.serial is not None)
+        aberta = comm.serial
+
+        comm.parar(timeout=1.0)
+
+        assert aberta.escritas == []
+        assert aberta.fechado is True
+        assert comm.serial is None
+
     def test_parar_com_close_travado_nao_espera_para_sempre(self):
         modulo = ModuloSerialFalso()
         modulo.portas = [Porta("COM6", "Arduino Uno")]

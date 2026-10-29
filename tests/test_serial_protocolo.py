@@ -131,6 +131,18 @@ class TestProtocoloSerial:
         assert comandos_para_arduino(["apertou:D"]) == ["LED_D_ON", "BEEP"]
         assert comandos_para_arduino(["led_reacender:C"]) == ["LED_C_ON"]
 
+    def test_modo_v2_nao_envia_led_buzzer_ou_reset(self):
+        eventos = [
+            "apertou:A",
+            "pontuou:A",
+            "tempo_esgotado",
+            "proxima_pergunta",
+            "led_reacender:D",
+        ]
+        assert comandos_para_arduino(eventos, protocolo="v2") == []
+        # O caminho v1 (e o estado antes do handshake) continua intacto.
+        assert comandos_para_arduino(["apertou:A"]) == ["LED_A_ON", "BEEP"]
+
     def test_configuracao_de_equipes(self):
         assert comando_config_equipes(2) == "CONFIG_TEAMS 2"
         assert comando_config_equipes(4) == "CONFIG_TEAMS 4"
@@ -140,6 +152,22 @@ class TestProtocoloSerial:
         assert equipes_confirmadas("EQUIPES X") is None
         assert equipes_confirmadas("EQUIPES 22") is None
         assert equipes_confirmadas("OUTRA COISA") is None
+
+    @pytest.mark.parametrize("valor", [0, 1, 5, 22])
+    def test_comando_config_equipes_rejeita_n_invalido(self, valor):
+        with pytest.raises(ValueError):
+            comando_config_equipes(valor)
+
+    @pytest.mark.parametrize(
+        "evento", ["VERSAO 2", "EQUIPES 2", "EQUIPES 4", "ERRO EQUIPES"]
+    )
+    def test_eventos_de_controle_v2_nao_alteram_o_jogo(
+        self, perguntas_exemplo, evento
+    ):
+        j = Jogo(perguntas_exemplo, num_equipes=4, contagem_largada=0)
+        antes = (j.estado.fase, j.estado.quem_apertou, dict(j.placar))
+        assert mapear_evento_arduino(evento, j) == []
+        assert (j.estado.fase, j.estado.quem_apertou, dict(j.placar)) == antes
 
 
 class TestProtocoloHeadless:

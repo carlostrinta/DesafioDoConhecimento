@@ -32,28 +32,35 @@ Os testes automatizados usam portas falsas. **Só o hardware real valida:**
 | 5 | **Tire o cabo** | em ~1 s volta para "não conectado"; não assume a COM4 |
 | 6 | **Recoloque o cabo** (mesma porta) | reconecta em até 3 s |
 | 7 | **Troque de porta USB** (ou use o clone) | reconecta na nova porta em até 3 s |
-| 8 | Com o jogo numa rodada, aperte **RESET** na placa | "Arduino reiniciado." e o LED de quem apertou reacende |
-| 9 | Feche o app com a placa conectada | LEDs apagam (`RESET`), porta fecha, processo termina |
+| 8 | Com o jogo numa rodada, aperte **RESET** na placa | "Arduino reiniciado."; no v1 o LED de quem apertou reacende; no v2 o app reenvia `CONFIG_TEAMS` |
+| 9 | Feche o app com a placa conectada | no v1, LEDs apagam (`RESET`); porta fecha e processo termina. No v2, o PC não envia `RESET` |
 | 10 | Repita 1–9 com o **clone CH340** | mesmo resultado (driver CH340 instalado) |
 | 11 | Repita 1–10 no **`Desafio do Conhecimento.exe`** | mesmo resultado |
 | 12 | Abra o app **sem placa** e deixe 1 min | console sem varredura infinita de portas; CPU baixa |
 
-## Firmware v2 (validação concluída)
+## Firmware v2 (validado no Uno e Mega 2560; CH340 pendente)
 
-O v2 foi validado no Arduino Uno em 29/10/2026. O roteiro da bancada está em
+O firmware v2 de produção foi **validado no Arduino Uno e no Mega 2560**. O
+roteiro completo, com a matriz PC v1/v2 × firmware v1/v2, está em
+[`firmware/v2/ROTEIRO_VALIDACAO.md`](firmware/v2/ROTEIRO_VALIDACAO.md). A
+bancada de 10 botões também foi validada separadamente em
 [`firmware/bancada_botoes/README.md`](firmware/bancada_botoes/README.md).
 
-Para repetir a validação com o firmware v2 gravado:
+Resumo do que foi confirmado com o firmware v2 gravado:
 
-1. Abra o app e confira o log: o Arduino deve enviar `PRONTO` e `VERSAO 2`.
+1. O app recebe `PRONTO` e `VERSAO 2` no log.
 2. Com 4 equipes, o app envia `CONFIG_TEAMS 4` e o Arduino responde
-   `EQUIPES 4`.
-3. Teste A/B/C/D, acertos A/B/C/D, `AVANÇAR` e `REVELAR`.
-4. Em um teste separado, com o app fechado, use o Monitor Serial para enviar
-   `CONFIG_TEAMS 2` e confirme que C/D deixam de gerar eventos; envie
-   `CONFIG_TEAMS 5` e confira `ERRO EQUIPES`.
-5. O v2 não tem LEDs nem buzzer: o feedback visual/sonoro deve continuar no PC.
-6. Repita a reconexão (tirar/voltar o cabo) e o fechamento do app.
+   `EQUIPES 4`; sem ACK, há uma retentativa e aviso visível.
+3. A/B/C/D, acertos A/B/C/D, `AVANÇAR` e `REVELAR` respondem nos pinos D2–D11.
+4. Com o app fechado, o Monitor Serial confirma `CONFIG_TEAMS 2` (C/D deixam
+   de gerar eventos) e `CONFIG_TEAMS 5` (`EQUIPES <atual>`).
+5. O v2 não tem LEDs nem buzzer: o feedback visual/sonoro fica no PC e o PC v2
+   não envia `LED_*`, `BEEP*`, `BUZZER_*` nem `RESET`.
+6. Reconexão, reset por DTR no meio da rodada e fechamento do app foram
+   testados.
+
+O **clone CH340** com firmware v2 continua pendente. Se o `PRONTO` demorar mais
+de 3 s após o reset por DTR, aumente `serial.timeout_pronto` no `config.json`.
 
 ## Se algo falhar
 
@@ -69,4 +76,5 @@ Para repetir a validação com o firmware v2 gravado:
 `tests/test_serial_comm.py` reproduz, com porta falsa: COM4 Bluetooth sem
 `PRONTO` (nunca aceita), COM6 real, queda e volta em outra porta (COM7),
 ausência total de portas, encerramento sem placa e com driver travado
-(`parar()` em menos de 1,5 s), além de `RESET` ao fechar.
+(`parar()` em menos de 1,5 s), além de `RESET` ao fechar no v1 e ausência de
+`RESET` no v2.
