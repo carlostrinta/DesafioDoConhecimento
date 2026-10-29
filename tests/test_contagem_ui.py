@@ -18,6 +18,7 @@ import pytest
 
 import desafio
 import ui_componentes
+from apoio_tk import criar_raiz_tk
 from jogo import FASE_AGUARDANDO, FASE_CONTAGEM, Jogo
 from ui_selecao import ModalSelecaoPerguntas
 
@@ -106,10 +107,9 @@ def raiz_tk():
     import tkinter as tk
 
     try:
-        root = tk.Tk()
+        root = criar_raiz_tk()
     except tk.TclError as e:
         pytest.skip(f"Tk indisponível: {e}")
-    root.withdraw()
 
     def reportar(tipo, valor, tb):
         raise valor

@@ -11,15 +11,15 @@ import tkinter as tk
 import pytest
 
 import ui_componentes as mod
+from apoio_tk import criar_raiz_tk
 
 
 @pytest.fixture(scope="module")
 def raiz_tk():
     try:
-        root = tk.Tk()
+        root = criar_raiz_tk()
     except tk.TclError as e:
         pytest.skip(f"Tk indisponível: {e}")
-    root.withdraw()
     yield root
     root.destroy()
 

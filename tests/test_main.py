@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from apoio_tk import criar_raiz_tk
+
 RAIZ = Path(__file__).resolve().parent.parent
 
 
@@ -190,21 +192,21 @@ def test_desafio_executado_diretamente_orienta_o_entrypoint():
     assert "Traceback" not in saida.stderr
 
 
-def _tk_disponivel():
+def _tk_indisponivel():
+    """Devolve a mensagem do Tk ou None; preserva a causa real do skip."""
     try:
-        import tkinter as tk
-
-        root = tk.Tk()
+        root = criar_raiz_tk()
         root.destroy()
-        return True
-    except Exception:
-        return False
+        return None
+    except Exception as e:
+        return str(e)
 
 
 def test_main_abre_a_janela_e_sai_limpo():
     """Roda `python main.py` de verdade; a janela fecha sozinha após 1 s."""
-    if not _tk_disponivel():
-        pytest.skip("Tk indisponível (ambiente headless)")
+    erro_tk = _tk_indisponivel()
+    if erro_tk:
+        pytest.skip(f"Tk indisponível: {erro_tk}")
 
     env = os.environ.copy()
     env["DESAFIO_AUTO_FECHAR"] = "1"
@@ -239,8 +241,9 @@ def test_main_exercita_a_contagem_de_largada_e_sai_limpo():
     passa por 3, 2, 1, JÁ! e só então fecha. Sem elevar o widget do overlay
     corretamente, o caminho dispara TclError e o subprocesso não termina.
     """
-    if not _tk_disponivel():
-        pytest.skip("Tk indisponível (ambiente headless)")
+    erro_tk = _tk_indisponivel()
+    if erro_tk:
+        pytest.skip(f"Tk indisponível: {erro_tk}")
 
     env = os.environ.copy()
     env["DESAFIO_AUTO_FECHAR"] = "1"

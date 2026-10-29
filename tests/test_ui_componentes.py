@@ -11,8 +11,10 @@ O dump usa Tk de verdade; em ambiente sem display o teste é pulado.
 
 Na Etapa 4.6 foram acrescentados os casos `contagem_numero` e `contagem_ja`
 (overlay de largada). Os casos `barra_topo_*` são os mais sensíveis às
-métricas de fonte da máquina: se apenas eles divergirem, o layout de
-referência continua válido e não é preciso regenerar o arquivo inteiro.
+métricas de fonte da máquina, mas uma divergência nunca deve ser tratada como
+"deriva de ambiente": primeiro identifique o commit de origem por bisseção.
+Se o layout realmente mudou, regrave apenas os casos afetados em um commit
+separado e justificado.
 """
 
 import json
@@ -21,6 +23,8 @@ import sys
 from pathlib import Path
 
 import pytest
+
+from apoio_tk import criar_raiz_tk
 
 RAIZ = Path(__file__).resolve().parent.parent
 GOLDEN = Path(__file__).resolve().parent / "dados" / "ui_componentes_v23.json"
@@ -199,7 +203,7 @@ def capturar_componentes(mod):
     import tkinter as tk
 
     try:
-        root = tk.Tk()
+        root = criar_raiz_tk(retirar=False)
     except tk.TclError as e:
         pytest.skip(f"Tk indisponível: {e}")
 
@@ -250,7 +254,7 @@ def test_barra_topo_nao_sobrepoe_status_ao_titulo_em_janela_pequena():
     import ui_componentes as mod
 
     try:
-        root = tk.Tk()
+        root = criar_raiz_tk(retirar=False)
     except tk.TclError as e:
         pytest.skip(f"Tk indisponível: {e}")
 
@@ -322,7 +326,7 @@ def test_overlay_contagem_desenha_e_escala_com_a_janela():
     import ui_componentes as mod
 
     try:
-        root = tk.Tk()
+        root = criar_raiz_tk(retirar=False)
     except tk.TclError as e:
         pytest.skip(f"Tk indisponível: {e}")
 
