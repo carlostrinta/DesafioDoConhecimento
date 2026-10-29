@@ -2,8 +2,9 @@
 Duelo de Conhecimento — Aplicação Windows
 Versão 2.1 — interface de palco + máquina de estados + serial robusta + áudio
 
-Requisitos: Python 3.9+, pyserial  (pip install pyserial)
-Protocolo serial: IDÊNTICO ao da v1.1 (o firmware do Arduino não muda).
+Requisitos: Python 3.12+ (validado em 3.12.15), pyserial.
+Protocolo serial: v1 preservado; v2 detectado por `PRONTO` + `VERSAO 2`,
+com `CONFIG_TEAMS N` e ACK `EQUIPES N`.
 
 Atalhos de teclado (modo simulação, funcionam junto com o Arduino):
     A / B / C / D   apertar o botão da equipe
@@ -186,6 +187,9 @@ class DueloDeConhecimento:
         self._versao_prazo = 0.0
         self._job_equipes = None
         self._equipes_prazo = 0.0
+        self._equipes_tentativas = 0
+        self._equipes_alvo = 0
+        self._equipes_confirmado = False
         self._janela_sobre = None
         self._aviso_protocolo_mostrado = False
         self._geracao_conexao = 0
@@ -933,7 +937,14 @@ class DueloDeConhecimento:
             self.avisar(self._texto_recusa(eventos[0]))
             return
 
-        for cmd in comandos_para_arduino(eventos):
+        if self.protocolo_arduino == "v2" and "proxima_pergunta" in eventos:
+            # O firmware pode ter perdido a configuração; reenvia a cada
+            # pergunta nova, sem esperar uma reconexão.
+            self._solicitar_configuracao_equipes(motivo="pergunta")
+
+        for cmd in comandos_para_arduino(
+            eventos, protocolo=self.protocolo_arduino
+        ):
             self.enviar_serial(cmd)
 
         quem_piscar = None
@@ -1107,6 +1118,12 @@ class DueloDeConhecimento:
         if evento == "PRONTO":
             log.info("Arduino reiniciado.")
             self._geracao_conexao += 1
+            # O reset por DTR invalida qualquer ACK pendente. O VERSAO 2 que
+            # vem logo depois dispara uma nova configuração imediatamente.
+            self._cancelar_solicitacao_equipes()
+            self._equipes_tentativas = 0
+            self._equipes_alvo = 0
+            self._equipes_confirmado = False
             self._agendar_verificacao_versao()
         self._despachar(mapear_evento_arduino(evento, self.jogo))
 
@@ -1141,25 +1158,57 @@ class DueloDeConhecimento:
         self._versao_prazo = 0.0
         self._aplicar_protocolo("v1")
 
-    def _solicitar_configuracao_equipes(self):
-        """Pede ao firmware v2 para ativar exatamente as equipes do jogo."""
-        if self._job_equipes:
-            self.root.after_cancel(self._job_equipes)
+    def _cancelar_solicitacao_equipes(self):
+        """Cancela a janela do ACK sem alterar o protocolo detectado."""
+        job = getattr(self, "_job_equipes", None)
+        if job:
+            self.root.after_cancel(job)
             self._job_equipes = None
+        self._equipes_prazo = 0.0
+
+    def _definir_protocolo_serial(self, protocolo):
+        definir = getattr(self.serial_comm, "definir_protocolo", None)
+        if definir is not None:
+            definir(protocolo)
+
+    def _solicitar_configuracao_equipes(
+        self, *, retentativa=False, motivo="handshake"
+    ):
+        """
+        Pede ao firmware v2 para ativar exatamente as equipes do jogo.
+
+        Cada solicitação abre uma janela não bloqueante. Uma falha gera no
+        máximo uma retentativa; a segunda falha vira aviso visível e fallback.
+        """
+        if self.protocolo_arduino != "v2":
+            return
+
+        if retentativa:
+            if self._equipes_tentativas >= 2:
+                return
+            self._equipes_tentativas += 1
+        else:
+            self._equipes_tentativas = 1
 
         quantidade = self.jogo.num_equipes
+        self._equipes_alvo = quantidade
+        self._equipes_confirmado = False
+        self._cancelar_solicitacao_equipes()
         self.enviar_serial(comando_config_equipes(quantidade))
         self._equipes_prazo = self._clock() + TIMEOUT_PRONTO
         atraso_ms = max(1, int(math.ceil(TIMEOUT_PRONTO * 1000)))
         self._job_equipes = self.root.after(
             atraso_ms, self._confirmar_equipes
         )
-        log.info(
-            "Arduino v2: solicitando CONFIG_TEAMS %d.", quantidade
+        log.debug(
+            "Arduino v2: CONFIG_TEAMS %d (tentativa %d/2, %s).",
+            quantidade,
+            self._equipes_tentativas,
+            motivo,
         )
 
     def _confirmar_equipes(self):
-        """Timeout do ACK `EQUIPES N`; sem ACK, cai para o modo seguro."""
+        """Timeout do ACK `EQUIPES N`; sem ACK, tenta uma vez e avisa."""
         self._job_equipes = None
         if self.protocolo_arduino != "v2":
             return
@@ -1172,62 +1221,97 @@ class DueloDeConhecimento:
             return
 
         self._equipes_prazo = 0.0
+        self._falhar_equipes("não enviou ACK")
+
+    def _falhar_equipes(self, motivo):
+        """WARNING + uma retentativa; na segunda falha, aviso e fallback."""
+        alvo = self._equipes_alvo or self.jogo.num_equipes
+        tentativa = self._equipes_tentativas
         log.warning(
-            "Arduino v2 não confirmou CONFIG_TEAMS %d; "
-            "partida limitada a 2 equipes.",
-            self.jogo.num_equipes,
+            "Arduino v2 %s para CONFIG_TEAMS %d (tentativa %d/2).",
+            motivo,
+            alvo,
+            tentativa,
         )
-        self._aplicar_protocolo("sem_handshake")
+
+        if tentativa < 2:
+            self._solicitar_configuracao_equipes(
+                retentativa=True, motivo=motivo
+            )
+            return
+
+        mensagem = f"Arduino não confirmou {alvo} equipes"
+        log.warning("%s; usando 2 equipes para continuar.", mensagem)
+        self._aplicar_fallback_equipes(mensagem)
+
+    def _aplicar_fallback_equipes(self, mensagem):
+        """Reduz para 2 equipes, mantém o protocolo v2 e deixa o aviso visível."""
+        self._cancelar_solicitacao_equipes()
+        self._equipes_tentativas = 0
+        self._equipes_confirmado = False
+
+        if self.jogo.num_equipes > 2:
+            self.jogo.reduzir_equipes(2)
+            self._fallback_equipes = True
+            self._geracao_fallback = self._geracao_conexao
+            self._reconstruir_cartoes()
+            self._atualizar_barra()
+            self._salvador.pedir_imediato()
+
+        self._equipes_alvo = self.jogo.num_equipes
+        # Melhor esforço: deixa o firmware alinhado ao modo seguro. Não abre
+        # uma terceira janela de ACK; a próxima pergunta reenvia normalmente.
+        self.enviar_serial(comando_config_equipes(self.jogo.num_equipes))
+
+        self.topo.aviso_protocolo = mensagem
+        self.topo.desenhar()
+        self.avisar(mensagem)
 
     def _receber_equipes(self, evento):
         """Processa `EQUIPES N`/`ERRO EQUIPES` devolvido pelo firmware v2."""
-        if self._job_equipes:
-            self.root.after_cancel(self._job_equipes)
-            self._job_equipes = None
-        self._equipes_prazo = 0.0
-
-        if evento == "ERRO EQUIPES":
-            log.warning(
-                "Arduino v2 rejeitou CONFIG_TEAMS; "
-                "partida limitada a 2 equipes."
-            )
-            self._aplicar_protocolo("sem_handshake")
-            return
-
-        confirmadas = equipes_confirmadas(evento)
-        if confirmadas is None:
-            log.warning(
-                "Arduino v2 enviou ACK de equipes inválido (%r); "
-                "partida limitada a 2 equipes.",
-                evento,
-            )
-            self._aplicar_protocolo("sem_handshake")
-            return
-
         if self.protocolo_arduino != "v2":
             log.debug("ACK de equipes ignorado fora do protocolo v2: %s", evento)
             return
 
-        if confirmadas != self.jogo.num_equipes:
-            log.warning(
-                "Arduino v2 confirmou %d equipes, mas o jogo está com %d; "
-                "mantendo a partida e conferindo a configuração.",
-                confirmadas,
-                self.jogo.num_equipes,
+        pendente = self._job_equipes is not None and self._equipes_tentativas > 0
+        if not pendente:
+            log.debug("ACK de equipes sem solicitação pendente: %s", evento)
+            return
+
+        if evento == "ERRO EQUIPES":
+            self._cancelar_solicitacao_equipes()
+            self._falhar_equipes("rejeitou CONFIG_TEAMS")
+            return
+
+        confirmadas = equipes_confirmadas(evento)
+        if confirmadas is None:
+            self._cancelar_solicitacao_equipes()
+            self._falhar_equipes(f"enviou ACK inválido ({evento!r})")
+            return
+
+        alvo = self._equipes_alvo or self.jogo.num_equipes
+        if confirmadas != alvo:
+            self._cancelar_solicitacao_equipes()
+            self._falhar_equipes(
+                f"confirmou {confirmadas} equipes em vez de {alvo}"
             )
-        log.info("Arduino v2 confirmou %d equipes.", confirmadas)
+            return
+
+        self._cancelar_solicitacao_equipes()
+        self._equipes_confirmado = True
+        self._equipes_tentativas = 0
+        log.debug("Arduino v2 confirmou %d equipes.", confirmadas)
 
     def _aplicar_protocolo(self, protocolo):
         if self._job_versao:
             self.root.after_cancel(self._job_versao)
             self._job_versao = None
         self._versao_prazo = 0.0
-        if self._job_equipes:
-            self.root.after_cancel(self._job_equipes)
-            self._job_equipes = None
-        self._equipes_prazo = 0.0
+        self._cancelar_solicitacao_equipes()
 
         if protocolo == "v2":
+            self.protocolo_arduino = "v2"
+            self._definir_protocolo_serial("v2")
             if (
                 self._fallback_equipes
                 and self._geracao_conexao <= self._geracao_fallback
@@ -1241,20 +1325,23 @@ class DueloDeConhecimento:
                 )
                 return
 
-            self.protocolo_arduino = "v2"
             if self._fallback_equipes:
                 self._restaurar_equipes_pos_fallback()
             else:
                 log.info("Arduino confirmou protocolo v2.")
                 self.topo.aviso_protocolo = ""
                 self.topo.desenhar()
-            self._solicitar_configuracao_equipes()
+            self._solicitar_configuracao_equipes(motivo="handshake")
             return
 
         if protocolo not in ("v1", "sem_handshake"):
             return
 
         self.protocolo_arduino = protocolo
+        self._definir_protocolo_serial(protocolo)
+        self._equipes_tentativas = 0
+        self._equipes_alvo = 0
+        self._equipes_confirmado = False
         if protocolo == "v1":
             motivo = "Arduino v1 não suporta 3/4 equipes"
             aviso = (
@@ -1293,6 +1380,8 @@ class DueloDeConhecimento:
         alvo = self._equipes_configuradas
         if alvo <= self.jogo.num_equipes:
             self._fallback_equipes = False
+            self.topo.aviso_protocolo = ""
+            self.topo.desenhar()
             return
         if not self.jogo.restaurar_equipes(alvo):
             return
@@ -1391,11 +1480,7 @@ class DueloDeConhecimento:
             self.root.after_cancel(job_versao)
             self._job_versao = None
         self._versao_prazo = 0.0
-        job_equipes = getattr(self, "_job_equipes", None)
-        if job_equipes:
-            self.root.after_cancel(job_equipes)
-            self._job_equipes = None
-        self._equipes_prazo = 0.0
+        self._cancelar_solicitacao_equipes()
         self.serial_comm.parar()
         self.som.parar()
         trava = getattr(self, "_trava", None)

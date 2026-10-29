@@ -6,6 +6,7 @@ trava e persistência falsos. Em ambiente sem display são pulados.
 """
 
 import json
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -49,12 +50,16 @@ class SerialFalsa:
     def __init__(self, fila, log=None):
         self.fila = fila
         self.enviados = []
+        self.protocolo = None
 
     def iniciar(self):
         return None
 
     def enviar(self, comando):
         self.enviados.append(comando)
+
+    def definir_protocolo(self, protocolo):
+        self.protocolo = protocolo
 
     def parar(self):
         return None
@@ -381,7 +386,9 @@ def test_protocolo_sem_suporte_limita_para_duas_e_avisa(
     assert len(app.rodape.msg) > 0
 
 
-def test_protocolo_v2_mantem_quatro_equipes_e_pede_config(montar_app):
+def test_protocolo_v2_mantem_quatro_equipes_e_pede_config(
+    montar_app, caplog
+):
     montar, _banco = montar_app
     app, root, _relogio = montar(num_equipes=4)
 
@@ -398,16 +405,24 @@ def test_protocolo_v2_mantem_quatro_equipes_e_pede_config(montar_app):
     assert set(app.cartoes_placar) == {"A", "B", "C", "D"}
     assert app.topo.aviso_protocolo == ""
     assert app.serial_comm.enviados == ["CONFIG_TEAMS 4"]
+    assert app.serial_comm.protocolo == "v2"
     assert app._job_equipes is not None
 
-    app.processar_evento("EQUIPES 4")
+    with caplog.at_level(logging.DEBUG, logger="desafio"):
+        app.processar_evento("EQUIPES 4")
     root.update()
     assert app.protocolo_arduino == "v2"
     assert app._job_equipes is None
+    assert app._equipes_confirmado is True
+    assert any(
+        registro.levelno == logging.DEBUG
+        and "confirmou 4 equipes" in registro.getMessage()
+        for registro in caplog.records
+    )
 
 
 @pytest.mark.parametrize("ack", ["EQUIPES 5", "EQUIPES X", "ERRO EQUIPES"])
-def test_ack_invalido_de_equipes_cai_para_duas(montar_app, ack):
+def test_ack_invalido_de_equipes_tenta_uma_vez_e_avisa(montar_app, ack):
     montar, _banco = montar_app
     app, root, _relogio = montar(num_equipes=4)
 
@@ -417,14 +432,50 @@ def test_ack_invalido_de_equipes_cai_para_duas(montar_app, ack):
 
     app.processar_evento(ack)
     root.update()
+    assert app.serial_comm.enviados == [
+        "CONFIG_TEAMS 4",
+        "CONFIG_TEAMS 4",
+    ]
+    assert app.jogo.num_equipes == 4
+    assert app._job_equipes is not None
 
-    assert app.protocolo_arduino == "sem_handshake"
+    app.processar_evento(ack)
+    root.update()
+
+    assert app.protocolo_arduino == "v2"
+    assert app.serial_comm.protocolo == "v2"
     assert app.jogo.num_equipes == 2
     assert set(app.cartoes_placar) == {"A", "B"}
     assert app._job_equipes is None
+    assert "Arduino não confirmou 4 equipes" in app.aviso
+    assert "Arduino não confirmou 4 equipes" in app.topo.aviso_protocolo
+    assert app.serial_comm.enviados[-1] == "CONFIG_TEAMS 2"
 
 
-def test_timeout_do_ack_de_equipes_cai_para_duas(montar_app):
+def test_ack_divergente_tenta_uma_vez_e_avisa(montar_app):
+    montar, _banco = montar_app
+    app, root, _relogio = montar(num_equipes=4)
+
+    app.processar_evento("VERSAO 2")
+    root.update()
+    app.processar_evento("EQUIPES 3")
+    root.update()
+
+    assert app.jogo.num_equipes == 4
+    assert app.serial_comm.enviados == [
+        "CONFIG_TEAMS 4",
+        "CONFIG_TEAMS 4",
+    ]
+
+    app.processar_evento("EQUIPES 3")
+    root.update()
+
+    assert app.jogo.num_equipes == 2
+    assert app.protocolo_arduino == "v2"
+    assert "Arduino não confirmou 4 equipes" in app.aviso
+
+
+def test_timeout_do_ack_tenta_uma_vez_e_avisa(montar_app):
     montar, _banco = montar_app
     relogio = Relogio()
     app, root, _relogio = montar(
@@ -438,10 +489,123 @@ def test_timeout_do_ack_de_equipes_cai_para_duas(montar_app):
     relogio.avancar(desafio.TIMEOUT_PRONTO)
     app._confirmar_equipes()
     root.update()
+    assert app.jogo.num_equipes == 4
+    assert app.serial_comm.enviados == [
+        "CONFIG_TEAMS 4",
+        "CONFIG_TEAMS 4",
+    ]
 
-    assert app.protocolo_arduino == "sem_handshake"
+    relogio.avancar(desafio.TIMEOUT_PRONTO)
+    app._confirmar_equipes()
+    root.update()
+
+    assert app.protocolo_arduino == "v2"
     assert app.jogo.num_equipes == 2
     assert app._job_equipes is None
+    assert "Arduino não confirmou 4 equipes" in app.aviso
+
+
+def test_ack_perdido_uma_vez_e_recuperado_pela_retentativa(montar_app):
+    montar, _banco = montar_app
+    relogio = Relogio()
+    app, root, _relogio = montar(
+        num_equipes=4, relogio_protocolo=relogio
+    )
+
+    app.processar_evento("VERSAO 2")
+    root.update()
+    relogio.avancar(desafio.TIMEOUT_PRONTO)
+    app._confirmar_equipes()
+    root.update()
+
+    assert app.jogo.num_equipes == 4
+    assert app.serial_comm.enviados == [
+        "CONFIG_TEAMS 4",
+        "CONFIG_TEAMS 4",
+    ]
+
+    app.processar_evento("EQUIPES 4")
+    root.update()
+
+    assert app.jogo.num_equipes == 4
+    assert app._job_equipes is None
+    assert app._equipes_confirmado is True
+    assert app.aviso is None
+
+
+def test_v2_reenvia_config_a_cada_pergunta(montar_app):
+    montar, banco = montar_app
+    app, root, _relogio = montar(num_equipes=4)
+
+    app.processar_evento("VERSAO 2")
+    root.update()
+    app.processar_evento("EQUIPES 4")
+    root.update()
+    assert app.serial_comm.enviados == ["CONFIG_TEAMS 4"]
+
+    _escolher_tema(app, root, banco)
+
+    assert app.serial_comm.enviados.count("CONFIG_TEAMS 4") == 2
+    assert app.serial_comm.enviados[-1] == "CONFIG_TEAMS 4"
+
+
+def test_reset_por_dtr_no_meio_da_rodada_reenvia_config(montar_app):
+    montar, banco = montar_app
+    app, root, _relogio = montar(num_equipes=4)
+
+    app.processar_evento("VERSAO 2")
+    root.update()
+    app.processar_evento("EQUIPES 4")
+    root.update()
+    _escolher_tema(app, root, banco)
+    app.processar_evento("BTN_A")
+    root.update()
+    assert app.quem_apertou == "A"
+
+    app.serial_comm.enviados.clear()
+    app.processar_evento("PRONTO")
+    app.processar_evento("VERSAO 2")
+    root.update()
+
+    assert app.serial_comm.enviados == ["CONFIG_TEAMS 4"]
+    assert app._job_equipes is not None
+
+
+def test_modo_teclado_puro_nao_envia_config(montar_app):
+    montar, banco = montar_app
+    app, root, _relogio = montar(num_equipes=4)
+
+    _escolher_tema(app, root, banco)
+    _tecla(root, "a")
+    root.update()
+
+    assert app.quem_apertou == "A"
+    assert app.protocolo_arduino is None
+    assert not any(
+        cmd.startswith("CONFIG_TEAMS") for cmd in app.serial_comm.enviados
+    )
+
+
+def test_modo_v2_nao_envia_led_buzzer_ou_reset(montar_app):
+    montar, banco = montar_app
+    app, root, _relogio = montar(num_equipes=4)
+
+    app.processar_evento("VERSAO 2")
+    root.update()
+    app.processar_evento("EQUIPES 4")
+    root.update()
+    _escolher_tema(app, root, banco)
+
+    _tecla(root, "a")
+    _tecla(root, "r")
+    _tecla(root, "1")
+    _tecla(root, "n")
+    root.update()
+
+    proibidos = ("LED_", "BEEP", "BUZZER_", "RESET")
+    assert not any(
+        cmd.startswith(proibidos) for cmd in app.serial_comm.enviados
+    )
 
 
 def test_eventos_seriais_c_d_acionam_e_pontuam(montar_app):
@@ -534,11 +698,14 @@ def test_versao_2_tardia_so_restaura_na_proxima_reconexao(
     assert app.jogo.placar == {"A": 1, "B": 2}
     assert app._fallback_equipes is True
 
-    # V2 chegou atrasado na mesma conexão: não muda a partida em andamento.
+    # V2 chegou atrasado na mesma conexão: o protocolo é v2 (para não enviar
+    # comandos v1), mas a partida em andamento continua com 2 equipes.
     app.processar_evento("VERSAO 2")
     root.update()
 
-    assert app.protocolo_arduino == protocolo
+    assert app.protocolo_arduino == "v2"
+    assert app.serial_comm.protocolo == "v2"
+    assert app.serial_comm.enviados == []
     assert app.jogo.num_equipes == 2
     assert set(app.cartoes_placar) == {"A", "B"}
     assert app._fallback_equipes is True

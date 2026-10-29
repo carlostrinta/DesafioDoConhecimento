@@ -75,11 +75,17 @@ def mapear_evento_arduino(evento: str, jogo: Jogo) -> list[str]:
     """
     Executa no Jogo a ação correspondente a uma linha vinda do Arduino.
     Devolve os eventos de domínio (a UI decide LED, som e tela).
+
+    As linhas de controle do v2 (`VERSAO 2`, `EQUIPES N` e `ERRO EQUIPES`)
+    são reconhecidas pela camada serial, mas não alteram o Jogo.
     """
     if evento == "PRONTO":
         # Arduino reiniciou: re-sincroniza o LED se a rodada está em andamento
         if jogo.estado.quem_apertou:
             return [f"led_reacender:{jogo.estado.quem_apertou}"]
+        return []
+
+    if evento in ("VERSAO 2", "ERRO EQUIPES") or evento.startswith("EQUIPES "):
         return []
 
     acao = _ACOES.get(evento)
@@ -88,13 +94,19 @@ def mapear_evento_arduino(evento: str, jogo: Jogo) -> list[str]:
     return acao(jogo)
 
 
-def comandos_para_arduino(eventos_dominio: list[str]) -> list[str]:
+def comandos_para_arduino(
+    eventos_dominio: list[str], *, protocolo: str | None = None
+) -> list[str]:
     """
     Traduz eventos de domínio em comandos seriais, na mesma ordem do protótipo.
 
-    LED_x_ON, BEEP, BEEP_LONG e RESET. O firmware v2 sem saídas físicas
-    ignora os comandos de LED/buzzer; `CONFIG_TEAMS` é enviado à parte.
+    LED_x_ON, BEEP, BEEP_LONG e RESET. No protocolo v2 o PC não envia comandos
+    de saída física; `CONFIG_TEAMS` é enviado à parte. O caminho v1 (inclusive
+    `protocolo=None`, antes do handshake) permanece idêntico.
     """
+    if protocolo == "v2":
+        return []
+
     cmds: list[str] = []
     for ev in eventos_dominio:
         if ev.startswith("apertou:"):
@@ -116,7 +128,10 @@ def comandos_para_arduino(eventos_dominio: list[str]) -> list[str]:
 
 def comando_config_equipes(num_equipes: int) -> str:
     """Comando v2 para configurar o número de equipes no firmware."""
-    return f"CONFIG_TEAMS {int(num_equipes)}"
+    quantidade = int(num_equipes)
+    if not 2 <= quantidade <= 4:
+        raise ValueError("o firmware v2 aceita de 2 a 4 equipes")
+    return f"CONFIG_TEAMS {quantidade}"
 
 
 def equipes_confirmadas(linha: str) -> int | None:

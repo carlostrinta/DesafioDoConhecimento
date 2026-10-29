@@ -106,6 +106,8 @@ class ComunicacaoSerial:
 
         self.serial = None
         self.placa_atual = ""
+        # None/v1 preservam o RESET de fechamento; v2 não tem LEDs para apagar.
+        self.protocolo_arduino = None
         self._info_portas = {}
         self._porta_ausente_avisada = False
         self._sem_handshake_avisado = False
@@ -156,12 +158,21 @@ class ComunicacaoSerial:
         if s is not None:
             self._encerrar_porta(s)
 
+    def definir_protocolo(self, protocolo):
+        """Registra o protocolo detectado para o fechamento correto da porta."""
+        self.protocolo_arduino = protocolo
+
     def _encerrar_porta(self, s):
-        """Manda RESET (apaga LEDs) e fecha, com tempo limitado."""
+        """
+        Fecha com tempo limitado.
+
+        No v1, manda RESET para apagar os LEDs. No v2 não há saída física e o
+        PC não deve enviar comandos de LED/buzzer/RESET.
+        """
 
         def alvo():
             try:
-                if s.is_open:
+                if s.is_open and self.protocolo_arduino != "v2":
                     s.write(b"RESET\n")
             except Exception:
                 pass
