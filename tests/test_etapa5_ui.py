@@ -1,0 +1,316 @@
+"""
+Regressão de Tk real da Etapa 5: placar dinâmico e teclado de 2 a 4 equipes.
+
+Os testes montam a `DueloDeConhecimento` de verdade, com serial, áudio,
+trava e persistência falsos. Em ambiente sem display são pulados.
+"""
+
+import json
+from types import SimpleNamespace
+
+import pytest
+
+import desafio
+import ui_componentes
+from apoio_tk import criar_raiz_tk
+from jogo import (
+    FASE_AGUARDANDO,
+    FASE_CONTAGEM,
+    FASE_REVELADA,
+    FASE_RESPONDENDO,
+    Jogo,
+)
+from ui_selecao import ModalSelecaoPerguntas
+
+
+class Relogio:
+    def __init__(self, agora=100.0):
+        self.agora = agora
+
+    def __call__(self):
+        return self.agora
+
+    def avancar(self, segundos):
+        self.agora += segundos
+
+
+class TravaFalsa:
+    def adquirir(self):
+        return None
+
+    def liberar(self):
+        return None
+
+
+class SerialFalsa:
+    def __init__(self, fila, log=None):
+        self.fila = fila
+
+    def iniciar(self):
+        return None
+
+    def enviar(self, comando):
+        return None
+
+    def parar(self):
+        return None
+
+
+class SomFalso:
+    disponivel = True
+    ativo = True
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __getattr__(self, nome):
+        return lambda *args, **kwargs: None
+
+
+class SalvadorFalso:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def pedir(self):
+        return None
+
+    def pedir_imediato(self):
+        return None
+
+    def executar_agora(self):
+        return None
+
+
+def _banco(tmp_path):
+    caminho = tmp_path / "banco.json"
+    caminho.write_text(
+        json.dumps(
+            [
+                {
+                    "pergunta": f"Pergunta {i}?",
+                    "alternativas": ["Certa", "Errada"],
+                    "correta": 0,
+                    "categoria": "Teste",
+                    "explicacao": f"Explicação {i}.",
+                }
+                for i in range(1, 7)
+            ],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    return caminho
+
+
+@pytest.fixture(scope="module")
+def raiz_tk():
+    import tkinter as tk
+
+    try:
+        root = criar_raiz_tk()
+    except tk.TclError as e:
+        pytest.skip(f"Tk indisponível: {e}")
+
+    def reportar(tipo, valor, tb):
+        raise valor
+
+    root.report_callback_exception = reportar
+    yield root
+    root.destroy()
+
+
+@pytest.fixture
+def montar_app(tmp_path, monkeypatch, raiz_tk):
+    import tkinter as tk
+
+    monkeypatch.setattr(desafio.persistencia, "TravaInstancia", TravaFalsa)
+    monkeypatch.setattr(
+        desafio.persistencia,
+        "carregar",
+        lambda *a, **k: SimpleNamespace(partida=None, motivo=""),
+    )
+    monkeypatch.setattr(desafio.persistencia, "AgendadorSalvamento", SalvadorFalso)
+    monkeypatch.setattr(desafio, "ComunicacaoSerial", SerialFalsa)
+    monkeypatch.setattr(desafio, "Som", SomFalso)
+    monkeypatch.setattr(desafio, "CONFIG", SimpleNamespace(avisos=()))
+    monkeypatch.setattr(desafio, "PASTA_PERGUNTAS", str(tmp_path))
+    monkeypatch.setattr(desafio, "ARQUIVO_PERGUNTAS", "banco.json")
+    monkeypatch.setattr(
+        desafio.DueloDeConhecimento, "_iniciar_fluxo_inicial", lambda self: None
+    )
+
+    banco = _banco(tmp_path)
+    escala_original = ui_componentes.ESCALA
+    familias_originais = dict(ui_componentes.FAMILIAS)
+    criados = []
+
+    def montar(contagem=0, num_equipes=2):
+        monkeypatch.setattr(desafio, "NUM_EQUIPES", num_equipes)
+        root = tk.Toplevel(raiz_tk)
+        root.state = lambda *a: None
+
+        ui_componentes.definir_escala(1.0)
+        app = desafio.DueloDeConhecimento(root)
+        relogio = Relogio()
+        app.jogo = Jogo(
+            [],
+            num_equipes=num_equipes,
+            tempo_pergunta=30,
+            tempo_resposta=15,
+            clock=relogio,
+            contagem_largada=contagem,
+        )
+        app.render()
+        criados.append((app, root))
+        root.update()
+        return app, root, relogio
+
+    yield montar, banco
+
+    for app, root in criados:
+        app.rodando = False
+        try:
+            for job in root.tk.call("after", "info"):
+                try:
+                    root.after_cancel(job)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        for atributo in (
+            "_job_timer",
+            "_job_aviso",
+            "_job_escala",
+            "_job_contagem_visual",
+        ):
+            job = getattr(app, atributo, None)
+            if job:
+                try:
+                    root.after_cancel(job)
+                except Exception:
+                    pass
+        try:
+            root.update_idletasks()
+        except Exception:
+            pass
+        try:
+            root.destroy()
+        except Exception:
+            pass
+
+    ui_componentes.definir_escala(escala_original)
+    ui_componentes.FAMILIAS.clear()
+    ui_componentes.FAMILIAS.update(familias_originais)
+
+
+def _escolher_tema(app, root, banco):
+    app.abrir_seletor_tema(inicial=True)
+    root.update()
+    modal = next(
+        w
+        for w in root.winfo_children()
+        if isinstance(w, ModalSelecaoPerguntas)
+    )
+    modal.arquivo_selecionado = {"caminho": str(banco), "titulo": "Teste"}
+    modal._confirmar()
+    root.update()
+
+
+def _tecla(root, keysym, state=0):
+    root.focus_force()
+    root.update()
+    root.event_generate("<KeyPress>", keysym=keysym, state=state)
+    root.update()
+
+
+def _avancar(app, root, relogio, segundos):
+    relogio.avancar(segundos)
+    app._cancelar_job_timer()
+    root.after(0, app._tick)
+    root.update()
+
+
+def _confirmar_contagem(app, root, relogio):
+    _avancar(app, root, relogio, app.jogo.contagem_largada)
+    assert app.fase == FASE_AGUARDANDO
+
+
+@pytest.mark.parametrize("num_equipes", [2, 3, 4])
+def test_teclas_de_equipe_respeitam_numero_de_equipes(
+    montar_app, num_equipes
+):
+    montar, banco = montar_app
+    app, root, _relogio = montar(num_equipes=num_equipes)
+    _escolher_tema(app, root, banco)
+
+    ativas = "ABCD"[:num_equipes]
+    inativas = "ABCD"[num_equipes:]
+
+    # Teclas de equipe e de ponto inativas não podem apertar nem bloquear.
+    for letra in inativas:
+        _tecla(root, letra.lower())
+        _tecla(root, letra.upper(), state=0x2)  # Caps Lock
+        _tecla(root, str("ABCD".index(letra) + 1))
+        assert app.fase == FASE_AGUARDANDO
+        assert app.quem_apertou is None
+        assert app.jogo.placar == {equipe: 0 for equipe in ativas}
+
+    for indice, letra in enumerate(ativas):
+        # Alterna minúscula e maiúscula (Shift/Caps Lock) na mesma regressão.
+        if indice % 2:
+            _tecla(root, letra.upper(), state=0x1)
+        else:
+            _tecla(root, letra)
+        assert app.fase == FASE_RESPONDENDO
+        assert app.quem_apertou == letra
+
+        _tecla(root, "r")
+        assert app.fase == FASE_REVELADA
+
+        # Ponto de equipe inativa não pode pontuar.
+        for outra in inativas:
+            _tecla(root, str("ABCD".index(outra) + 1))
+            assert app.jogo.placar[letra] == 0
+
+        _tecla(root, str("ABCD".index(letra) + 1))
+        assert app.jogo.placar[letra] == 1
+
+        _tecla(root, "n")
+        assert app.fase == FASE_AGUARDANDO
+
+
+def test_countdown_ignora_equipes_e_avisa_nas_outras_teclas(montar_app):
+    montar, banco = montar_app
+    app, root, relogio = montar(contagem=3, num_equipes=4)
+    _escolher_tema(app, root, banco)
+    assert app.fase == FASE_CONTAGEM
+
+    for letra in "ABCD":
+        _tecla(root, letra.lower())
+        assert app.fase == FASE_CONTAGEM
+        assert app.quem_apertou is None
+
+    for keysym in ("1", "3", "4", "r", "n"):
+        _tecla(root, keysym)
+        assert app.fase == FASE_CONTAGEM
+        assert "Aguarde o JÁ!" in app.aviso
+
+    _confirmar_contagem(app, root, relogio)
+    _tecla(root, "d")
+    assert app.fase == FASE_RESPONDENDO
+    assert app.quem_apertou == "D"
+
+
+def test_ctrl_c_e_ctrl_d_nao_aperam_equipe(montar_app):
+    montar, banco = montar_app
+    app, root, _relogio = montar(num_equipes=4)
+    _escolher_tema(app, root, banco)
+
+    _tecla(root, "c", state=0x4)
+    _tecla(root, "d", state=0x4)
+    _tecla(root, "C", state=0x5)
+    _tecla(root, "D", state=0x5)
+
+    assert app.fase == FASE_AGUARDANDO
+    assert app.quem_apertou is None
+    assert app.jogo.placar == {"A": 0, "B": 0, "C": 0, "D": 0}

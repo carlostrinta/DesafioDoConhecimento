@@ -1087,23 +1087,30 @@ class DueloDeConhecimento:
     # TECLADO (simulação)
     # -----------------------------------------------------
     def tecla_pressionada(self, event):
-        k = event.char.lower()
-        if k == "a":
-            self.apertar_botao("A")
-        elif k == "b":
-            self.apertar_botao("B")
+        # Ctrl/Alt não podem virar aperto de equipe: em alguns teclados o
+        # Tk entrega `event.char` mesmo com o modificador pressionado. Shift
+        # e Caps Lock continuam valendo (o `lower()` normaliza a letra).
+        if event.state & (0x4 | 0x8 | 0x20000):
+            return
+
+        k = (event.char or "").lower()
+        if not k:
+            # Fallback para Num Lock desligado em alguns layouts: o numpad
+            # pode chegar sem `event.char`. O comportamento 1/2 é preservado.
+            k = {
+                "KP_1": "1", "KP_2": "2", "KP_3": "3", "KP_4": "4",
+            }.get(event.keysym, "")
+
+        if k in ("a", "b", "c", "d"):
+            self.apertar_botao(k.upper())
+        elif k in ("1", "2", "3", "4"):
+            self.confirmar_acerto(("A", "B", "C", "D")[int(k) - 1])
         elif k == "n":
             self.proxima_pergunta()
-        elif k == "1":
-            self.confirmar_acerto("A")
-        elif k == "2":
-            self.confirmar_acerto("B")
         elif k == "r":
             self.revelar_resposta()
         elif k == "s":
             self.alternar_som()
-        elif k == "t" and (event.state & 0x4):
-            self.abrir_seletor_tema(inicial=False)
 
     def fechar(self):
         # Fechar normalmente preserva a partida: grava o que estiver pendente.
