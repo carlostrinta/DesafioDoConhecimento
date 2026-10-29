@@ -27,6 +27,19 @@ from apoio_serial import (
 RAIZ = Path(__file__).resolve().parent.parent
 
 
+def _evento(itens, nome):
+    """Devolve a linha de evento enfileirada, ignorando o timestamp."""
+    for item in itens:
+        if (
+            isinstance(item, tuple)
+            and len(item) >= 3
+            and item[0] == "evento"
+            and item[1] == nome
+        ):
+            return item
+    return None
+
+
 # ─────────────────────────────────────────────────────────
 # Detecção de portas
 # ─────────────────────────────────────────────────────────
@@ -159,7 +172,9 @@ class TestConexao:
             assert modulo.abertas[0].resets == 0  # não descarta o PRONTO
             itens = drenar(fila)
             assert ("conexao", "COM6") in itens
-            assert ("evento", "PRONTO") in itens
+            pronto = _evento(itens, "PRONTO")
+            assert pronto is not None
+            assert isinstance(pronto[2], float)
         finally:
             comm.rodando = False
             comm.fechar()
@@ -258,7 +273,7 @@ class TestConexao:
             comm.serial.linhas.append(b"BTN_A\n")
             comm.serial.linhas.append(b"PRONTO\n")
             assert esperar(
-                lambda: ("evento", "BTN_A") in drenar(fila)
+                lambda: _evento(drenar(fila), "BTN_A") is not None
             )
         finally:
             comm.rodando = False
@@ -535,7 +550,7 @@ class TestCenarioReal:
 
             # 3. Eventos continuam chegando.
             comm.serial.linhas.append(b"BTN_A\n")
-            assert esperar(lambda: ("evento", "BTN_A") in drenar(fila))
+            assert esperar(lambda: _evento(drenar(fila), "BTN_A") is not None)
 
             # 4. Cabo cai; a COM4 fantasma continua disponível.
             comm.serial.queda = True

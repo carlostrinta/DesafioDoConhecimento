@@ -62,7 +62,9 @@ class ComunicacaoSerial:
         ("placa", "Arduino Uno (2341:0043)")  -> nome para a barra de status
         ("porta_ausente", "COM9") -> configurada, mas não encontrada
         ("porta_ausente", None)   -> a porta configurada voltou a existir
-        ("evento", "BTN_A")  -> linha recebida do Arduino
+        ("evento", "BTN_A", ts)   -> linha recebida do Arduino; `ts` é
+                                     `time.monotonic()` no instante da leitura
+                                     no PC (não é o instante físico do aperto)
     """
 
     def __init__(
@@ -321,7 +323,7 @@ class ComunicacaoSerial:
                         self._porta_ausente_avisada = False
                         self.fila.put(("porta_ausente", None))
                     # Avisa a UI (reacende o LED se a rodada está em andamento).
-                    self.fila.put(("evento", "PRONTO"))
+                    self.fila.put(("evento", "PRONTO", time.monotonic()))
                     return True
             s.close()
             self.log(f"✗ {porta}: sem PRONTO em {self.timeout_handshake:.0f}s")
@@ -364,8 +366,13 @@ class ComunicacaoSerial:
             try:
                 linha = s.readline().decode(errors="ignore").strip()
                 if linha:
+                    # Marca o instante de recepção no PC. A UI usa esse
+                    # timestamp para separar apertos anteriores ao "JÁ!" dos
+                    # que chegaram depois dele; o protocolo v1 não traz
+                    # timestamp nem número de sequência do firmware.
+                    recebido_em = time.monotonic()
                     self.log(f"[ARDUINO] {linha}")
-                    self.fila.put(("evento", linha))
+                    self.fila.put(("evento", linha, recebido_em))
             except Exception as e:
                 self.log(f"[ERRO SERIAL] {e} — tentando reconectar")
                 self.placa_atual = ""

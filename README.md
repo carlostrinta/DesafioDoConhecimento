@@ -224,9 +224,21 @@ aguardar.
 - As teclas **A**/**B** e os eventos `BTN_A`/`BTN_B` da serial são **ignorados**
   durante a contagem. **R**, **1**/**2** e **N** são recusados com o aviso
   `Aguarde o JÁ! da contagem de largada.`
-- Ao entrar em **AGUARDANDO**, os eventos de botão de equipe que ainda
-  estivessem na fila serial são descartados: um aperto durante a contagem não
-  ganha a rodada. Os demais eventos da fila são preservados.
+- A fronteira da rodada é o instante em que a UI processa o **JÁ!** (ou a
+  entrada em **AGUARDANDO** com a contagem desativada). A thread serial
+  enfileira cada linha com `time.monotonic()` do instante de recepção no PC; ao
+  cruzar a fronteira, só os `BTN_A`/`BTN_B`/`BTN_C`/`BTN_D` recebidos **antes**
+  desse instante são descartados. Um aperto recebido logo depois do **JÁ!**
+  vale, e os demais eventos da fila são preservados na ordem.
+- Limitação do protocolo v1: o timestamp é da **recepção no PC**, não do
+  instante físico do aperto, e o firmware não envia número de sequência. Se uma
+  linha atrasar na serial e chegar depois do corte, ela pode ser tratada como
+  aperto da rodada; a solução definitiva é o protocolo v2 (timestamp/sequência
+  no firmware).
+- O firmware v1 só envia `BTN_*` na borda de descida (pressionar); manter o
+  botão pressionado não gera novas linhas e soltar também não gera evento.
+  Assim, um botão mantido durante a contagem e solto depois não produz aperto
+  válido.
 - Sons: `contagem` toca um tick a cada número e `largada` toca no **JÁ!**; os
   dois têm fallbacks sintetizados distintos (veja
   [Pacote de sons](#pacote-de-sons-etapa-45)).
@@ -510,8 +522,8 @@ depois a **Etapa 5**. A **Etapa 4.6** está concluída; a próxima é a **Etapa 
   duração configurável (`jogo.contagem_largada`, padrão 3 s; `0` desativa).
 - Overlay com números grandes (3, 2, 1, JÁ!) em `ui_componentes.py`, escalando
   com a janela e sem cobrir os cartões de placar.
-- Botões das equipes ignorados durante a contagem; eventos de botão acumulados
-  na fila serial são descartados ao entrar em `AGUARDANDO`.
+- Botões das equipes ignorados durante a contagem; eventos de botão recebidos
+  antes do corte do `JÁ!` são descartados pelo timestamp de recepção no PC.
 - O tempo de 30 s só começa no "JÁ!"; a pergunta fica oculta por padrão
   (`jogo.mostrar_pergunta_na_contagem`).
 - Sons `contagem` (tick por número) e `largada`, com fallbacks sintetizados

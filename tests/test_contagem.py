@@ -285,3 +285,70 @@ class TestFilaSerial:
 
         assert app.descartar_botoes_fila() == 0
         assert app.fila.get_nowait() == ("evento", "PRONTO")
+
+    def test_aperto_recebido_antes_do_corte_nao_vence(self):
+        """(a) BTN recebido antes do instante do "JÁ!" é descartado."""
+        relogio = Relogio()
+        jogo = _jogo(relogio)
+        app = self._app_com_fila(("evento", "BTN_A", 100.0))
+
+        relogio.avancar(3.0)
+        assert jogo.tick_contagem() == ["largada"]
+        assert app.descartar_botoes_fila(103.0) == 1
+
+        assert app.fila.empty()
+        assert jogo.estado.quem_apertou is None
+
+    def test_aperto_recebido_depois_do_corte_vale(self):
+        """(b) BTN recebido depois do "JÁ!" chega ao Jogo e vence."""
+        relogio = Relogio()
+        jogo = _jogo(relogio)
+
+        relogio.avancar(3.0)
+        assert jogo.tick_contagem() == ["largada"]
+
+        app = self._app_com_fila(("evento", "BTN_A", 103.001))
+        assert app.descartar_botoes_fila(103.0) == 0
+
+        tipo, evento, _ = app.fila.get_nowait()
+        assert tipo == "evento"
+        assert mapear_evento_arduino(evento, jogo) == ["apertou:A"]
+        assert jogo.estado.quem_apertou == "A"
+
+    def test_botao_mantido_na_contagem_e_solto_depois_nao_vale(self):
+        """
+        (c) O firmware v1 só envia BTN na borda de descida; manter o botão
+        pressionado durante a contagem não gera novas linhas, e soltar também
+        não gera evento. O único BTN recebido é o da contagem e é descartado.
+        """
+        relogio = Relogio()
+        jogo = _jogo(relogio)
+        app = self._app_com_fila(("evento", "BTN_A", 100.0))
+
+        relogio.avancar(3.0)
+        assert jogo.tick_contagem() == ["largada"]
+        assert app.descartar_botoes_fila(103.0) == 1
+
+        # A soltura não enfileira nada; não há evento válido para o Jogo.
+        assert app.fila.empty()
+        assert jogo.estado.quem_apertou is None
+        assert jogo.estado.fase == FASE_AGUARDANDO
+
+    def test_corte_preserva_botoes_recebidos_depois_e_outros_itens(self):
+        app = self._app_com_fila(
+            ("evento", "BTN_A", 100.0),
+            ("conexao", "COM7"),
+            ("evento", "BTN_B", 100.5),
+            ("evento", "BTN_C", 101.0),
+        )
+
+        assert app.descartar_botoes_fila(100.5) == 1
+
+        restantes = []
+        while not app.fila.empty():
+            restantes.append(app.fila.get_nowait())
+        assert restantes == [
+            ("conexao", "COM7"),
+            ("evento", "BTN_B", 100.5),
+            ("evento", "BTN_C", 101.0),
+        ]

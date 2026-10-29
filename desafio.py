@@ -19,6 +19,7 @@ import logging
 import math
 import os
 import queue
+import time
 import tkinter as tk
 from tkinter import messagebox
 
@@ -832,18 +833,22 @@ class DueloDeConhecimento:
                 if self.jogo.estado.fase == FASE_AGUARDANDO:
                     # Contagem desativada: já estamos valendo; botões que
                     # ficaram na fila da rodada anterior não podem ganhar.
-                    self.descartar_botoes_fila()
+                    self.descartar_botoes_fila(time.monotonic())
             elif ev.startswith("contagem:"):
                 self._mostrar_contagem(ev.split(":", 1)[1])
                 self.som.contagem()
             elif ev == "largada":
+                # Fronteira da rodada: tudo que a thread serial recebeu antes
+                # deste instante é aperto da contagem e não vale. Eventos
+                # recebidos depois do corte seguem para o Jogo.
+                corte = time.monotonic()
                 self._limpar_aviso()
                 self._ultimo_seg_tick = None
                 self._mostrar_contagem("JÁ!")
                 self.som.largada()
-                # Aperto durante a contagem não vale: remove os BTN_A/B que
-                # a thread serial enfileirou antes do "JÁ!".
-                self.descartar_botoes_fila()
+                # Aperto durante a contagem não vale: remove os BTN_A/B/C/D
+                # recebidos antes do "JÁ!".
+                self.descartar_botoes_fila(corte)
             elif ev == "reiniciou_placar":
                 self._limpar_aviso()
             # "reiniciou_banco" e "led_reacender:*" só têm efeito serial/tela
@@ -890,7 +895,10 @@ class DueloDeConhecimento:
     def drenar_fila(self):
         try:
             while True:
-                tipo, valor = self.fila.get_nowait()
+                # Itens de evento trazem o timestamp de recepção como terceiro
+                # campo; os demais itens da fila continuam com dois campos.
+                item = self.fila.get_nowait()
+                tipo, valor = item[0], item[1]
                 try:
                     if tipo == "evento":
                         self.processar_evento(valor)
@@ -912,14 +920,21 @@ class DueloDeConhecimento:
         if self.rodando:
             self.root.after(20, self.drenar_fila)
 
-    def descartar_botoes_fila(self):
+    def descartar_botoes_fila(self, corte=None):
         """
-        Remove da fila serial os BTN_A/B ainda não processados.
+        Remove da fila os BTN_A/B/C/D recebidos antes do corte.
 
-        Chamado ao entrar em AGUARDANDO (no "JÁ!" ou com a contagem
-        desativada). Outros eventos (conexão, placa, revelar, avançar) são
-        preservados na mesma ordem. Devolve quantos foram descartados.
+        O corte é o instante em que a UI processa a entrada em AGUARDANDO
+        (no "JÁ!" ou com a contagem desativada). Cada evento da thread serial
+        carrega `time.monotonic()` do instante de recepção no PC; só os
+        apertos anteriores a esse instante são descartados. Itens sem
+        timestamp (fila de teste/legado) são tratados como antigos. Outros
+        eventos (conexão, placa, revelar, avançar) são preservados na mesma
+        ordem. Devolve quantos foram descartados.
         """
+        if corte is None:
+            corte = time.monotonic()
+
         mantidos = []
         descartados = 0
         while True:
@@ -927,14 +942,18 @@ class DueloDeConhecimento:
                 item = self.fila.get_nowait()
             except queue.Empty:
                 break
+
             if (
                 isinstance(item, tuple)
                 and len(item) >= 2
                 and item[0] == "evento"
                 and item[1] in ("BTN_A", "BTN_B", "BTN_C", "BTN_D")
             ):
-                descartados += 1
-                continue
+                recebido_em = item[2] if len(item) >= 3 else None
+                if recebido_em is None or recebido_em < corte:
+                    descartados += 1
+                    continue
+
             mantidos.append(item)
 
         for item in mantidos:
@@ -942,8 +961,8 @@ class DueloDeConhecimento:
 
         if descartados:
             log.info(
-                "Descartado(s) %d evento(s) de botão de equipe acumulado(s) "
-                "durante a contagem.",
+                "Descartado(s) %d evento(s) de botão de equipe recebido(s) "
+                "antes do corte da contagem.",
                 descartados,
             )
         return descartados
