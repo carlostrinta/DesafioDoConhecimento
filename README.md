@@ -5,9 +5,11 @@ Jogo de perguntas e respostas para **2 a 4 equipes**, com interface desktop
 primeiro tem a vez de responder; o tempo controla a rodada e o placar fica na
 tela.
 
-O projeto está em evolução por etapas. Esta versão (`v2.2-logica-integrada`)
+O projeto está em evolução por etapas. Esta versão (`v2.3-etapa5-python`)
 já tem toda a regra de jogo isolada em `jogo.py`, testada sem interface, e a
-interface apenas desenha e encaminha ações.
+interface apenas desenha e encaminha ações. A parte Python da Etapa 5 aceita
+**2, 3 ou 4 equipes** no teclado; a atualização do firmware/protocolo v2 fica
+para a etapa seguinte.
 
 ---
 
@@ -90,11 +92,9 @@ A pasta `logs/` não é versionada (veja `.gitignore`).
 
 | Tecla | Ação |
 | --- | --- |
-| `A` | equipe A aperta o botão |
-| `B` | equipe B aperta o botão |
+| `A` / `B` / `C` / `D` | a equipe correspondente aperta o botão |
 | `R` | revela a resposta |
-| `1` | ponto para a equipe A |
-| `2` | ponto para a equipe B |
+| `1` / `2` / `3` / `4` | ponto para a equipe A / B / C / D |
 | `N` | próxima pergunta |
 | `S` | liga/desliga o som |
 | `F11` | alterna tela cheia |
@@ -105,7 +105,14 @@ A pasta `logs/` não é versionada (veja `.gitignore`).
 No seletor de tema: `↑`/`↓` movem a seleção, `Enter` confirma e `Esc`
 cancela. Clique simples seleciona; clique duplo escolhe o tema.
 
-Durante a **contagem de largada**, `A`/`B` são ignorados e `R`, `1`/`2` e `N`
+As teclas de equipe e de ponto respeitam `jogo.num_equipes`: com 2 equipes,
+`C`/`D` e `3`/`4` são ignorados; com 3, `D`/`4` são ignorados; com 4, todas
+valem. Teclas de equipe inativa não pontuam nem bloqueiam a rodada. `A`-`D` e
+`1`-`4` funcionam com Caps Lock e em maiúscula/minúscula; o numpad segue o
+mesmo comportamento de `1`/`2`. Combinações com `Ctrl` ou `Alt` não apertam
+equipe (`Ctrl+C`/`Ctrl+D`, por exemplo, são ignorados).
+
+Durante a **contagem de largada**, `A`-`D` são ignorados e `R`, `1`-`4` e `N`
 mostram um aviso para aguardar o `JÁ!` (veja
 [Contagem de largada](#contagem-de-largada-etapa-46)).
 
@@ -168,7 +175,7 @@ Copy-Item config.exemplo.json config.json
 | --- | --- | --- | --- |
 | `tempos.tempo_pergunta` | inteiro (s) | `30` | `> 0` |
 | `tempos.tempo_resposta` | inteiro (s) | `15` | `> 0` |
-| `jogo.num_equipes` | inteiro | `2` | `2` a `4`; `3`/`4` avisam e a UI usa `2` até a Etapa 5 |
+| `jogo.num_equipes` | inteiro | `2` | `2` a `4`; define o número real de equipes (teclado e firmware v2) |
 | `jogo.pontuar_apos_tempo` | booleano | `false` | `true`/`false` |
 | `jogo.contagem_largada` | inteiro (s) | `3` | `0` a `10`; `0` desativa a contagem |
 | `jogo.mostrar_pergunta_na_contagem` | booleano | `false` | `true` exibe a pergunta e as alternativas durante a contagem |
@@ -221,9 +228,9 @@ aguardar.
 - Por padrão, a pergunta e as alternativas ficam **ocultas** durante a
   contagem. Com `jogo.mostrar_pergunta_na_contagem: true`, elas aparecem desde
   o início.
-- As teclas **A**/**B** e os eventos `BTN_A`/`BTN_B` da serial são **ignorados**
-  durante a contagem. **R**, **1**/**2** e **N** são recusados com o aviso
-  `Aguarde o JÁ! da contagem de largada.`
+- As teclas **A**-**D** e os eventos `BTN_A`-**`BTN_D`** da serial são
+  **ignorados** durante a contagem. **R**, **1**-**4** e **N** são recusados com
+  o aviso `Aguarde o JÁ! da contagem de largada.`
 - A fronteira da rodada é o instante em que a UI processa o **JÁ!** (ou a
   entrada em **AGUARDANDO** com a contagem desativada). A thread serial
   enfileira cada linha com `time.monotonic()` do instante de recepção no PC; ao
@@ -264,6 +271,12 @@ O hash detecta alteração no conteúdo do banco mesmo quando a quantidade de
 perguntas continua igual. O formato atual é a **versão 2**; estados da versão
 1 (sem hash) ou de versão desconhecida são recusados e geram partida nova,
 com `WARNING` no log.
+
+O número de equipes também faz parte da validação: se o estado salvo tiver
+`2`, `3` ou `4` equipes diferente de `jogo.num_equipes` no `config.json`, a
+partida antiga **não é retomada**. O app mostra o aviso, remove o estado antigo
+e começa uma partida nova, para o placar de C/D não reaparecer em uma
+configuração de 2 equipes (ou vice-versa).
 
 O app usa `estado_partida.lock` para detectar duas instâncias na mesma pasta.
 A segunda instância **não é bloqueada** (requisito da Etapa 4.3), mas registra
@@ -335,7 +348,12 @@ python -m pytest tests/test_ui_componentes.py -q
 - os testes de `tests/test_contagem_ui.py`, que montam a interface de verdade
   e percorrem o modal de tema → primeira pergunta → contagem → `AGUARDANDO`
   para `contagem_largada` `0`, `1`, `3` e `10`, com a pergunta visível ou não
-  e com redimensionamento no meio da contagem.
+  e com redimensionamento no meio da contagem;
+- os testes de `tests/test_etapa5_ui.py`, também em Tk real, que cobrem
+  teclado de **2, 3 e 4 equipes** (incluindo teclas inativas, Caps
+  Lock/maiúsculas e `Ctrl+C`/`Ctrl+D`), o bloqueio durante a contagem, o
+  fallback de firmware v1/sem handshake e o layout em **1366×768**,
+  **1920×1080** e **900×600**.
 
 O teste de `desafio.py` é headless: apenas confere o aviso e o código 1. O
 logging (rotação, níveis, fallback e captura de exceções) é testado em
@@ -401,7 +419,9 @@ PC → Arduino:
 | `RESET` | apaga LEDs e reinicia a rodada no Arduino |
 
 O protocolo **não muda** sem aprovação: a tabela acima é a referência
-congelada da v1. A versão 2 (4 equipes, `VERSAO 2`) será definida na Etapa 5.
+congelada da v1. A versão 2 (4 equipes, `VERSAO 2`) será implementada no
+firmware na próxima parte da Etapa 5; a interface Python já reconhece a linha
+`VERSAO 2` e o fallback descrito abaixo.
 
 **Como o app escolhe a porta (Etapa 4.4):** a regra é aplicada nesta ordem:
 
@@ -431,6 +451,16 @@ COM9 não encontrada`; quando a porta configurada aparece, o aviso é limpo. A
 mensagem é encurtada com reticências em janelas estreitas (teste em
 `tests/test_ui_componentes.py`). O aviso é emitido **uma vez por ausência**,
 não a cada varredura de 3 s.
+
+**Fallback de protocolo e 3/4 equipes:** o `config.json` pode pedir **2, 3 ou
+4 equipes**; sem Arduino (modo teclado puro), esse número é mantido. Ao
+conectar uma placa, o app espera o `PRONTO` e, no firmware v2, a linha
+`VERSAO 2`. Se houver porta candidata mas nenhuma confirmar o handshake, ou se
+o firmware responder apenas com `PRONTO` (v1), a partida é **limitada a 2
+equipes**: os cartões C/D são removidos (o placar de A/B é preservado), o
+estado é atualizado e aparece um aviso persistente na barra superior.
+Assim, uma placa v1 nunca recebe comandos `LED_C`/`LED_D` que não conhece.
+Quando `jogo.num_equipes` já é `2`, o fallback não altera a tela.
 
 A **lista única de VID/PID** fica em `dispositivos.py`:
 
@@ -514,7 +544,9 @@ lado do `.exe`), a pasta `sons/` (com `README.md` e `LICENCAS.md`, mesmo sem
 ## Roadmap (próximas etapas)
 
 Ordem combinada: **3.6**, **3.7**, **4.x** (com a **4.6 antes da Etapa 5**) e
-depois a **Etapa 5**. A **Etapa 4.6** está concluída; a próxima é a **Etapa 5**.
+depois a **Etapa 5**. A **Etapa 4.6** está concluída. A **parte Python da
+Etapa 5** também está implementada; falta a atualização do firmware/protocolo
+v2.
 
 ### Etapa 4.6 — Contagem de largada (implementada)
 
@@ -531,6 +563,23 @@ depois a **Etapa 5**. A **Etapa 4.6** está concluída; a próxima é a **Etapa 
 - Vale também para a primeira pergunta e para a partida restaurada.
 - Sem mudança de firmware nem de protocolo serial.
 
+### Etapa 5 — Teclado e UI para 2, 3 e 4 equipes (parte Python implementada)
+
+- `jogo.num_equipes` agora é real: 2, 3 ou 4 equipes nos cartões, no placar,
+  no teclado e na persistência; C usa `#B388FF` e D usa `#FF6FB5`.
+- Teclas `A`-`D` apertam e `1`-`4` pontuam a equipe correspondente, com Caps
+  Lock/maiúsculas; teclas inativas não bloqueiam; `Ctrl`/`Alt` são ignorados.
+- Firmware v1 ou ausência de handshake cai para 2 equipes com aviso persistente;
+  modo teclado sem porta candidata mantém o número configurado.
+- Estado salvo com número de equipes diferente do `config.json` é recusado e
+  vira partida nova.
+- Golden visual ganhou apenas os casos novos dos cartões C/D; os casos antigos
+  foram conferidos e permaneceram iguais.
+- A edição de nomes de equipe **não** faz parte desta etapa: os nomes vêm
+  somente de `config.json`.
+- Falta implementar o firmware/protocolo v2 (`VERSAO 2`, `CONFIG_TEAMS N`,
+  botões C/D e ACK não bloqueante).
+
 ### Melhorias futuras (sem etapa definida)
 
 - **Renomear `desafio.py`** para um nome que reflita seu papel (ex.:
@@ -540,9 +589,11 @@ depois a **Etapa 5**. A **Etapa 4.6** está concluída; a próxima é a **Etapa 
 
 ## Limitações conhecidas (em evolução)
 
-- A interface ainda mostra **2 equipes**; a lógica já suporta 2, 3 ou 4. Se
-  `jogo.num_equipes` for 3 ou 4, o app avisa e continua com 2 até a Etapa 5.
-- `config.json` ainda não cobre cores, modo de jogo nem alvo de pontos.
+- Com Arduino de firmware v1 (ou sem handshake), a partida cai para **2
+  equipes** com aviso; 3/4 equipes com botões físicos só depois do protocolo
+  v2. No modo teclado puro, 3/4 equipes já funcionam.
+- `config.json` ainda não cobre cores, modo de jogo nem alvo de pontos; a
+  edição de nomes de equipe pela interface fica para outra etapa.
 - `eletrotecnica.json` e `radiologia.json` têm só 20 perguntas: o baralho
   reinicia rápido (pendência da Etapa 4).
 - A partida salva retoma a pergunta atual em `CONTAGEM` (ou em `AGUARDANDO`,
@@ -552,5 +603,5 @@ depois a **Etapa 5**. A **Etapa 4.6** está concluída; a próxima é a **Etapa 
   demorar mais de 3 s após o reset por DTR, aumentar
   `serial.timeout_pronto` no `config.json` (padrão 3 s).
 - A validação com hardware real usou uma **Mega 2560** (VID `2341:0042`).
-  A Etapa 5 deve validar o mapeamento de pinos do firmware em uma **Uno** e
-  documentar a diferença Mega × Uno.
+  A parte de firmware da Etapa 5 deve validar o mapeamento de pinos em uma
+  **Uno** e documentar a diferença Mega × Uno.
