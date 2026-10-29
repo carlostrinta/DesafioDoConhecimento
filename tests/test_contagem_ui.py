@@ -19,7 +19,7 @@ import pytest
 import desafio
 import ui_componentes
 from apoio_tk import criar_raiz_tk
-from jogo import FASE_AGUARDANDO, FASE_CONTAGEM, Jogo
+from jogo import FASE_AGUARDANDO, FASE_CONTAGEM, FASE_RESPONDENDO, Jogo
 from ui_selecao import ModalSelecaoPerguntas
 
 
@@ -272,6 +272,48 @@ def _confirmar_contagem(app, root, relogio):
     root.update()
     assert not app.overlay_contagem.winfo_ismapped()
     assert app.cartao_pergunta.winfo_ismapped()
+
+
+def test_ja_visual_usa_duracao_configurada_e_aperto_vale(montar_app, monkeypatch):
+    monkeypatch.setattr(desafio, "DURACAO_OVERLAY_JA", 0.3)
+    montar, banco = montar_app
+    app, root, relogio = montar(contagem=1)
+    assert app._duracao_overlay_ja == 0.3
+
+    _escolher_tema(app, root, banco)
+
+    agendados = []
+    after_original = root.after
+
+    def after_espiao(ms, func=None, *args):
+        job = after_original(ms, func, *args)
+        if func == app._ocultar_contagem:
+            agendados.append((ms, job))
+        return job
+
+    root.after = after_espiao
+    try:
+        _avancar(app, root, relogio, 1)
+
+        assert app.fase == FASE_AGUARDANDO
+        assert app.overlay_contagem.winfo_ismapped()
+        assert "JÁ!" in _textos_do_overlay(app)
+        assert agendados and agendados[-1][0] == 300
+
+        # Aperto durante o "JÁ!" já vale: o Jogo está em AGUARDANDO.
+        app.apertar_botao("A")
+        root.update()
+        assert app.fase == FASE_RESPONDENDO
+        assert app.quem_apertou == "A"
+        assert app.overlay_contagem.winfo_ismapped()
+
+        # Processa o after da duração visual: o overlay some.
+        root.after(0, app._ocultar_contagem)
+        root.update()
+        assert not app.overlay_contagem.winfo_ismapped()
+        assert app._job_contagem_visual is None
+    finally:
+        root.after = after_original
 
 
 def test_fluxo_real_3_2_1_ja_chega_em_aguardando(montar_app):

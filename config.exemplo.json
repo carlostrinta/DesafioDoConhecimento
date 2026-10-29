@@ -9,6 +9,9 @@
     "contagem_largada": 3,
     "mostrar_pergunta_na_contagem": false
   },
+  "ui": {
+    "duracao_overlay_ja": 1.0
+  },
   "nomes_equipes": {
     "A": "Competidor A",
     "B": "Competidor B",

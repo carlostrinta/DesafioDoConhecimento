@@ -172,6 +172,7 @@ Copy-Item config.exemplo.json config.json
 | `jogo.pontuar_apos_tempo` | booleano | `false` | `true`/`false` |
 | `jogo.contagem_largada` | inteiro (s) | `3` | `0` a `10`; `0` desativa a contagem |
 | `jogo.mostrar_pergunta_na_contagem` | booleano | `false` | `true` exibe a pergunta e as alternativas durante a contagem |
+| `ui.duracao_overlay_ja` | número (s) | `1.0` | `0.3` a `3.0`; só visual, não altera a largada nem o timer |
 | `nomes_equipes.A` … `.D` | texto | `Competidor A` … `D` | 1 a 24 caracteres, não vazio |
 | `serial.porta` | texto | `"auto"` | `auto`, `COMx` ou `VID:PID` (ex.: `1A86:7523`) |
 | `serial.baud_rate` | inteiro | `9600` | `1200` a `115200` |
@@ -212,6 +213,11 @@ aguardar.
 - `jogo.contagem_largada` define a duração em segundos (padrão `3`, faixa de
   `0` a `10`). Com **`0`**, a contagem é desativada e a pergunta já entra
   valendo, como nas versões anteriores.
+- `ui.duracao_overlay_ja` define por quanto tempo o **JÁ!** permanece visível
+  (padrão `1.0`, faixa `0.3` a `3.0`). É puramente visual: a fase já é
+  **AGUARDANDO**, os botões já valem e os 30 s já estão correndo desde o
+  instante do **JÁ!**; nada muda na máquina de estados, na fila serial ou no
+  protocolo.
 - Por padrão, a pergunta e as alternativas ficam **ocultas** durante a
   contagem. Com `jogo.mostrar_pergunta_na_contagem: true`, elas aparecem desde
   o início.

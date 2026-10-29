@@ -31,6 +31,7 @@ from config import (
     CONFIG,
     CONTAGEM_LARGADA,
     CONTINUAR_AUTOMATICO,
+    DURACAO_OVERLAY_JA,
     MOSTRAR_PERGUNTA_NA_CONTAGEM,
     NOMES_EQUIPES,
     NUM_EQUIPES,
@@ -206,6 +207,9 @@ class DueloDeConhecimento:
         self._job_escala = None
         self._job_contagem_visual = None
         self._contagem_visual = None
+        # Duração puramente visual do "JÁ!" (config.ui.duracao_overlay_ja).
+        # O Jogo já está em AGUARDANDO e os botões já valem neste instante.
+        self._duracao_overlay_ja = DURACAO_OVERLAY_JA
         self._salvador = persistencia.AgendadorSalvamento(
             self._salvar_estado,
             self.root.after,
@@ -671,8 +675,9 @@ class DueloDeConhecimento:
         overlay.tk.call("raise", overlay._w)
         overlay.desenhar()
         if str(valor) == "JÁ!":
+            atraso_ms = int(round(self._duracao_overlay_ja * 1000))
             self._job_contagem_visual = self.root.after(
-                500, self._ocultar_contagem
+                atraso_ms, self._ocultar_contagem
             )
 
     def _ocultar_contagem(self, renderizar=True):

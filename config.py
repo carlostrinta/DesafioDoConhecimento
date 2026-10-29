@@ -56,6 +56,7 @@ VOLUME_AUDIO_PADRAO = 1.0
 BUFFER_AUDIO_PADRAO = 512
 CONTAGEM_LARGADA_PADRAO = 3
 MOSTRAR_PERGUNTA_NA_CONTAGEM_PADRAO = False
+DURACAO_OVERLAY_JA_PADRAO = 1.0
 CONTINUAR_AUTOMATICO_PADRAO = False
 
 # ─── Limites de validação ───
@@ -70,6 +71,8 @@ BUFFER_AUDIO_MINIMO = 128
 BUFFER_AUDIO_MAXIMO = 2048
 CONTAGEM_LARGADA_MINIMO = 0
 CONTAGEM_LARGADA_MAXIMO = 10
+DURACAO_OVERLAY_JA_MINIMO = 0.3
+DURACAO_OVERLAY_JA_MAXIMO = 3.0
 NUM_EQUIPES_UI = 2  # a interface (e o Arduino) só usam 2 até a Etapa 5
 
 _SECOES = {
@@ -81,6 +84,7 @@ _SECOES = {
         "mostrar_pergunta_na_contagem",
     },
     "nomes_equipes": set(EQUIPES),
+    "ui": {"duracao_overlay_ja"},
     "serial": {"porta", "baud_rate", "timeout_pronto"},
     "perguntas": {"pasta", "arquivo_padrao"},
     "audio": {"ativo", "volume", "buffer"},
@@ -102,6 +106,7 @@ class Configuracao:
     num_equipes_configurado: int = NUM_EQUIPES_PADRAO
     contagem_largada: int = CONTAGEM_LARGADA_PADRAO
     mostrar_pergunta_na_contagem: bool = MOSTRAR_PERGUNTA_NA_CONTAGEM_PADRAO
+    duracao_overlay_ja: float = DURACAO_OVERLAY_JA_PADRAO
     nomes_equipes: dict[str, str] = field(
         default_factory=lambda: dict(NOMES_EQUIPES_PADRAO)
     )
@@ -191,6 +196,7 @@ def carregar(caminho=None, diretorio_base=None) -> Configuracao:
 
     tempos = _secao(dados, "tempos", avisos)
     jogo = _secao(dados, "jogo", avisos)
+    ui = _secao(dados, "ui", avisos)
     nomes = _secao(dados, "nomes_equipes", avisos)
     serial = _secao(dados, "serial", avisos)
     perguntas = _secao(dados, "perguntas", avisos)
@@ -232,6 +238,7 @@ def carregar(caminho=None, diretorio_base=None) -> Configuracao:
         MOSTRAR_PERGUNTA_NA_CONTAGEM_PADRAO,
         avisos,
     )
+    duracao_overlay_ja = _ler_duracao_overlay_ja(ui, avisos)
 
     nomes_equipes = _ler_nomes(nomes, avisos)
     porta_serial = _ler_porta(serial, avisos)
@@ -275,6 +282,7 @@ def carregar(caminho=None, diretorio_base=None) -> Configuracao:
         num_equipes_configurado=num_pedido,
         contagem_largada=contagem_largada,
         mostrar_pergunta_na_contagem=mostrar_pergunta_na_contagem,
+        duracao_overlay_ja=duracao_overlay_ja,
         nomes_equipes=nomes_equipes,
         porta_serial=porta_serial,
         timeout_pronto=timeout_pronto,
@@ -303,6 +311,9 @@ def modelo_padrao() -> dict:
             "pontuar_apos_tempo": PONTUAR_APOS_TEMPO_PADRAO,
             "contagem_largada": CONTAGEM_LARGADA_PADRAO,
             "mostrar_pergunta_na_contagem": MOSTRAR_PERGUNTA_NA_CONTAGEM_PADRAO,
+        },
+        "ui": {
+            "duracao_overlay_ja": DURACAO_OVERLAY_JA_PADRAO,
         },
         "nomes_equipes": dict(NOMES_EQUIPES_PADRAO),
         "serial": {
@@ -467,6 +478,28 @@ def _ler_timeout(secao, avisos):
     return float(valor)
 
 
+def _ler_duracao_overlay_ja(secao, avisos):
+    chave = "duracao_overlay_ja"
+    nome = "ui.duracao_overlay_ja"
+    if chave not in secao:
+        return DURACAO_OVERLAY_JA_PADRAO
+    valor = secao[chave]
+    valido = (
+        not isinstance(valor, bool)
+        and isinstance(valor, (int, float))
+        and DURACAO_OVERLAY_JA_MINIMO <= valor <= DURACAO_OVERLAY_JA_MAXIMO
+    )
+    if not valido:
+        _aviso(
+            avisos,
+            f"{nome}: valor inválido {valor!r}; use número entre "
+            f"{DURACAO_OVERLAY_JA_MINIMO:g} e {DURACAO_OVERLAY_JA_MAXIMO:g}; "
+            f"usando {DURACAO_OVERLAY_JA_PADRAO:g}.",
+        )
+        return DURACAO_OVERLAY_JA_PADRAO
+    return float(valor)
+
+
 def _ler_nomes(secao, avisos):
     nomes = dict(NOMES_EQUIPES_PADRAO)
     for equipe, valor in secao.items():
@@ -581,6 +614,7 @@ PONTUAR_APOS_TEMPO = CONFIG.pontuar_apos_tempo
 NUM_EQUIPES = CONFIG.num_equipes
 CONTAGEM_LARGADA = CONFIG.contagem_largada
 MOSTRAR_PERGUNTA_NA_CONTAGEM = CONFIG.mostrar_pergunta_na_contagem
+DURACAO_OVERLAY_JA = CONFIG.duracao_overlay_ja
 NOMES_EQUIPES = dict(CONFIG.nomes_equipes)
 PORTA_FORCADA = CONFIG.porta_serial
 TIMEOUT_PRONTO = CONFIG.timeout_pronto

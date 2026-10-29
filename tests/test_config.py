@@ -103,6 +103,7 @@ class TestModuloConfig:
         assert config.VOLUME_AUDIO == config.CONFIG.volume_audio
         assert config.BUFFER_AUDIO == config.CONFIG.buffer_audio
         assert config.CONTAGEM_LARGADA == config.CONFIG.contagem_largada
+        assert config.DURACAO_OVERLAY_JA == config.CONFIG.duracao_overlay_ja
         assert (
             config.MOSTRAR_PERGUNTA_NA_CONTAGEM
             is config.CONFIG.mostrar_pergunta_na_contagem
@@ -137,6 +138,7 @@ class TestSemArquivo:
         assert cfg.buffer_audio == 512
         assert cfg.contagem_largada == 3
         assert cfg.mostrar_pergunta_na_contagem is False
+        assert cfg.duracao_overlay_ja == 1.0
         assert cfg.continuar_automatico is False
 
     def test_comportamento_identico_sem_config_json(self, tmp_path):
@@ -171,6 +173,7 @@ class TestLeitura:
             {
                 "tempos": {"tempo_pergunta": 45, "tempo_resposta": 20},
                 "jogo": {"num_equipes": 2, "pontuar_apos_tempo": True},
+                "ui": {"duracao_overlay_ja": 2.5},
                 "nomes_equipes": {"A": "Time Azul", "B": "Time Laranja"},
                 "serial": {
                     "porta": "COM5",
@@ -192,6 +195,7 @@ class TestLeitura:
         assert cfg.tempo_resposta == 20
         assert cfg.pontuar_apos_tempo is True
         assert cfg.num_equipes == 2
+        assert cfg.duracao_overlay_ja == 2.5
         assert cfg.nomes_equipes["A"] == "Time Azul"
         assert cfg.nomes_equipes["B"] == "Time Laranja"
         assert cfg.nomes_equipes["C"] == "Competidor C"
@@ -290,6 +294,11 @@ class TestValidacao:
             ({"jogo": {"contagem_largada": 1.5}}, "contagem_largada", 3),
             ({"jogo": {"mostrar_pergunta_na_contagem": "sim"}}, "mostrar_pergunta_na_contagem", False),
             ({"jogo": {"mostrar_pergunta_na_contagem": 1}}, "mostrar_pergunta_na_contagem", False),
+            ({"ui": {"duracao_overlay_ja": 0.29}}, "duracao_overlay_ja", 1.0),
+            ({"ui": {"duracao_overlay_ja": 3.01}}, "duracao_overlay_ja", 1.0),
+            ({"ui": {"duracao_overlay_ja": "1.0"}}, "duracao_overlay_ja", 1.0),
+            ({"ui": {"duracao_overlay_ja": True}}, "duracao_overlay_ja", 1.0),
+            ({"ui": {"duracao_overlay_ja": None}}, "duracao_overlay_ja", 1.0),
             ({"audio": {"ativo": 1}}, "som_ativo", True),
             ({"audio": {"ativo": "sim"}}, "som_ativo", True),
             ({"audio": {"volume": 1.1}}, "volume_audio", 1.0),
@@ -381,6 +390,18 @@ class TestValidacao:
         cfg = _carregar(tmp_path, {"jogo": {"contagem_largada": valor}})
 
         assert cfg.contagem_largada == valor
+        assert cfg.avisos == ()
+
+    @pytest.mark.parametrize(
+        "valor, esperado",
+        [(0.3, 0.3), (0.5, 0.5), (1, 1.0), (1.5, 1.5), (3.0, 3.0)],
+    )
+    def test_duracao_overlay_ja_valida_e_aceita(
+        self, tmp_path, valor, esperado
+    ):
+        cfg = _carregar(tmp_path, {"ui": {"duracao_overlay_ja": valor}})
+
+        assert cfg.duracao_overlay_ja == esperado
         assert cfg.avisos == ()
 
     @pytest.mark.parametrize("valor", [True, False])
@@ -584,6 +605,7 @@ class TestExemploECriacao:
         assert cfg.buffer_audio == 512
         assert cfg.contagem_largada == 3
         assert cfg.mostrar_pergunta_na_contagem is False
+        assert cfg.duracao_overlay_ja == 1.0
         assert cfg.pasta_perguntas == str(RAIZ)
 
     def test_criar_config_exemplo(self, tmp_path):
@@ -602,6 +624,7 @@ class TestExemploECriacao:
 
         assert modelo["jogo"]["contagem_largada"] == 3
         assert modelo["jogo"]["mostrar_pergunta_na_contagem"] is False
+        assert modelo["ui"]["duracao_overlay_ja"] == 1.0
         assert modelo["audio"]["buffer"] == 512
 
     def test_texto_avisos_e_simples(self):
@@ -645,6 +668,7 @@ class TestUiUsaConfig:
         assert desafio.TEMPO_PERGUNTA == config.TEMPO_PERGUNTA
         assert desafio.TEMPO_RESPOSTA == config.TEMPO_RESPOSTA
         assert desafio.PONTUAR_APOS_TEMPO == config.PONTUAR_APOS_TEMPO
+        assert desafio.DURACAO_OVERLAY_JA == config.DURACAO_OVERLAY_JA
         assert desafio.SOM_ATIVO == config.SOM_ATIVO
         assert desafio.NOME_A == config.NOMES_EQUIPES["A"]
         assert desafio.NOME_B == config.NOMES_EQUIPES["B"]
