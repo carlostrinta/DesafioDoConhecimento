@@ -59,7 +59,7 @@ O debounce é de **60 ms** e não há `delay()` no loop.
 
 ## Como gravar
 
-1. Abra `duelo_arduino/duelo_arduino.ino` na Arduino IDE.
+1. Abra `duelo_arduino_v2/duelo_arduino_v2.ino` na Arduino IDE.
 2. Selecione **Arduino Uno** e a porta correta.
 3. Faça o upload e feche o Monitor Serial antes de abrir o jogo.
 4. O aplicativo deve mostrar o status de Arduino conectado e reconhecer

@@ -167,9 +167,9 @@ Mapa dos 10 botões usado pelo sketch de bancada:
 ### Firmware v1 (2 equipes)
 
 O firmware original está em
-[`firmware/v1/duelo_arduino.ino/duelo_arduino.ino.ino`](firmware/v1/duelo_arduino.ino/duelo_arduino.ino.ino)
-(cópia idêntica, mantida como ponto de retorno) e também em
-[`duelo_arduino.ino/duelo_arduino.ino.ino`](duelo_arduino.ino/duelo_arduino.ino.ino).
+[`firmware/v1/duelo_arduino_v1/duelo_arduino_v1.ino`](firmware/v1/duelo_arduino_v1/duelo_arduino_v1.ino)
+(cópia idêntica, mantida como ponto de retorno). Essa é agora a única cópia
+versionada do v1.
 
 | Pino | Função |
 | --- | --- |
@@ -204,7 +204,7 @@ abrir o jogo.
 ### Firmware v2 de produção (em validação)
 
 O firmware v2 fica em
-[`firmware/v2/duelo_arduino/duelo_arduino.ino`](firmware/v2/duelo_arduino/duelo_arduino.ino)
+[`firmware/v2/duelo_arduino_v2/duelo_arduino_v2.ino`](firmware/v2/duelo_arduino_v2/duelo_arduino_v2.ino)
 e usa o mesmo mapa de 10 botões em `D2–D11`. Ele **não usa LEDs nem buzzer**:
 o feedback fica no aplicativo. O handshake é `PRONTO` + `VERSAO 2`; depois o
 Python envia `CONFIG_TEAMS N` e espera o ACK `EQUIPES N`.
@@ -275,10 +275,10 @@ script, se não houver permissão de escrita).
 | `recursos.py` | localização da pasta da aplicação (fonte ou `.exe`) |
 | `logging_conf.py` | log rotativo, níveis e captura de exceções |
 | `conhecimentos_gerais.json`, `eletrotecnica.json`, `radiologia.json` | bancos de perguntas |
-| `firmware/v1/` | cópia idêntica do firmware original (ponto de retorno) |
+| `firmware/README.md` | índice dos sketches e ordem de validação |
+| `firmware/v1/duelo_arduino_v1/` | firmware v1 congelado (ponto de retorno) |
 | `firmware/bancada_botoes/` | sketch e roteiro de validação dos 10 botões |
-| `firmware/v2/` | firmware v2 (10 botões, 4 equipes, sem LEDs/buzzer) |
-| `duelo_arduino.ino/` | firmware v1 original do Arduino |
+| `firmware/v2/duelo_arduino_v2/` | firmware v2 (10 botões, 4 equipes, sem LEDs/buzzer) |
 | `sons/` | documentação de áudio e registro de licenças |
 | `tests/` | suíte de testes pytest |
 | `Desafio do Conhecimento.spec` | receita de build do PyInstaller |
@@ -396,6 +396,8 @@ Se você redistribuir o jogo, mantenha os arquivos `LICENSE`,
   de áudio.
 - [`sons/LICENCAS.md`](sons/LICENCAS.md) — registro obrigatório de licenças
   dos sons.
+- [`firmware/README.md`](firmware/README.md) — índice dos sketches e ordem de
+  validação.
 - [`firmware/v1/README.md`](firmware/v1/README.md) — cópia do firmware
   original e seu hash.
 - [`firmware/bancada_botoes/README.md`](firmware/bancada_botoes/README.md) —

@@ -4,12 +4,16 @@ A validação física continua sendo obrigatória; estes testes só evitam que a
 bancada e o firmware de produção percam pinos, eventos ou o debounce de 60 ms.
 """
 
+import hashlib
 from pathlib import Path
 
 
 RAIZ = Path(__file__).resolve().parent.parent
+V1 = RAIZ / "firmware" / "v1" / "duelo_arduino_v1" / "duelo_arduino_v1.ino"
 BANCADA = RAIZ / "firmware" / "bancada_botoes" / "bancada_botoes.ino"
-V2 = RAIZ / "firmware" / "v2" / "duelo_arduino" / "duelo_arduino.ino"
+V2 = RAIZ / "firmware" / "v2" / "duelo_arduino_v2" / "duelo_arduino_v2.ino"
+
+HASH_V1 = "761CAF1BA38765DE458B1458D898AFAA60E07794CF45C65908D864B80FCB351A"
 
 EVENTOS = (
     "BTN_A",
@@ -27,6 +31,12 @@ EVENTOS = (
 
 def _texto(caminho):
     return caminho.read_text(encoding="utf-8")
+
+
+def test_v1_fica_somente_em_firmware_e_mantem_o_hash():
+    assert V1.exists()
+    assert not (RAIZ / "duelo_arduino.ino").exists()
+    assert hashlib.sha256(V1.read_bytes()).hexdigest().upper() == HASH_V1
 
 
 def test_bancada_tem_os_10_botoes_e_debounce_de_60ms():
