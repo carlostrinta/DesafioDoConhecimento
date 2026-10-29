@@ -82,6 +82,20 @@ CASOS = [
         320,
         420,
     ),
+    (
+        "placar_equipe_c",
+        "CartaoPlacar",
+        {"nome": "Competidor C", "cor": "#B388FF", "pontos": 4, "rotulo": "Na frente"},
+        320,
+        420,
+    ),
+    (
+        "placar_equipe_d",
+        "CartaoPlacar",
+        {"nome": "Competidor D", "cor": "#FF6FB5", "pontos": 9, "rotulo": ""},
+        320,
+        420,
+    ),
     ("pergunta_vazia", "CartaoPergunta", {}, 900, 320),
     (
         "pergunta",

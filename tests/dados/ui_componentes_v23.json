@@ -2108,5 +2108,234 @@
    "anchor": "center",
    "justify": "left"
   }
+ ],
+ "placar_equipe_c": [
+  {
+   "tipo": "polygon",
+   "coords": [
+    22.0,
+    2.0,
+    22.0,
+    2.0,
+    298.0,
+    2.0,
+    298.0,
+    2.0,
+    318.0,
+    2.0,
+    318.0,
+    22.0,
+    318.0,
+    22.0,
+    318.0,
+    398.0,
+    318.0,
+    398.0,
+    318.0,
+    418.0,
+    298.0,
+    418.0,
+    298.0,
+    418.0,
+    22.0,
+    418.0,
+    22.0,
+    418.0,
+    2.0,
+    418.0,
+    2.0,
+    398.0,
+    2.0,
+    398.0,
+    2.0,
+    22.0,
+    2.0,
+    22.0,
+    2.0,
+    2.0
+   ],
+   "fill": "#121A33",
+   "outline": "#2A3560",
+   "width": "2.0",
+   "smooth": "true"
+  },
+  {
+   "tipo": "text",
+   "coords": [
+    160.0,
+    50.4
+   ],
+   "fill": "#B388FF",
+   "width": "0",
+   "text": "Competidor C",
+   "font": "Bahnschrift 20 bold",
+   "anchor": "center",
+   "justify": "left"
+  },
+  {
+   "tipo": "text",
+   "coords": [
+    160.0,
+    159.6
+   ],
+   "fill": "#EAF0FF",
+   "width": "290",
+   "text": "4",
+   "font": "Bahnschrift 78 bold",
+   "anchor": "center",
+   "justify": "center"
+  },
+  {
+   "tipo": "text",
+   "coords": [
+    160.0,
+    252.0
+   ],
+   "fill": "#8F9BC4",
+   "width": "0",
+   "text": "pontos",
+   "font": "{Segoe UI} 13 normal",
+   "anchor": "center",
+   "justify": "left"
+  },
+  {
+   "tipo": "oval",
+   "coords": [
+    124.8,
+    292.4,
+    195.2,
+    362.8
+   ],
+   "fill": "#353260",
+   "outline": "#524685",
+   "width": "2.0"
+  },
+  {
+   "tipo": "text",
+   "coords": [
+    160.0,
+    390.6
+   ],
+   "fill": "#8F9BC4",
+   "width": "0",
+   "text": "Na frente",
+   "font": "{Segoe UI} 13 normal",
+   "anchor": "center",
+   "justify": "left"
+  }
+ ],
+ "placar_equipe_d": [
+  {
+   "tipo": "polygon",
+   "coords": [
+    22.0,
+    2.0,
+    22.0,
+    2.0,
+    298.0,
+    2.0,
+    298.0,
+    2.0,
+    318.0,
+    2.0,
+    318.0,
+    22.0,
+    318.0,
+    22.0,
+    318.0,
+    398.0,
+    318.0,
+    398.0,
+    318.0,
+    418.0,
+    298.0,
+    418.0,
+    298.0,
+    418.0,
+    22.0,
+    418.0,
+    22.0,
+    418.0,
+    2.0,
+    418.0,
+    2.0,
+    398.0,
+    2.0,
+    398.0,
+    2.0,
+    22.0,
+    2.0,
+    22.0,
+    2.0,
+    2.0
+   ],
+   "fill": "#121A33",
+   "outline": "#2A3560",
+   "width": "2.0",
+   "smooth": "true"
+  },
+  {
+   "tipo": "text",
+   "coords": [
+    160.0,
+    50.4
+   ],
+   "fill": "#FF6FB5",
+   "width": "0",
+   "text": "Competidor D",
+   "font": "Bahnschrift 20 bold",
+   "anchor": "center",
+   "justify": "left"
+  },
+  {
+   "tipo": "text",
+   "coords": [
+    160.0,
+    159.6
+   ],
+   "fill": "#EAF0FF",
+   "width": "290",
+   "text": "9",
+   "font": "Bahnschrift 78 bold",
+   "anchor": "center",
+   "justify": "center"
+  },
+  {
+   "tipo": "text",
+   "coords": [
+    160.0,
+    252.0
+   ],
+   "fill": "#8F9BC4",
+   "width": "0",
+   "text": "pontos",
+   "font": "{Segoe UI} 13 normal",
+   "anchor": "center",
+   "justify": "left"
+  },
+  {
+   "tipo": "oval",
+   "coords": [
+    124.8,
+    292.4,
+    195.2,
+    362.8
+   ],
+   "fill": "#462d50",
+   "outline": "#713c67",
+   "width": "2.0"
+  },
+  {
+   "tipo": "text",
+   "coords": [
+    160.0,
+    390.6
+   ],
+   "fill": "#8F9BC4",
+   "width": "0",
+   "font": "{Segoe UI} 13 normal",
+   "anchor": "center",
+   "justify": "left"
+  }
  ]
 }
