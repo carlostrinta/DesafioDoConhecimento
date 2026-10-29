@@ -185,13 +185,44 @@ class TestTresQuatroEquipes:
         assert j.reiniciar_placar() == ["reiniciou_placar"]
         assert all(v == 0 for v in j.placar.values())
 
-    def test_reduzir_equipes_preserva_ab_e_descarta_cd(self, jogo_4_equipes):
+    def test_reduzir_equipes_preserva_ab_e_guarda_cd(self, jogo_4_equipes):
         j = jogo_4_equipes
         j.placar = {"A": 5, "B": 3, "C": 2, "D": 1}
         assert j.reduzir_equipes(2) is True
         assert j.num_equipes == 2
         assert j.equipes_ativas == ("A", "B")
         assert j.placar == {"A": 5, "B": 3}
+        assert j._placar_reservado == {"C": 2, "D": 1}
+
+    def test_restaurar_equipes_devolve_pontos_guardados_de_cd(
+        self, jogo_4_equipes
+    ):
+        j = jogo_4_equipes
+        j.placar = {"A": 5, "B": 3, "C": 2, "D": 1}
+        assert j.reduzir_equipes(2) is True
+
+        assert j.restaurar_equipes(4) is True
+        assert j.num_equipes == 4
+        assert j.equipes_ativas == ("A", "B", "C", "D")
+        assert j.placar == {"A": 5, "B": 3, "C": 2, "D": 1}
+        assert j._placar_reservado == {}
+
+    def test_restaurar_equipes_nao_reduz_nem_repete(self, jogo_2_equipes):
+        j = jogo_2_equipes
+        assert j.restaurar_equipes(3) is True
+        assert j.num_equipes == 3
+        assert j.restaurar_equipes(2) is False
+        assert j.restaurar_equipes(3) is False
+        assert j.num_equipes == 3
+
+    def test_reiniciar_placar_limpa_pontos_guardados(self, jogo_4_equipes):
+        j = jogo_4_equipes
+        j.placar = {"A": 5, "B": 3, "C": 2, "D": 1}
+        assert j.reduzir_equipes(2) is True
+        assert j.reiniciar_placar() == ["reiniciou_placar"]
+        assert j._placar_reservado == {}
+        assert j.restaurar_equipes(4) is True
+        assert j.placar == {"A": 0, "B": 0, "C": 0, "D": 0}
 
     def test_reduzir_equipes_durante_resposta_de_c_volta_para_aguardando(
         self, jogo_4_equipes

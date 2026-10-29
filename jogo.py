@@ -156,6 +156,9 @@ class Jogo:
 
         # Estado mutável
         self.placar: dict[str, int] = {eq: 0 for eq in self.equipes_ativas}
+        # Pontos de equipes temporariamente fora da partida (fallback para 2).
+        # Ficam só em memória: uma reconexão v2 pode restaurá-los na mesma sessão.
+        self._placar_reservado: dict[str, int] = {}
         self.perguntas: list[Pergunta] = []
         self.estado = EstadoRodada()
 
@@ -200,18 +203,28 @@ class Jogo:
         self.timer_cor = ""
         if zerar_placar:
             self.placar = {eq: 0 for eq in self.equipes_ativas}
+            self._placar_reservado = {}
         return ["reiniciou_banco"]
 
     def reduzir_equipes(self, num_equipes: int = 2) -> bool:
         """
         Reduz a partida para 2 equipes quando o protocolo não suporta 3/4.
 
-        Preserva o placar de A/B e descarta C/D. Se a equipe da vez for uma
-        das removidas, a rodada volta para AGUARDANDO com o tempo cheio para
-        A/B disputarem. Devolve True quando houve redução.
+        Preserva o placar de A/B e guarda os pontos de C/D para uma eventual
+        reconexão v2 na mesma sessão. Se a equipe da vez for uma das removidas,
+        a rodada volta para AGUARDANDO com o tempo cheio para A/B disputarem.
+        Devolve True quando houve redução.
         """
         if not 2 <= num_equipes < self.num_equipes:
             return False
+
+        removidas = [
+            equipe for equipe in self.equipes_ativas
+            if equipe not in TODAS_EQUIPES[:num_equipes]
+        ]
+        self._placar_reservado.update(
+            {equipe: self.placar.get(equipe, 0) for equipe in removidas}
+        )
 
         self.num_equipes = num_equipes
         self.equipes_ativas = TODAS_EQUIPES[:num_equipes]
@@ -233,6 +246,24 @@ class Jogo:
                     self._iniciar_timer(
                         self.tempo_pergunta, "Tempo para apertar", ""
                     )
+        return True
+
+    def restaurar_equipes(self, num_equipes: int) -> bool:
+        """
+        Volta ao modo v2 com 3/4 equipes e devolve os pontos guardados de C/D.
+
+        Só aumenta a partida; nunca reduz. Devolve True quando restaurou.
+        """
+        if num_equipes not in (3, 4) or num_equipes <= self.num_equipes:
+            return False
+
+        self.num_equipes = num_equipes
+        self.equipes_ativas = TODAS_EQUIPES[:num_equipes]
+        for equipe in self.equipes_ativas:
+            if equipe in self._placar_reservado:
+                self.placar[equipe] = self._placar_reservado.pop(equipe)
+            else:
+                self.placar.setdefault(equipe, 0)
         return True
 
     # ─── Timer (usa clock injetável) ───
@@ -452,6 +483,7 @@ class Jogo:
     def reiniciar_placar(self) -> list[str]:
         for eq in self.equipes_ativas:
             self.placar[eq] = 0
+        self._placar_reservado = {}
         return ["reiniciou_placar"]
 
     def _tempo_esgotado(self) -> None:

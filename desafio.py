@@ -41,6 +41,7 @@ from config import (
     SOM_ATIVO,
     TEMPO_PERGUNTA,
     TEMPO_RESPOSTA,
+    TIMEOUT_PRONTO,
     TITULO,
     VOLUME_AUDIO,
     texto_avisos,
@@ -150,8 +151,9 @@ def escolher_arquivo_inicial(arquivos, arquivo_atual, pasta, arquivo_padrao):
 # APLICAÇÃO PRINCIPAL
 # =========================================================
 class DueloDeConhecimento:
-    def __init__(self, root):
+    def __init__(self, root, *, clock=None):
         self.root = root
+        self._clock = clock or time.monotonic
         self.root.title(TITULO)
         self.root.geometry("1280x800")
         self.root.minsize(900, 600)
@@ -174,7 +176,11 @@ class DueloDeConhecimento:
         self._equipes_configuradas = NUM_EQUIPES
         self.protocolo_arduino = None
         self._job_versao = None
+        self._versao_prazo = 0.0
         self._aviso_protocolo_mostrado = False
+        self._geracao_conexao = 0
+        self._geracao_fallback = 0
+        self._fallback_equipes = False
         self.jogo = Jogo(
             [],
             num_equipes=NUM_EQUIPES,
@@ -1052,6 +1058,7 @@ class DueloDeConhecimento:
             return
         if evento == "PRONTO":
             log.info("Arduino reiniciado.")
+            self._geracao_conexao += 1
             self._agendar_verificacao_versao()
         self._despachar(mapear_evento_arduino(evento, self.jogo))
 
@@ -1064,26 +1071,51 @@ class DueloDeConhecimento:
             return
         if self._job_versao:
             self.root.after_cancel(self._job_versao)
-        self._job_versao = self.root.after(500, self._confirmar_protocolo_v1)
+        self._versao_prazo = self._clock() + TIMEOUT_PRONTO
+        atraso_ms = max(1, int(math.ceil(TIMEOUT_PRONTO * 1000)))
+        self._job_versao = self.root.after(
+            atraso_ms, self._confirmar_protocolo_v1
+        )
 
     def _confirmar_protocolo_v1(self):
         self._job_versao = None
-        if self.protocolo_arduino != "v2":
-            self._aplicar_protocolo("v1")
+        if self.protocolo_arduino == "v2":
+            return
+        restante = self._versao_prazo - self._clock()
+        if restante > 0.0005:
+            # O `after` do Tk pode disparar um pouco antes; o relógio é a
+            # autoridade, então reagenda o que faltar.
+            self._job_versao = self.root.after(
+                max(1, int(math.ceil(restante * 1000))),
+                self._confirmar_protocolo_v1,
+            )
+            return
+        self._versao_prazo = 0.0
+        self._aplicar_protocolo("v1")
 
     def _aplicar_protocolo(self, protocolo):
         if self._job_versao:
             self.root.after_cancel(self._job_versao)
             self._job_versao = None
+        self._versao_prazo = 0.0
 
         if protocolo == "v2":
-            self.protocolo_arduino = "v2"
-            if self._aviso_protocolo_mostrado and self._equipes_configuradas > 2:
+            if (
+                self._fallback_equipes
+                and self._geracao_conexao <= self._geracao_fallback
+            ):
+                # V2 chegou atrasado na mesma conexão que já caiu para 2.
+                # Não expande a partida no meio da rodada; a próxima
+                # reconexão (novo PRONTO) poderá restaurar 3/4.
                 log.warning(
-                    "VERSAO 2 recebida depois do fallback para 2 equipes; "
-                    "reinicie o aplicativo para voltar a %d equipes.",
-                    self._equipes_configuradas,
+                    "VERSAO 2 tardio após o fallback; mantendo 2 equipes "
+                    "até a próxima reconexão."
                 )
+                return
+
+            self.protocolo_arduino = "v2"
+            if self._fallback_equipes:
+                self._restaurar_equipes_pos_fallback()
             else:
                 log.info("Arduino confirmou protocolo v2.")
                 self.topo.aviso_protocolo = ""
@@ -1096,17 +1128,28 @@ class DueloDeConhecimento:
         self.protocolo_arduino = protocolo
         if protocolo == "v1":
             motivo = "Arduino v1 não suporta 3/4 equipes"
-            aviso = "Arduino v1: usando 2 equipes."
+            aviso = (
+                "Arduino v1: usando 2 equipes; "
+                "pontos de C/D guardados nesta sessão."
+            )
         else:
             motivo = "Arduino não confirmou o handshake"
-            aviso = "Sem handshake do Arduino: usando 2 equipes."
+            aviso = (
+                "Sem handshake do Arduino: usando 2 equipes; "
+                "pontos de C/D guardados nesta sessão."
+            )
 
         if self.jogo.num_equipes > 2:
             self.jogo.reduzir_equipes(2)
+            self._fallback_equipes = True
+            self._geracao_fallback = self._geracao_conexao
             self._reconstruir_cartoes()
             self._atualizar_barra()
             self._salvador.pedir_imediato()
-            log.warning("%s; partida limitada a 2 equipes.", motivo)
+            log.warning(
+                "%s; partida limitada a 2 equipes; pontos de C/D guardados.",
+                motivo,
+            )
 
         if self._equipes_configuradas > 2 and not self._aviso_protocolo_mostrado:
             self._aviso_protocolo_mostrado = True
@@ -1115,6 +1158,33 @@ class DueloDeConhecimento:
             self.avisar(aviso)
         else:
             log.info("%s; mantendo 2 equipes.", motivo)
+
+    def _restaurar_equipes_pos_fallback(self):
+        """Volta a 3/4 equipes quando o v2 retorna em uma nova conexão."""
+        alvo = self._equipes_configuradas
+        if alvo <= self.jogo.num_equipes:
+            self._fallback_equipes = False
+            return
+        if not self.jogo.restaurar_equipes(alvo):
+            return
+
+        self._fallback_equipes = False
+        self._geracao_fallback = 0
+        self._aviso_protocolo_mostrado = False
+        self._reconstruir_cartoes()
+        self._atualizar_barra()
+        self._salvador.pedir_imediato()
+        self.topo.aviso_protocolo = ""
+        self.topo.desenhar()
+        aviso = (
+            f"Arduino v2: {alvo} equipes restauradas; "
+            "pontos de C/D recuperados."
+        )
+        self.avisar(aviso)
+        log.info(
+            "Arduino v2 reconectado; partida restaurada para %d equipes.",
+            alvo,
+        )
 
     # -----------------------------------------------------
     # AÇÕES DA UI (só delegam ao Jogo e despacham os eventos)
@@ -1191,6 +1261,7 @@ class DueloDeConhecimento:
         if job_versao:
             self.root.after_cancel(job_versao)
             self._job_versao = None
+        self._versao_prazo = 0.0
         self.serial_comm.parar()
         self.som.parar()
         trava = getattr(self, "_trava", None)

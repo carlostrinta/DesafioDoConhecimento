@@ -147,13 +147,15 @@ def montar_app(tmp_path, monkeypatch, raiz_tk):
     familias_originais = dict(ui_componentes.FAMILIAS)
     criados = []
 
-    def montar(contagem=0, num_equipes=2, tamanho=None):
+    def montar(
+        contagem=0, num_equipes=2, tamanho=None, relogio_protocolo=None
+    ):
         monkeypatch.setattr(desafio, "NUM_EQUIPES", num_equipes)
         root = tk.Toplevel(raiz_tk)
         root.state = lambda *a: None
 
         ui_componentes.definir_escala(1.0)
-        app = desafio.DueloDeConhecimento(root)
+        app = desafio.DueloDeConhecimento(root, clock=relogio_protocolo)
         relogio = Relogio()
         app.jogo = Jogo(
             [],
@@ -344,6 +346,7 @@ def test_protocolo_sem_suporte_limita_para_duas_e_avisa(
     assert app.jogo.equipes_ativas == ("A", "B")
     assert set(app.cartoes_placar) == {"A", "B"}
     assert trecho in app.topo.aviso_protocolo
+    assert "pontos de C/D guardados nesta sessão" in app.topo.aviso_protocolo
     assert trecho in app.aviso
     assert len(app.rodape.msg) > 0
 
@@ -368,14 +371,96 @@ def test_protocolo_v2_mantem_quatro_equipes(montar_app):
 
 def test_pronto_sem_versao_cai_para_v1(montar_app):
     montar, _banco = montar_app
-    app, root, _relogio = montar(num_equipes=4)
+    relogio = Relogio()
+    app, root, _relogio = montar(
+        num_equipes=4, relogio_protocolo=relogio
+    )
 
     app.processar_evento("PRONTO")
+    relogio.avancar(desafio.TIMEOUT_PRONTO)
     app._confirmar_protocolo_v1()
     root.update()
 
     assert app.protocolo_arduino == "v1"
     assert app.jogo.num_equipes == 2
+
+
+def test_janela_do_versao_2_usa_timeout_pronto_e_relogio(
+    montar_app, monkeypatch
+):
+    montar, _banco = montar_app
+    relogio = Relogio()
+    app, root, _relogio = montar(
+        num_equipes=3, relogio_protocolo=relogio
+    )
+    monkeypatch.setattr(desafio, "TIMEOUT_PRONTO", 2.5)
+
+    agendados = []
+
+    def after(ms, callback):
+        agendados.append((ms, callback))
+        return f"job{len(agendados)}"
+
+    monkeypatch.setattr(root, "after", after)
+    monkeypatch.setattr(root, "after_cancel", lambda job: None)
+
+    app.processar_evento("PRONTO")
+
+    assert agendados[-1][0] == 2500
+    assert app._versao_prazo == relogio.agora + 2.5
+
+    # Disparo antecipado do Tk não confirma v1: reagenda o restante.
+    app._confirmar_protocolo_v1()
+    assert app.protocolo_arduino is None
+    assert agendados[-1][0] == 2500
+
+    relogio.avancar(2.5)
+    app._confirmar_protocolo_v1()
+    root.update()
+
+    assert app.protocolo_arduino == "v1"
+    assert app.jogo.num_equipes == 2
+
+
+@pytest.mark.parametrize("protocolo", ["v1", "sem_handshake"])
+def test_versao_2_tardia_so_restaura_na_proxima_reconexao(
+    montar_app, protocolo
+):
+    montar, _banco = montar_app
+    app, root, _relogio = montar(num_equipes=4)
+    app.jogo.placar.update({"A": 1, "B": 2, "C": 5, "D": 7})
+
+    if protocolo == "v1":
+        app.processar_evento("PRONTO")
+        app._aplicar_protocolo("v1")
+    else:
+        app._aplicar_protocolo("sem_handshake")
+
+    assert app.jogo.num_equipes == 2
+    assert app.jogo.placar == {"A": 1, "B": 2}
+    assert app._fallback_equipes is True
+
+    # V2 chegou atrasado na mesma conexão: não muda a partida em andamento.
+    app.processar_evento("VERSAO 2")
+    root.update()
+
+    assert app.protocolo_arduino == protocolo
+    assert app.jogo.num_equipes == 2
+    assert set(app.cartoes_placar) == {"A", "B"}
+    assert app._fallback_equipes is True
+
+    # Um novo PRONTO + VERSAO 2 é a próxima reconexão: aí sim restaura.
+    app.processar_evento("PRONTO")
+    app.processar_evento("VERSAO 2")
+    root.update()
+
+    assert app.protocolo_arduino == "v2"
+    assert app._job_versao is None
+    assert app.jogo.num_equipes == 4
+    assert app.jogo.placar == {"A": 1, "B": 2, "C": 5, "D": 7}
+    assert set(app.cartoes_placar) == {"A", "B", "C", "D"}
+    assert app.topo.aviso_protocolo == ""
+    assert "pontos de C/D recuperados" in app.aviso
 
 
 def test_estado_com_numero_diferente_avisa_e_abre_partida_nova(

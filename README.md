@@ -455,12 +455,23 @@ não a cada varredura de 3 s.
 **Fallback de protocolo e 3/4 equipes:** o `config.json` pode pedir **2, 3 ou
 4 equipes**; sem Arduino (modo teclado puro), esse número é mantido. Ao
 conectar uma placa, o app espera o `PRONTO` e, no firmware v2, a linha
-`VERSAO 2`. Se houver porta candidata mas nenhuma confirmar o handshake, ou se
-o firmware responder apenas com `PRONTO` (v1), a partida é **limitada a 2
-equipes**: os cartões C/D são removidos (o placar de A/B é preservado), o
-estado é atualizado e aparece um aviso persistente na barra superior.
-Assim, uma placa v1 nunca recebe comandos `LED_C`/`LED_D` que não conhece.
-Quando `jogo.num_equipes` já é `2`, o fallback não altera a tela.
+`VERSAO 2`. A janela para essa linha é `serial.timeout_pronto` (padrão 3 s),
+o mesmo timeout do handshake. Se houver porta candidata mas nenhuma confirmar
+o handshake, ou se o firmware responder apenas com `PRONTO` (v1), a partida é
+**limitada a 2 equipes**: os cartões C/D são removidos, o placar de A/B é
+preservado e aparece um aviso persistente na barra superior. Assim, uma placa
+v1 nunca recebe comandos `LED_C`/`LED_D` que não conhece. Quando
+`jogo.num_equipes` já é `2`, o fallback não altera a tela.
+
+**Pontos de C/D no fallback (decisão):** os pontos de C/D **não são
+descartados**. Ao reduzir para 2, eles ficam guardados em memória e os cartões
+C/D são ocultados. Se o modo v2 voltar em uma **reconexão posterior na mesma
+sessão**, o app restaura as 3/4 equipes e devolve os pontos guardados de C/D.
+Um `VERSAO 2` que chegue atrasado na mesma conexão do fallback **não expande a
+partida no meio da rodada**; ele só passa a valer no próximo ciclo
+`PRONTO` + `VERSAO 2`. Se o aplicativo for fechado antes dessa reconexão, o
+estado salvo já estará em 2 equipes e os pontos guardados de C/D não
+sobrevivem ao reinício.
 
 A **lista única de VID/PID** fica em `dispositivos.py`:
 
