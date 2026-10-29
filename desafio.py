@@ -357,6 +357,15 @@ class DueloDeConhecimento:
     # PARTIDA SALVA (Etapa 4.3)
     # -----------------------------------------------------
     def _iniciar_fluxo_inicial(self):
+        if os.environ.get("DESAFIO_AUTO_INICIAR"):
+            # Gancho do smoke test: pula seletor/estado salvo e começa a
+            # contagem pelo banco padrão. Não grava estado por cima da
+            # partida salva do usuário.
+            self.carregar_perguntas()
+            self.proxima_pergunta(forcar=True)
+            self.arquivo_atual = None
+            return
+
         if self._partida_salva is not None:
             if CONTINUAR_AUTOMATICO:
                 log.info("Continuando partida salva automaticamente.")
@@ -656,7 +665,10 @@ class DueloDeConhecimento:
             relwidth=0.72,
             relheight=0.54,
         )
-        overlay.lift()
+        # Em Canvas, `lift`, `tkraise` e `tag_raise` são o MESMO método e
+        # exigem item/tag do canvas. Para elevar o widget acima dos irmãos do
+        # palco, chamamos o comando Tcl de widget diretamente.
+        overlay.tk.call("raise", overlay._w)
         overlay.desenhar()
         if str(valor) == "JÁ!":
             self._job_contagem_visual = self.root.after(

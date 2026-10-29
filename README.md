@@ -290,8 +290,8 @@ python -m pytest tests/ -q
 A suíte cobre a máquina de estados, o placar, o carregador de perguntas, o
 timer e a contagem de largada (com relógio injetável — nenhum teste usa
 `sleep`) e o protocolo serial em modo headless. Nenhum teste exige Arduino.
-Abrem uma janela Tk de verdade apenas dois testes, e ambos são pulados em
-ambiente headless:
+Abrem uma janela Tk de verdade os testes visuais e de entrypoint abaixo; todos
+são pulados em ambiente headless:
 
 - o **golden visual** dos componentes (Etapa 3.5), **opt-in** porque as
   métricas de fonte variam entre PCs — guarda local de refatoração, não de CI:
@@ -303,7 +303,14 @@ python -m pytest tests/test_ui_componentes.py -q
 
 - o teste de **regressão do entrypoint**, que executa `python main.py` como
   subprocesso com `DESAFIO_AUTO_FECHAR=1` (a janela se fecha após 1 s) e exige
-  código de saída 0.
+  código de saída 0;
+- o **smoke da contagem de largada**, que usa `DESAFIO_AUTO_INICIAR=1` para
+  pular o seletor, iniciar o banco padrão e só fechar depois de chegar em
+  `AGUARDANDO` — assim o overlay é desenhado no caminho real do entrypoint;
+- os testes de `tests/test_contagem_ui.py`, que montam a interface de verdade
+  e percorrem o modal de tema → primeira pergunta → contagem → `AGUARDANDO`
+  para `contagem_largada` `0`, `1`, `3` e `10`, com a pergunta visível ou não
+  e com redimensionamento no meio da contagem.
 
 O teste de `desafio.py` é headless: apenas confere o aviso e o código 1. O
 logging (rotação, níveis, fallback e captura de exceções) é testado em
@@ -315,10 +322,11 @@ e a lista de VID/PID ficam em `tests/test_persistencia.py`,
 `tests/test_jogo_persistencia.py`, `tests/test_fechamento.py` e
 `tests/test_dispositivos.py`; nenhum desses testes abre janela. A seleção de
 porta e a fila de placa são testadas com portas falsas em
-`tests/test_serial_comm.py`. A contagem de largada fica em
-`tests/test_contagem.py`: sequência 3-2-1-JÁ!, desativação com `0`, duração
-inválida, recusas de `R`/`1`/`2`/`N`, descarte da fila serial e restauração da
-partida — tudo com relógio falso.
+`tests/test_serial_comm.py`. A contagem de largada tem dois níveis:
+`tests/test_contagem.py` cobre a regra (sequência 3-2-1-JÁ!, desativação com
+`0`, duração inválida, recusas de `R`/`1`/`2`/`N`, descarte da fila serial e
+restauração) com relógio falso; `tests/test_contagem_ui.py` cobre o caminho
+visual em Tk real.
 
 ## Estrutura do projeto
 

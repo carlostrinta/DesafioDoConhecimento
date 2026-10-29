@@ -168,6 +168,7 @@ def test_auto_fechar_agenda_o_fechamento(monkeypatch):
     _sem_log(monkeypatch, main)
     monkeypatch.setattr(main.tk, "Tk", lambda: RootFalsa())
     monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    monkeypatch.delenv("DESAFIO_AUTO_INICIAR", raising=False)
 
     main.iniciar(AppFalsa)
 
@@ -227,6 +228,46 @@ def test_main_abre_a_janela_e_sai_limpo():
         processo.kill()
         saida, erro = processo.communicate()
         pytest.fail(f"main.py não fechou com DESAFIO_AUTO_FECHAR:\n{saida}\n{erro}")
+
+    assert processo.returncode == 0, f"stdout={saida}\nstderr={erro}"
+    assert "Traceback" not in erro, erro
+
+
+def test_main_exercita_a_contagem_de_largada_e_sai_limpo():
+    """
+    Smoke do caminho real da Etapa 4.6: o app inicia sozinho o banco padrão,
+    passa por 3, 2, 1, JÁ! e só então fecha. Sem elevar o widget do overlay
+    corretamente, o caminho dispara TclError e o subprocesso não termina.
+    """
+    if not _tk_disponivel():
+        pytest.skip("Tk indisponível (ambiente headless)")
+
+    env = os.environ.copy()
+    env["DESAFIO_AUTO_FECHAR"] = "1"
+    env["DESAFIO_AUTO_INICIAR"] = "1"
+
+    processo = subprocess.Popen(
+        [sys.executable, "main.py"],
+        cwd=str(RAIZ),
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        time.sleep(0.5)
+        assert processo.poll() is None, (
+            "main.py saiu antes de iniciar a contagem "
+            "(montagem ou primeira pergunta falhou)"
+        )
+        saida, erro = processo.communicate(timeout=60)
+    except subprocess.TimeoutExpired:
+        processo.kill()
+        saida, erro = processo.communicate()
+        pytest.fail(
+            "main.py não fechou após a contagem de largada:\n"
+            f"stdout={saida}\nstderr={erro}"
+        )
 
     assert processo.returncode == 0, f"stdout={saida}\nstderr={erro}"
     assert "Traceback" not in erro, erro
