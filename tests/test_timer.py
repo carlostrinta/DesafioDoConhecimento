@@ -6,7 +6,7 @@ from perguntas import Pergunta
 
 @pytest.fixture
 def jogo_timer(perguntas_exemplo):
-    return Jogo(perguntas_exemplo, num_equipes=2, tempo_pergunta=2, tempo_resposta=1)
+    return Jogo(perguntas_exemplo, num_equipes=2, tempo_pergunta=2, tempo_resposta=1, contagem_largada=0)
 
 
 class TestTimer:

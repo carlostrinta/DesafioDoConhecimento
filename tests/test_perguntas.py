@@ -68,14 +68,14 @@ class TestCarregamentoPerguntas:
         monkeypatch.setattr("jogo.random.shuffle", lambda seq: seq.reverse())
         original = [p.texto for p in perguntas_exemplo]
 
-        j = Jogo(perguntas_exemplo, num_equipes=2)
+        j = Jogo(perguntas_exemplo, num_equipes=2, contagem_largada=0)
 
         assert [p.texto for p in j.perguntas] == list(reversed(original))
         # A lista recebida não é alterada no lugar (o Jogo trabalha numa cópia)
         assert [p.texto for p in perguntas_exemplo] == original
 
     def test_reinicia_banco_ao_final(self, perguntas_exemplo):
-        j = Jogo(perguntas_exemplo, num_equipes=2)
+        j = Jogo(perguntas_exemplo, num_equipes=2, contagem_largada=0)
         total = len(j.perguntas)
         # Avança total + 2 vezes: __init__ já fez 1 próxima, então loop roda total+2 vezes
         for _ in range(total + 2):

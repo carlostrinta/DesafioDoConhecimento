@@ -38,6 +38,8 @@ Formatos recomendados:
 | Tempo esgotado | `tempo_esgotado.wav` ou `.ogg` | 0,5–1,5 s |  |
 | Tick normal | `tick.wav` ou `.ogg` | 30–80 ms | Deve ser discreto e não competir com a fala. |
 | Tick final | `tick_final.wav` ou `.ogg` | 40–100 ms | Últimos 3 segundos; mais urgente que o tick normal. |
+| Contagem de largada | `contagem.wav` ou `.ogg` | 60–120 ms | Um tick por número (3, 2, 1). |
+| Largada (JÁ!) | `largada.wav` ou `.ogg` | 0,2–0,6 s | Distinto do tick; marca o início do tempo de resposta. |
 | Vitória / fim de partida | `vitoria.wav` ou `.ogg` | 1–3 s | Também usado por `fim_partida()`. |
 | Troca de tema | `troca_tema.wav` ou `.ogg` | 0,3–1 s | Tocado ao carregar um tema. |
 

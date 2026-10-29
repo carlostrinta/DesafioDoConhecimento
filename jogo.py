@@ -9,7 +9,9 @@ apresentação apenas reage a eles (LED, som, serial, tela):
     revelou            resposta revelada (RESPONDENDO -> REVELADA)
     pontuou:X          equipe X pontuou (REVELADA -> PONTUADA)
     tempo_esgotado     prazo expirou (transição decidida pelo próprio Jogo)
-    proxima_pergunta   nova pergunta carregada
+    proxima_pergunta   nova pergunta carregada (entra em CONTAGEM)
+    contagem:N         número N deve aparecer no overlay (N, N-1, ..., 1)
+    largada            contagem terminou; AGUARDANDO e timer de 30 s iniciados
     reiniciou_banco    baralho embaralhado (fim do banco)
     reiniciou_placar   placar zerado
     led_reacender:X    Arduino reiniciou; re-sincronizar o LED de X
@@ -17,6 +19,7 @@ apresentação apenas reage a eles (LED, som, serial, tela):
 """
 
 from __future__ import annotations
+import math
 import random
 import time
 from dataclasses import dataclass
@@ -34,11 +37,19 @@ FASE_AGUARDANDO = 0
 FASE_RESPONDENDO = 1
 FASE_REVELADA = 2
 FASE_PONTUADA = 3
+FASE_CONTAGEM = 4
+
+# ─── Contagem de largada (Etapa 4.6) ───
+CONTAGEM_LARGADA_PADRAO = 3
+CONTAGEM_LARGADA_MINIMO = 0
+CONTAGEM_LARGADA_MAXIMO = 10
+MOSTRAR_PERGUNTA_NA_CONTAGEM_PADRAO = False
 
 # ─── Equipes suportadas ───
 TODAS_EQUIPES = ("A", "B", "C", "D")
 
 # ─── Motivos de recusa (texto fica na camada de apresentação) ───
+MOTIVO_CONTAGEM = "contagem"
 MOTIVO_AVANCAR = "avancar"
 MOTIVO_REVELAR_AGUARDANDO = "revelar_aguardando"
 MOTIVO_ACERTO_FASE = "acerto_fase"
@@ -47,6 +58,7 @@ MOTIVO_ACERTO_OUTRA_EQUIPE = "acerto_outra_equipe"
 MOTIVO_ACERTO_TEMPO = "acerto_tempo"
 
 MOTIVOS_RECUSA = (
+    MOTIVO_CONTAGEM,
     MOTIVO_AVANCAR,
     MOTIVO_REVELAR_AGUARDANDO,
     MOTIVO_ACERTO_FASE,
@@ -78,6 +90,15 @@ def _ordem_valida(ordem, total: int) -> bool:
     return True
 
 
+def _normalizar_contagem(valor) -> int:
+    """Duração da contagem em 0..10; valor inválido volta ao padrão 3."""
+    if isinstance(valor, bool) or not isinstance(valor, int):
+        return CONTAGEM_LARGADA_PADRAO
+    if not CONTAGEM_LARGADA_MINIMO <= valor <= CONTAGEM_LARGADA_MAXIMO:
+        return CONTAGEM_LARGADA_PADRAO
+    return valor
+
+
 @dataclass
 class EstadoRodada:
     fase: int = FASE_AGUARDANDO
@@ -105,6 +126,8 @@ class Jogo:
         pontuar_apos_tempo: bool = False,
         nomes_equipes: dict[str, str] | None = None,
         clock: Callable[[], float] | None = None,
+        contagem_largada: int = CONTAGEM_LARGADA_PADRAO,
+        mostrar_pergunta_na_contagem: bool = MOSTRAR_PERGUNTA_NA_CONTAGEM_PADRAO,
     ):
         if not 2 <= num_equipes <= 4:
             raise ValueError("num_equipes deve ser 2, 3 ou 4")
@@ -115,6 +138,12 @@ class Jogo:
         self.tempo_pergunta = tempo_pergunta
         self.tempo_resposta = tempo_resposta
         self.pontuar_apos_tempo = pontuar_apos_tempo
+        self.contagem_largada = _normalizar_contagem(contagem_largada)
+        self.mostrar_pergunta_na_contagem = (
+            mostrar_pergunta_na_contagem
+            if isinstance(mostrar_pergunta_na_contagem, bool)
+            else MOSTRAR_PERGUNTA_NA_CONTAGEM_PADRAO
+        )
 
         self.nomes_equipes = nomes_equipes or {
             "A": "Competidor A",
@@ -135,6 +164,11 @@ class Jogo:
         self.timer_cor: str = ""          # "" = neutro | "A".."D" = cor da equipe
         self.timer_motivo: str = ""       # "" | "revelada" | "tempo_esgotado"
         self.timer_congelado: float = 0.0  # restante no instante da parada
+
+        # Contagem de largada: relógio próprio, separado do timer de resposta.
+        self.contagem_fim: float = 0.0
+        self.contagem_duracao: float = 0.0
+        self.contagem_ultimo: int = 0
 
         self._embaralhar_e_preparar()
         self.proxima_pergunta(forcar=True)
@@ -161,6 +195,7 @@ class Jogo:
         self._embaralhar_e_preparar()
         self.estado = EstadoRodada()
         self._parar_timer()
+        self._parar_contagem()
         self.timer_rotulo = ""
         self.timer_cor = ""
         if zerar_placar:
@@ -186,6 +221,85 @@ class Jogo:
             self.timer_congelado = 0.0
         self.timer_fim = 0.0
         self.timer_motivo = motivo
+
+    # ─── Contagem de largada (usa o mesmo clock injetável) ───
+    @property
+    def contagem_ativa(self) -> bool:
+        return self.estado.fase == FASE_CONTAGEM and self.contagem_fim > 0
+
+    def _parar_contagem(self) -> None:
+        self.contagem_fim = 0.0
+        self.contagem_duracao = 0.0
+        self.contagem_ultimo = 0
+
+    def _iniciar_contagem(self) -> None:
+        """
+        Coloca a rodada em CONTAGEM ou, com duração 0, direto em AGUARDANDO.
+
+        O timer de resposta só é iniciado no "JÁ!"; durante a contagem
+        `timer_ativo` fica False e `timer_restante()` retorna 0.
+        """
+        self._parar_timer()
+        self.timer_rotulo = ""
+        self.timer_cor = ""
+        self.timer_motivo = ""
+        self.timer_congelado = 0.0
+
+        if self.contagem_largada <= 0:
+            self.estado.fase = FASE_AGUARDANDO
+            self._parar_contagem()
+            self._iniciar_timer(self.tempo_pergunta, "Tempo para apertar", "")
+            return
+
+        self.estado.fase = FASE_CONTAGEM
+        agora = self._clock()
+        self.contagem_fim = agora + self.contagem_largada
+        self.contagem_duracao = float(self.contagem_largada)
+        self.contagem_ultimo = 0
+
+    def contagem_restante(self) -> float:
+        """Segundos restantes da contagem; 0 quando ela não está ativa."""
+        if not self.contagem_ativa:
+            return 0.0
+        return max(0.0, self.contagem_fim - self._clock())
+
+    def contagem_numero(self) -> int:
+        """Número que o overlay deve mostrar (3, 2, 1) ou 0 no "JÁ!"."""
+        if not self.contagem_ativa:
+            return 0
+        restante = self.contagem_restante()
+        if restante <= 0:
+            return 0
+        numero = math.ceil(restante - 1e-9)
+        return max(1, min(int(self.contagem_duracao), numero))
+
+    def contagem_fracao(self) -> float:
+        """Fração restante da contagem, para a barra de tempo."""
+        if self.contagem_duracao <= 0:
+            return 0.0
+        return max(0.0, min(1.0, self.contagem_restante() / self.contagem_duracao))
+
+    def tick_contagem(self) -> list[str]:
+        """
+        Avança a contagem pelo relógio injetável.
+
+        Devolve `["contagem:N"]` quando o número exibido muda e `["largada"]`
+        na transição para AGUARDANDO (quando o timer de 30 s começa).
+        """
+        if not self.contagem_ativa:
+            return []
+
+        if self._clock() >= self.contagem_fim:
+            self.estado.fase = FASE_AGUARDANDO
+            self._parar_contagem()
+            self._iniciar_timer(self.tempo_pergunta, "Tempo para apertar", "")
+            return ["largada"]
+
+        numero = self.contagem_numero()
+        if numero != self.contagem_ultimo:
+            self.contagem_ultimo = numero
+            return [f"contagem:{numero}"]
+        return []
 
     def timer_restante(self) -> float:
         """Tempo restante. Zero quando o timer está parado."""
@@ -244,6 +358,8 @@ class Jogo:
         return [f"apertou:{equipe}"]
 
     def revelar_resposta(self) -> list[str]:
+        if self.estado.fase == FASE_CONTAGEM:
+            return self._recusa(MOTIVO_CONTAGEM)
         if self.estado.fase == FASE_AGUARDANDO:
             return self._recusa(MOTIVO_REVELAR_AGUARDANDO)
         if self.estado.fase != FASE_RESPONDENDO:
@@ -256,6 +372,8 @@ class Jogo:
     def confirmar_acerto(self, equipe: str) -> list[str]:
         if self.estado.fase == FASE_PONTUADA:
             return []
+        if self.estado.fase == FASE_CONTAGEM:
+            return self._recusa(MOTIVO_CONTAGEM)
         if self.estado.fase != FASE_REVELADA:
             return self._recusa(MOTIVO_ACERTO_FASE)
         if self.estado.quem_apertou is None:
@@ -270,6 +388,8 @@ class Jogo:
         return [f"pontuou:{equipe}"]
 
     def proxima_pergunta(self, forcar: bool = False) -> list[str]:
+        if not forcar and self.estado.fase == FASE_CONTAGEM:
+            return self._recusa(MOTIVO_CONTAGEM)
         if not forcar and self.estado.pergunta_atual is not None and self.estado.fase not in (
             FASE_REVELADA,
             FASE_PONTUADA,
@@ -290,10 +410,9 @@ class Jogo:
         self.estado.indice_pergunta += 1
         self.estado.numero_pergunta += 1
 
-        self.estado.fase = FASE_AGUARDANDO
         self.estado.quem_apertou = None
         self.estado.tempo_estourou = False
-        self._iniciar_timer(self.tempo_pergunta, "Tempo para apertar", "")
+        self._iniciar_contagem()
         eventos.append("proxima_pergunta")
         return eventos
 
@@ -327,8 +446,8 @@ class Jogo:
         """
         Estado mínimo para continuar a partida.
 
-        Não inclui fase, quem apertou nem o timer: a Etapa 4.3 restaura a
-        pergunta atual em AGUARDANDO com o tempo cheio.
+        Não inclui fase, quem apertou nem o timer: a restauração recomeça a
+        pergunta atual pela contagem de largada (Etapa 4.6), com o tempo cheio.
         """
         return {
             "placar": dict(self.placar),
@@ -348,7 +467,8 @@ class Jogo:
         Reconstrói o jogo a partir de `to_dict()`.
 
         Restaura placar, nomes, índice, rodada e a ordem do baralho. A fase
-        sempre volta para AGUARDANDO e o timer reinicia cheio.
+        intermediária não é restaurada: a pergunta atual volta em CONTAGEM
+        (ou em AGUARDANDO com o tempo cheio, se a contagem estiver desativada).
         """
         dados = data if isinstance(data, dict) else {}
 
@@ -405,8 +525,9 @@ class Jogo:
 
         jogo.estado.indice_pergunta = indice
         jogo.estado.numero_pergunta = numero
-        # Regra da Etapa 4.3: não restaura timer nem fase intermediária.
-        jogo.estado.fase = FASE_AGUARDANDO
+        # Não restaura fase intermediária nem tempo restante. A pergunta
+        # atual entra na contagem de largada (Etapa 4.6); sem pergunta, a
+        # rodada fica limpa em AGUARDANDO, sem timer.
         jogo.estado.quem_apertou = None
         jogo.estado.tempo_estourou = False
         jogo.estado.pergunta_atual = (
@@ -415,7 +536,11 @@ class Jogo:
             else None
         )
         jogo._parar_timer()
+        jogo._parar_contagem()
         jogo.timer_rotulo = ""
         jogo.timer_cor = ""
-        jogo._iniciar_timer(jogo.tempo_pergunta, "Tempo para apertar", "")
+        if jogo.estado.pergunta_atual is not None:
+            jogo._iniciar_contagem()
+        else:
+            jogo.estado.fase = FASE_AGUARDANDO
         return jogo

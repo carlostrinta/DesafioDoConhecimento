@@ -15,14 +15,25 @@ def perguntas_exemplo():
 
 @pytest.fixture
 def jogo_2_equipes(perguntas_exemplo):
-    return Jogo(perguntas_exemplo, num_equipes=2, tempo_pergunta=30, tempo_resposta=15)
+    # Testes históricos das regras: contagem desativada (o comportamento
+    # padrão da Etapa 4.6 é coberto em tests/test_contagem.py).
+    return Jogo(
+        perguntas_exemplo, num_equipes=2, tempo_pergunta=30,
+        tempo_resposta=15, contagem_largada=0,
+    )
 
 
 @pytest.fixture
 def jogo_3_equipes(perguntas_exemplo):
-    return Jogo(perguntas_exemplo, num_equipes=3, tempo_pergunta=30, tempo_resposta=15)
+    return Jogo(
+        perguntas_exemplo, num_equipes=3, tempo_pergunta=30,
+        tempo_resposta=15, contagem_largada=0,
+    )
 
 
 @pytest.fixture
 def jogo_4_equipes(perguntas_exemplo):
-    return Jogo(perguntas_exemplo, num_equipes=4, tempo_pergunta=30, tempo_resposta=15)
+    return Jogo(
+        perguntas_exemplo, num_equipes=4, tempo_pergunta=30,
+        tempo_resposta=15, contagem_largada=0,
+    )

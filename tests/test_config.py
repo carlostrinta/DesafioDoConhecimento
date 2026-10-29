@@ -102,6 +102,11 @@ class TestModuloConfig:
         assert config.SOM_ATIVO is config.CONFIG.som_ativo
         assert config.VOLUME_AUDIO == config.CONFIG.volume_audio
         assert config.BUFFER_AUDIO == config.CONFIG.buffer_audio
+        assert config.CONTAGEM_LARGADA == config.CONFIG.contagem_largada
+        assert (
+            config.MOSTRAR_PERGUNTA_NA_CONTAGEM
+            is config.CONFIG.mostrar_pergunta_na_contagem
+        )
         assert config.CONTINUAR_AUTOMATICO is config.CONFIG.continuar_automatico
         assert config.AVISOS_CONFIG == config.CONFIG.avisos
 
@@ -130,6 +135,8 @@ class TestSemArquivo:
         assert cfg.som_ativo is True
         assert cfg.volume_audio == 1.0
         assert cfg.buffer_audio == 512
+        assert cfg.contagem_largada == 3
+        assert cfg.mostrar_pergunta_na_contagem is False
         assert cfg.continuar_automatico is False
 
     def test_comportamento_identico_sem_config_json(self, tmp_path):
@@ -276,6 +283,13 @@ class TestValidacao:
             ({"jogo": {"num_equipes": "3"}}, "num_equipes", 2),
             ({"jogo": {"pontuar_apos_tempo": "sim"}}, "pontuar_apos_tempo", False),
             ({"jogo": {"pontuar_apos_tempo": 0}}, "pontuar_apos_tempo", False),
+            ({"jogo": {"contagem_largada": -1}}, "contagem_largada", 3),
+            ({"jogo": {"contagem_largada": 11}}, "contagem_largada", 3),
+            ({"jogo": {"contagem_largada": "3"}}, "contagem_largada", 3),
+            ({"jogo": {"contagem_largada": True}}, "contagem_largada", 3),
+            ({"jogo": {"contagem_largada": 1.5}}, "contagem_largada", 3),
+            ({"jogo": {"mostrar_pergunta_na_contagem": "sim"}}, "mostrar_pergunta_na_contagem", False),
+            ({"jogo": {"mostrar_pergunta_na_contagem": 1}}, "mostrar_pergunta_na_contagem", False),
             ({"audio": {"ativo": 1}}, "som_ativo", True),
             ({"audio": {"ativo": "sim"}}, "som_ativo", True),
             ({"audio": {"volume": 1.1}}, "volume_audio", 1.0),
@@ -360,6 +374,22 @@ class TestValidacao:
         cfg = _carregar(tmp_path, {"audio": {"buffer": valor}})
 
         assert cfg.buffer_audio == valor
+        assert cfg.avisos == ()
+
+    @pytest.mark.parametrize("valor", [0, 1, 3, 10])
+    def test_contagem_largada_valida_e_aceita(self, tmp_path, valor):
+        cfg = _carregar(tmp_path, {"jogo": {"contagem_largada": valor}})
+
+        assert cfg.contagem_largada == valor
+        assert cfg.avisos == ()
+
+    @pytest.mark.parametrize("valor", [True, False])
+    def test_mostrar_pergunta_na_contagem_valido_e_aceito(self, tmp_path, valor):
+        cfg = _carregar(
+            tmp_path, {"jogo": {"mostrar_pergunta_na_contagem": valor}}
+        )
+
+        assert cfg.mostrar_pergunta_na_contagem is valor
         assert cfg.avisos == ()
 
     @pytest.mark.parametrize(
@@ -552,6 +582,8 @@ class TestExemploECriacao:
         assert cfg.tempo_pergunta == 30
         assert cfg.volume_audio == 1.0
         assert cfg.buffer_audio == 512
+        assert cfg.contagem_largada == 3
+        assert cfg.mostrar_pergunta_na_contagem is False
         assert cfg.pasta_perguntas == str(RAIZ)
 
     def test_criar_config_exemplo(self, tmp_path):
@@ -564,6 +596,13 @@ class TestExemploECriacao:
         cfg = config.carregar(diretorio_base=str(tmp_path))
         assert cfg.encontrado is True
         assert cfg.avisos == ()
+
+    def test_modelo_padrao_inclui_contagem(self):
+        modelo = config.modelo_padrao()
+
+        assert modelo["jogo"]["contagem_largada"] == 3
+        assert modelo["jogo"]["mostrar_pergunta_na_contagem"] is False
+        assert modelo["audio"]["buffer"] == 512
 
     def test_texto_avisos_e_simples(self):
         texto = config.texto_avisos(["um problema", "outro problema"])

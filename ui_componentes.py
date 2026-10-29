@@ -54,6 +54,7 @@ FONTE_DEF = {
     "status":   ("corpo", 20, "bold"),
     "passo":    ("corpo", 12, "bold"),
     "explic":   ("corpo", 16, "normal"),
+    "contagem": ("display", 180, "bold"),
 }
 
 
@@ -436,6 +437,59 @@ class BarraTempo(Tela):
                              capstyle="round", fill=self.cor)
         self.create_text(w - 4, cy, text=f"{self.segundos}s", anchor="e",
                          fill=self.cor, font=F("tempo"))
+
+
+class OverlayContagem(Tela):
+    """
+    Overlay da contagem de largada (Etapa 4.6).
+
+    Mostra 3, 2, 1 ou JÁ! em fonte grande, escalando com a janela pela
+    constante global ESCALA. A interface o coloca sobre o palco central; os
+    cartões de placar ficam nas colunas laterais e continuam visíveis.
+    """
+
+    def __init__(self, master, **kw):
+        super().__init__(master, **kw)
+        self.valor = "3"
+
+    def pintar(self, w, h):
+        e = max(2, int(3 * min(ESCALA, 1.5)))
+        raio = 26 * min(ESCALA, 1.5)
+        retangulo_arredondado(
+            self, e, e, w - e, h - e, raio,
+            fill=Cor.PAINEL, outline=Cor.APOIO, width=e,
+        )
+
+        largada = self.valor == "JÁ!"
+        cor = Cor.CERTO if largada else Cor.APOIO
+
+        self.create_text(
+            w / 2, h * 0.13, text="CONTAGEM DE LARGADA",
+            fill=Cor.SUAVE, font=F("pequena", 1.15),
+        )
+
+        # Sombra deslocada + número: o contraste mantém a leitura à distância.
+        mult = 0.62 if largada else 1.0
+        deslocamento = max(2, int(4 * ESCALA))
+        self.create_text(
+            w / 2 + deslocamento, h * 0.52 + deslocamento,
+            text=self.valor, fill="#050A18", font=F("contagem", mult),
+        )
+        self.create_text(
+            w / 2, h * 0.52, text=self.valor, fill=cor,
+            font=F("contagem", mult),
+        )
+
+        rodape = (
+            "Valendo! O primeiro a apertar responde."
+            if largada
+            else "Aguarde o JÁ! para apertar."
+        )
+        self.create_text(
+            w / 2, h * 0.88, text=rodape,
+            fill=Cor.TEXTO if largada else Cor.SUAVE,
+            font=F("status", 0.9),
+        )
 
 
 class Rodape(Cartao):

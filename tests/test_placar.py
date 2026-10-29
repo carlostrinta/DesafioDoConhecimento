@@ -6,12 +6,12 @@ from perguntas import Pergunta
 
 @pytest.fixture
 def jogo_2(perguntas_exemplo):
-    return Jogo(perguntas_exemplo, num_equipes=2)
+    return Jogo(perguntas_exemplo, num_equipes=2, contagem_largada=0)
 
 
 @pytest.fixture
 def jogo_3(perguntas_exemplo):
-    return Jogo(perguntas_exemplo, num_equipes=3)
+    return Jogo(perguntas_exemplo, num_equipes=3, contagem_largada=0)
 
 
 class TestPlacar:

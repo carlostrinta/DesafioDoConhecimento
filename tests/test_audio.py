@@ -236,6 +236,8 @@ class TestPacoteDeSons:
             "tempo_esgotado": "tempo_esgotado",
             "tick": "tick",
             "tick_final": "tick_final",
+            "contagem": "contagem",
+            "largada": "largada",
             "vitoria": "vitoria",
             "troca_tema": "troca_tema",
         }
@@ -380,6 +382,40 @@ class TestPacoteDeSons:
 
         assert len(set(dados)) == 4
 
+    def test_contagem_e_largada_tem_arquivos_proprios(
+        self, pygame_falso, pasta_sons
+    ):
+        for nome in ("contagem.wav", "largada.wav"):
+            (pasta_sons / nome).write_bytes(b"externo")
+
+        som = audio.Som(diretorio_sons=str(pasta_sons))
+        som.contagem()
+        som.largada()
+
+        assert som._cache_arquivos["contagem"] is not None
+        assert som._cache_arquivos["largada"] is not None
+        assert som._cache == {}
+
+    def test_fallback_de_contagem_e_largada_e_distinto(
+        self, pygame_falso, pasta_sons
+    ):
+        def dados_de(acao):
+            # Cada Som reutiliza o Channel(0) do mixer falso; limpa o canal
+            # para o tick de baixa prioridade não ser ignorado por estar ocupado.
+            pygame_falso.mixer.canais.clear()
+            som = audio.Som(diretorio_sons=str(pasta_sons))
+            acao(som)
+            (som_sintetizado,) = som._cache.values()
+            return som_sintetizado.dados
+
+        contagem = dados_de(lambda s: s.contagem())
+        largada = dados_de(lambda s: s.largada())
+        tick = dados_de(lambda s: s.tick(9, FASE_AGUARDANDO))
+        nova = dados_de(lambda s: s.nova_pergunta())
+        acerto = dados_de(lambda s: s.acertou())
+
+        assert len({contagem, largada, tick, nova, acerto}) == 5
+
     def test_vitoria_e_troca_de_tema_tem_mapeamento(
         self, pygame_falso, pasta_sons
     ):
@@ -433,6 +469,8 @@ class TestSemPygame:
         som = audio.Som()
         for _, acao, _, _ in EVENTOS_V22:
             acao(som)  # não pode levantar
+        som.contagem()
+        som.largada()
         som.vitoria()
         som.troca_tema()
         som.parar()

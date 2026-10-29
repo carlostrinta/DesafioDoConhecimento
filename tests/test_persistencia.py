@@ -191,9 +191,10 @@ class TestCarga:
         assert partida.jogo.placar == {"A": 2, "B": 1}
         assert partida.jogo.estado.indice_pergunta == jogo.estado.indice_pergunta
         assert partida.jogo.estado.numero_pergunta == jogo.estado.numero_pergunta
-        assert partida.jogo.estado.fase == 0
-        assert partida.jogo.timer_restante() > 0
-        assert partida.jogo.timer_rotulo == "Tempo para apertar"
+        # Etapa 4.6: a pergunta restaurada entra na contagem de largada.
+        assert partida.jogo.estado.fase == 4
+        assert partida.jogo.timer_ativo is False
+        assert partida.jogo.contagem_ativa is True
         esperado = [partida.jogo.perguntas_base[i].texto for i in dados["jogo"]["ordem"]]
         assert [p.texto for p in partida.jogo.perguntas] == esperado
         assert "Tema: Tema Teste" in partida.resumo
@@ -208,6 +209,7 @@ class TestCarga:
             nomes_equipes={"A": "Novo A", "B": "Novo B"},
             tempo_pergunta=45,
             tempo_resposta=12,
+            contagem_largada=0,
         )
 
         partida = resultado.partida

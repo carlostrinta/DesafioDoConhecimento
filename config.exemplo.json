@@ -5,7 +5,9 @@
   },
   "jogo": {
     "num_equipes": 2,
-    "pontuar_apos_tempo": false
+    "pontuar_apos_tempo": false,
+    "contagem_largada": 3,
+    "mostrar_pergunta_na_contagem": false
   },
   "nomes_equipes": {
     "A": "Competidor A",

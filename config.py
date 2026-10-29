@@ -54,6 +54,8 @@ ARQUIVO_PERGUNTAS_PADRAO = "conhecimentos_gerais.json"
 SOM_ATIVO_PADRAO = True
 VOLUME_AUDIO_PADRAO = 1.0
 BUFFER_AUDIO_PADRAO = 512
+CONTAGEM_LARGADA_PADRAO = 3
+MOSTRAR_PERGUNTA_NA_CONTAGEM_PADRAO = False
 CONTINUAR_AUTOMATICO_PADRAO = False
 
 # ─── Limites de validação ───
@@ -66,11 +68,18 @@ VOLUME_AUDIO_MINIMO = 0.0
 VOLUME_AUDIO_MAXIMO = 1.0
 BUFFER_AUDIO_MINIMO = 128
 BUFFER_AUDIO_MAXIMO = 2048
+CONTAGEM_LARGADA_MINIMO = 0
+CONTAGEM_LARGADA_MAXIMO = 10
 NUM_EQUIPES_UI = 2  # a interface (e o Arduino) só usam 2 até a Etapa 5
 
 _SECOES = {
     "tempos": {"tempo_pergunta", "tempo_resposta"},
-    "jogo": {"num_equipes", "pontuar_apos_tempo"},
+    "jogo": {
+        "num_equipes",
+        "pontuar_apos_tempo",
+        "contagem_largada",
+        "mostrar_pergunta_na_contagem",
+    },
     "nomes_equipes": set(EQUIPES),
     "serial": {"porta", "baud_rate", "timeout_pronto"},
     "perguntas": {"pasta", "arquivo_padrao"},
@@ -91,6 +100,8 @@ class Configuracao:
     pontuar_apos_tempo: bool = PONTUAR_APOS_TEMPO_PADRAO
     num_equipes: int = NUM_EQUIPES_PADRAO
     num_equipes_configurado: int = NUM_EQUIPES_PADRAO
+    contagem_largada: int = CONTAGEM_LARGADA_PADRAO
+    mostrar_pergunta_na_contagem: bool = MOSTRAR_PERGUNTA_NA_CONTAGEM_PADRAO
     nomes_equipes: dict[str, str] = field(
         default_factory=lambda: dict(NOMES_EQUIPES_PADRAO)
     )
@@ -209,6 +220,19 @@ def carregar(caminho=None, diretorio_base=None) -> Configuracao:
             f"{NUM_EQUIPES_UI} equipes (até a Etapa 5); usando {NUM_EQUIPES_UI}.",
         )
 
+    contagem_largada = _ler_inteiro(
+        jogo, "contagem_largada", "jogo.contagem_largada",
+        CONTAGEM_LARGADA_PADRAO, avisos,
+        minimo=CONTAGEM_LARGADA_MINIMO, maximo=CONTAGEM_LARGADA_MAXIMO,
+    )
+    mostrar_pergunta_na_contagem = _ler_booleano(
+        jogo,
+        "mostrar_pergunta_na_contagem",
+        "jogo.mostrar_pergunta_na_contagem",
+        MOSTRAR_PERGUNTA_NA_CONTAGEM_PADRAO,
+        avisos,
+    )
+
     nomes_equipes = _ler_nomes(nomes, avisos)
     porta_serial = _ler_porta(serial, avisos)
     baud_rate = _ler_inteiro(
@@ -249,6 +273,8 @@ def carregar(caminho=None, diretorio_base=None) -> Configuracao:
         pontuar_apos_tempo=pontuar_apos_tempo,
         num_equipes=min(num_pedido, NUM_EQUIPES_UI),
         num_equipes_configurado=num_pedido,
+        contagem_largada=contagem_largada,
+        mostrar_pergunta_na_contagem=mostrar_pergunta_na_contagem,
         nomes_equipes=nomes_equipes,
         porta_serial=porta_serial,
         timeout_pronto=timeout_pronto,
@@ -275,6 +301,8 @@ def modelo_padrao() -> dict:
         "jogo": {
             "num_equipes": NUM_EQUIPES_PADRAO,
             "pontuar_apos_tempo": PONTUAR_APOS_TEMPO_PADRAO,
+            "contagem_largada": CONTAGEM_LARGADA_PADRAO,
+            "mostrar_pergunta_na_contagem": MOSTRAR_PERGUNTA_NA_CONTAGEM_PADRAO,
         },
         "nomes_equipes": dict(NOMES_EQUIPES_PADRAO),
         "serial": {
@@ -551,6 +579,8 @@ TEMPO_PERGUNTA = CONFIG.tempo_pergunta
 TEMPO_RESPOSTA = CONFIG.tempo_resposta
 PONTUAR_APOS_TEMPO = CONFIG.pontuar_apos_tempo
 NUM_EQUIPES = CONFIG.num_equipes
+CONTAGEM_LARGADA = CONFIG.contagem_largada
+MOSTRAR_PERGUNTA_NA_CONTAGEM = CONFIG.mostrar_pergunta_na_contagem
 NOMES_EQUIPES = dict(CONFIG.nomes_equipes)
 PORTA_FORCADA = CONFIG.porta_serial
 TIMEOUT_PRONTO = CONFIG.timeout_pronto

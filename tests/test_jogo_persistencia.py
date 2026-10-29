@@ -38,6 +38,7 @@ def _jogo(perguntas, num_equipes=2, clock=None):
             "D": "Rosa",
         },
         clock=clock,
+        contagem_largada=0,
     )
 
 
@@ -95,7 +96,9 @@ class TestIdaEVolta:
         dados["quem_apertou"] = "B"
         dados["tempo_estourou"] = True
 
-        novo = Jogo.from_dict(dados, perguntas, clock=relogio)
+        novo = Jogo.from_dict(
+            dados, perguntas, clock=relogio, contagem_largada=0
+        )
 
         assert novo.estado.fase == FASE_AGUARDANDO
         assert novo.estado.quem_apertou is None

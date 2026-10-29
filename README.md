@@ -105,6 +105,10 @@ A pasta `logs/` não é versionada (veja `.gitignore`).
 No seletor de tema: `↑`/`↓` movem a seleção, `Enter` confirma e `Esc`
 cancela. Clique simples seleciona; clique duplo escolhe o tema.
 
+Durante a **contagem de largada**, `A`/`B` são ignorados e `R`, `1`/`2` e `N`
+mostram um aviso para aguardar o `JÁ!` (veja
+[Contagem de largada](#contagem-de-largada-etapa-46)).
+
 ## Perguntas e temas
 
 Os bancos de perguntas são arquivos JSON na pasta do jogo. O formato aceito é
@@ -166,6 +170,8 @@ Copy-Item config.exemplo.json config.json
 | `tempos.tempo_resposta` | inteiro (s) | `15` | `> 0` |
 | `jogo.num_equipes` | inteiro | `2` | `2` a `4`; `3`/`4` avisam e a UI usa `2` até a Etapa 5 |
 | `jogo.pontuar_apos_tempo` | booleano | `false` | `true`/`false` |
+| `jogo.contagem_largada` | inteiro (s) | `3` | `0` a `10`; `0` desativa a contagem |
+| `jogo.mostrar_pergunta_na_contagem` | booleano | `false` | `true` exibe a pergunta e as alternativas durante a contagem |
 | `nomes_equipes.A` … `.D` | texto | `Competidor A` … `D` | 1 a 24 caracteres, não vazio |
 | `serial.porta` | texto | `"auto"` | `auto`, `COMx` ou `VID:PID` (ex.: `1A86:7523`) |
 | `serial.baud_rate` | inteiro | `9600` | `1200` a `115200` |
@@ -192,6 +198,33 @@ O que acontece com arquivo problemático:
   temas abre normalmente, sem tela vazia.
 - `config.json` é local e **não** é versionado (veja `.gitignore`); o modelo
   versionado é `config.exemplo.json`.
+
+## Contagem de largada (Etapa 4.6)
+
+Cada pergunta nova entra na fase **CONTAGEM** antes de ficar valendo — inclusive
+a primeira depois da escolha do tema e a pergunta retomada de uma partida salva.
+A tela mostra **3, 2, 1, JÁ!** em um overlay central grande, que escala com a
+janela e fica dentro do palco: os cartões de placar das equipes continuam
+visíveis. O relógio de **30 s para apertar** só começa no **JÁ!**; durante a
+contagem, a barra de tempo acompanha a contagem regressiva e o rodapé avisa para
+aguardar.
+
+- `jogo.contagem_largada` define a duração em segundos (padrão `3`, faixa de
+  `0` a `10`). Com **`0`**, a contagem é desativada e a pergunta já entra
+  valendo, como nas versões anteriores.
+- Por padrão, a pergunta e as alternativas ficam **ocultas** durante a
+  contagem. Com `jogo.mostrar_pergunta_na_contagem: true`, elas aparecem desde
+  o início.
+- As teclas **A**/**B** e os eventos `BTN_A`/`BTN_B` da serial são **ignorados**
+  durante a contagem. **R**, **1**/**2** e **N** são recusados com o aviso
+  `Aguarde o JÁ! da contagem de largada.`
+- Ao entrar em **AGUARDANDO**, os eventos de botão de equipe que ainda
+  estivessem na fila serial são descartados: um aperto durante a contagem não
+  ganha a rodada. Os demais eventos da fila são preservados.
+- Sons: `contagem` toca um tick a cada número e `largada` toca no **JÁ!**; os
+  dois têm fallbacks sintetizados distintos (veja
+  [Pacote de sons](#pacote-de-sons-etapa-45)).
+- Sem mudança de firmware nem de protocolo serial.
 
 ## Persistência da partida (Etapa 4.3)
 
@@ -243,8 +276,9 @@ Ao abrir:
   quantidade de perguntas diferente ou hash diferente → `WARNING` no log,
   aviso na tela e partida nova (o app nunca quebra).
 
-A pergunta atual volta em **AGUARDANDO com o tempo cheio**. Fase intermediária
-e tempo restante **não** são restaurados de propósito.
+A pergunta atual volta em **CONTAGEM** (ou em **AGUARDANDO** com o tempo cheio,
+se `jogo.contagem_largada` for `0`). Fase intermediária e tempo restante **não**
+são restaurados de propósito; a contagem recomeça com a configuração atual.
 
 ## Testes
 
@@ -254,9 +288,10 @@ python -m pytest tests/ -q
 ```
 
 A suíte cobre a máquina de estados, o placar, o carregador de perguntas, o
-timer (com relógio injetável — nenhum teste usa `sleep`) e o protocolo serial
-em modo headless. Nenhum teste exige Arduino. Abrem uma janela Tk de verdade
-apenas dois testes, e ambos são pulados em ambiente headless:
+timer e a contagem de largada (com relógio injetável — nenhum teste usa
+`sleep`) e o protocolo serial em modo headless. Nenhum teste exige Arduino.
+Abrem uma janela Tk de verdade apenas dois testes, e ambos são pulados em
+ambiente headless:
 
 - o **golden visual** dos componentes (Etapa 3.5), **opt-in** porque as
   métricas de fonte variam entre PCs — guarda local de refatoração, não de CI:
@@ -280,7 +315,10 @@ e a lista de VID/PID ficam em `tests/test_persistencia.py`,
 `tests/test_jogo_persistencia.py`, `tests/test_fechamento.py` e
 `tests/test_dispositivos.py`; nenhum desses testes abre janela. A seleção de
 porta e a fila de placa são testadas com portas falsas em
-`tests/test_serial_comm.py`.
+`tests/test_serial_comm.py`. A contagem de largada fica em
+`tests/test_contagem.py`: sequência 3-2-1-JÁ!, desativação com `0`, duração
+inválida, recusas de `R`/`1`/`2`/`N`, descarte da fila serial e restauração da
+partida — tudo com relógio falso.
 
 ## Estrutura do projeto
 
@@ -289,12 +327,12 @@ porta e a fila de placa são testadas com portas falsas em
 | `main.py` | ponto de entrada: logging, monta a janela e inicia o loop do Tk |
 | `logging_conf.py` | log rotativo em `logs/`, níveis e captura de exceções |
 | `desafio.py` | interface tkinter: telas, teclado e ligação com o jogo |
-| `ui_componentes.py` | componentes Canvas: paleta, tipografia e widgets visuais (sem lógica de jogo) |
+| `ui_componentes.py` | componentes Canvas: paleta, tipografia, widgets visuais e overlay da contagem (sem lógica de jogo) |
 | `ui_selecao.py` | modal de escolha do banco de perguntas (widgets Tk clássicos) |
 | `serial_comm.py` | thread serial, detecção de porta, reconexão e fila de eventos |
 | `dispositivos.py` | lista única de VID/PID, prioridade e nome da placa (puro) |
 | `audio.py` | sons externos em `sons/` + fallback sintetizado (pygame opcional; sem ele fica mudo) |
-| `jogo.py` | regra de jogo pura: estado, placar e timer |
+| `jogo.py` | regra de jogo pura: estado, placar, timer e contagem de largada |
 | `perguntas.py` | modelo, carregador/validador, listagem e nomes de tema (puro) |
 | `persistencia.py` | estado da partida em JSON, hash, trava de instância e debounce (puro) |
 | `recursos.py` | pasta da aplicação (código-fonte ou `.exe`) — puro |
@@ -403,6 +441,8 @@ arquivo não existir, estiver corrompido, passar de **5 segundos** ou de
 - Volume geral em `audio.volume` (`0.0`–`1.0`), aplicado também ao fallback.
 - O mixer usa `pre_init` com buffer de **512** amostras por padrão (ajustável
   em `audio.buffer`, `128`–`2048`) e mantém `set_num_channels(4)`.
+- Contagem de largada: `contagem` toca um tick por número (3, 2, 1) e
+  `largada` toca no **JÁ!**, com timbres sintetizados distintos.
 - **O evento de vitória/fim de partida só dispara na Etapa 5.** O som
   `vitoria` já está mapeado, mas o jogo atual não o dispara; a tela de campeão
   e o fluxo de fim de partida pertencem àquela etapa. A troca de tema toca o
@@ -441,19 +481,20 @@ lado do `.exe`), a pasta `sons/` (com `README.md` e `LICENCAS.md`, mesmo sem
 ## Roadmap (próximas etapas)
 
 Ordem combinada: **3.6**, **3.7**, **4.x** (com a **4.6 antes da Etapa 5**) e
-depois a **Etapa 5**.
+depois a **Etapa 5**. A **Etapa 4.6** está concluída; a próxima é a **Etapa 5**.
 
-### Etapa 4.6 — Contagem de largada (não implementada)
+### Etapa 4.6 — Contagem de largada (implementada)
 
-- Nova fase `CONTAGEM` no `Jogo`, antes de `AGUARDANDO`, com relógio
-  injetável e duração configurável (padrão 3 s; `0` desativa).
-- Overlay com números grandes (3, 2, 1, JÁ!), desenhado em
-  `ui_componentes.py`.
-- Botões das equipes ignorados durante a contagem; descartar eventos de
-  botão acumulados na fila serial ao entrar em `AGUARDANDO`.
-- O tempo de 30 s só começa no "JÁ!"; pergunta oculta ou desfocada durante a
-  contagem (configurável).
-- Sons: tick por número e som distinto para o "JÁ!" (junto da 4.5).
+- Fase `CONTAGEM` no `Jogo`, antes de `AGUARDANDO`, com relógio injetável e
+  duração configurável (`jogo.contagem_largada`, padrão 3 s; `0` desativa).
+- Overlay com números grandes (3, 2, 1, JÁ!) em `ui_componentes.py`, escalando
+  com a janela e sem cobrir os cartões de placar.
+- Botões das equipes ignorados durante a contagem; eventos de botão acumulados
+  na fila serial são descartados ao entrar em `AGUARDANDO`.
+- O tempo de 30 s só começa no "JÁ!"; a pergunta fica oculta por padrão
+  (`jogo.mostrar_pergunta_na_contagem`).
+- Sons `contagem` (tick por número) e `largada`, com fallbacks sintetizados
+  distintos.
 - Vale também para a primeira pergunta e para a partida restaurada.
 - Sem mudança de firmware nem de protocolo serial.
 
@@ -471,8 +512,8 @@ depois a **Etapa 5**.
 - `config.json` ainda não cobre cores, modo de jogo nem alvo de pontos.
 - `eletrotecnica.json` e `radiologia.json` têm só 20 perguntas: o baralho
   reinicia rápido (pendência da Etapa 4).
-- A partida salva retoma a pergunta atual em `AGUARDANDO`; fase e tempo
-  restante não são restaurados.
+- A partida salva retoma a pergunta atual em `CONTAGEM` (ou em `AGUARDANDO`,
+  com a contagem desativada); fase e tempo restante não são restaurados.
 - O firmware usa `delay()` no bipe e será revisado junto com o protocolo v2.
 - **Pendência de hardware:** validar com clone **CH340**; se o `PRONTO`
   demorar mais de 3 s após o reset por DTR, aumentar

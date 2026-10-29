@@ -89,7 +89,10 @@ class TestMaquinaEstados:
         assert j.placar["A"] == 0
 
     def test_confirmar_acerto_permite_se_pontuar_apos_tempo_true(self, perguntas_exemplo):
-        j = Jogo(perguntas_exemplo, num_equipes=2, pontuar_apos_tempo=True)
+        j = Jogo(
+            perguntas_exemplo, num_equipes=2, pontuar_apos_tempo=True,
+            contagem_largada=0,
+        )
         j.apertar_botao("A")
         j._tempo_esgotado()
         j.revelar_resposta()
@@ -183,7 +186,7 @@ class TestTresQuatroEquipes:
         assert all(v == 0 for v in j.placar.values())
 
     def test_recarregar_perguntas_reinicia_estado(self, perguntas_exemplo):
-        j = Jogo(perguntas_exemplo, num_equipes=2)
+        j = Jogo(perguntas_exemplo, num_equipes=2, contagem_largada=0)
         j.apertar_botao("A")
         j.revelar_resposta()
         j.confirmar_acerto("A")
@@ -202,7 +205,7 @@ class TestTresQuatroEquipes:
         assert j.estado.pergunta_atual.texto == "P?"
 
     def test_recarregar_perguntas_com_zerar_placar(self, perguntas_exemplo):
-        j = Jogo(perguntas_exemplo, num_equipes=2)
+        j = Jogo(perguntas_exemplo, num_equipes=2, contagem_largada=0)
         j.placar["A"] = 7
         j.recarregar_perguntas(perguntas_exemplo, zerar_placar=True)
         assert j.placar == {"A": 0, "B": 0}
@@ -216,7 +219,7 @@ class TestTimerComClockInjetavel:
         def clock_fake():
             return tempo
 
-        j = Jogo(perguntas_exemplo, num_equipes=2, tempo_pergunta=30, tempo_resposta=15, clock=clock_fake)
+        j = Jogo(perguntas_exemplo, num_equipes=2, tempo_pergunta=30, tempo_resposta=15, clock=clock_fake, contagem_largada=0)
         # Timer inicia cheio
         assert j.timer_restante() == 30.0
         assert j.timer_fracao() == pytest.approx(1.0)
@@ -237,7 +240,7 @@ class TestTimerComClockInjetavel:
         def clock_fake():
             return tempo
 
-        j = Jogo(perguntas_exemplo, num_equipes=2, tempo_pergunta=30, tempo_resposta=15, clock=clock_fake)
+        j = Jogo(perguntas_exemplo, num_equipes=2, tempo_pergunta=30, tempo_resposta=15, clock=clock_fake, contagem_largada=0)
         j.apertar_botao("A")
         # Timer de resposta inicia
         assert j.timer_restante() == 15.0

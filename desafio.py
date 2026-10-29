@@ -29,7 +29,9 @@ from config import (
     ARQUIVO_PERGUNTAS,
     BUFFER_AUDIO,
     CONFIG,
+    CONTAGEM_LARGADA,
     CONTINUAR_AUTOMATICO,
+    MOSTRAR_PERGUNTA_NA_CONTAGEM,
     NOMES_EQUIPES,
     NUM_EQUIPES,
     PASTA_PERGUNTAS,
@@ -47,11 +49,13 @@ from jogo import (
     FASE_RESPONDENDO,
     FASE_REVELADA,
     FASE_PONTUADA,
+    FASE_CONTAGEM,
     MOTIVO_ACERTO_FASE,
     MOTIVO_ACERTO_OUTRA_EQUIPE,
     MOTIVO_ACERTO_SEM_QUEM,
     MOTIVO_ACERTO_TEMPO,
     MOTIVO_AVANCAR,
+    MOTIVO_CONTAGEM,
     MOTIVO_REVELAR_AGUARDANDO,
     PREFIXO_RECUSA,
     TIMER_MOTIVO_REVELADA,
@@ -72,6 +76,7 @@ from ui_componentes import (
     CartaoPergunta,
     CartaoPlacar,
     Cor,
+    OverlayContagem,
     Rodape,
     escolher_fonte,
 )
@@ -96,6 +101,7 @@ NOME_B = NOMES_EQUIPES["B"]
 # =========================================================
 # Mensagens das recusas do Jogo. A regra mora no Jogo; aqui só o texto.
 MENSAGENS_RECUSA = {
+    MOTIVO_CONTAGEM: "Aguarde o JÁ! da contagem de largada.",
     MOTIVO_AVANCAR: "Resolva a pergunta atual (revele ou pontue) antes de avançar.",
     MOTIVO_REVELAR_AGUARDANDO: "Ninguém apertou ainda. REVELAR só funciona depois que A ou B apertar.",
     MOTIVO_ACERTO_FASE: "Revele a resposta (botão REVELAR) antes de pontuar.",
@@ -169,6 +175,8 @@ class DueloDeConhecimento:
             tempo_resposta=TEMPO_RESPOSTA,
             pontuar_apos_tempo=PONTUAR_APOS_TEMPO,
             nomes_equipes=dict(NOMES_EQUIPES),
+            contagem_largada=CONTAGEM_LARGADA,
+            mostrar_pergunta_na_contagem=MOSTRAR_PERGUNTA_NA_CONTAGEM,
         )
 
         # Avisa (sem bloquear) se já houver outra instância usando esta pasta.
@@ -184,6 +192,8 @@ class DueloDeConhecimento:
             tempo_resposta=TEMPO_RESPOSTA,
             pontuar_apos_tempo=PONTUAR_APOS_TEMPO,
             num_equipes=NUM_EQUIPES,
+            contagem_largada=CONTAGEM_LARGADA,
+            mostrar_pergunta_na_contagem=MOSTRAR_PERGUNTA_NA_CONTAGEM,
         )
         self._partida_salva = self._resultado_salvo.partida
         self._motivo_estado = self._resultado_salvo.motivo
@@ -194,6 +204,8 @@ class DueloDeConhecimento:
         self._job_timer = None
         self._job_aviso = None
         self._job_escala = None
+        self._job_contagem_visual = None
+        self._contagem_visual = None
         self._salvador = persistencia.AgendadorSalvamento(
             self._salvar_estado,
             self.root.after,
@@ -394,6 +406,11 @@ class DueloDeConhecimento:
         self.erro_carga = ""
         self._aviso_carga = None
         self._ultimo_seg_tick = None
+        self._ocultar_contagem(renderizar=False)
+        if self.fase == FASE_AGUARDANDO:
+            # Contagem desativada (0): a partida retomada já está valendo,
+            # então botões enfileirados não podem ganhar a rodada.
+            self.descartar_botoes_fila()
 
         if hasattr(self, "topo"):
             self.topo.tema = self.tema_atual
@@ -500,11 +517,16 @@ class DueloDeConhecimento:
         self.cartao_explic = CartaoExplicacao(palco)
         self.cartao_explic.grid(row=6, column=0, sticky="nsew", pady=(6, 0))
 
+        # Overlay fica dentro do palco central: os cartões de placar das
+        # equipes (colunas laterais) continuam visíveis durante a contagem.
+        self.overlay_contagem = OverlayContagem(palco)
+
         self.rodape = Rodape(r, height=84)
         self.rodape.grid(row=2, column=0, columnspan=3, sticky="ew", padx=P, pady=(0, 14))
 
         self.telas = [self.topo, self.cartao_a, self.cartao_b, self.barra,
-                      self.cartao_pergunta, *self.cartoes_alt, self.cartao_explic, self.rodape]
+                      self.cartao_pergunta, *self.cartoes_alt, self.cartao_explic,
+                      self.rodape, self.overlay_contagem]
 
     def _nome(self, letra):
         return NOME_A if letra == "A" else NOME_B
@@ -518,6 +540,8 @@ class DueloDeConhecimento:
                 return (self.erro_carga or "Aguardando seleção de tema de perguntas.", Cor.SUAVE)
             return (self.erro_carga or "Nenhuma pergunta válida carregada.", Cor.ERRO)
         q = self.quem_apertou
+        if self.fase == FASE_CONTAGEM:
+            return ("Contagem de largada: aguarde o JÁ! para apertar.", Cor.APOIO)
         if self.fase == FASE_AGUARDANDO:
             return ("Valendo! O primeiro a apertar o botão responde.", Cor.APOIO)
         if self.fase == FASE_RESPONDENDO:
@@ -534,6 +558,10 @@ class DueloDeConhecimento:
         """Desenha a tela inteira a partir do estado atual."""
         p = self.pergunta_atual
         revelado = self.fase in (FASE_REVELADA, FASE_PONTUADA)
+        em_contagem = self.fase == FASE_CONTAGEM
+        mostrar_pergunta = (
+            not em_contagem or self.jogo.mostrar_pergunta_na_contagem
+        )
 
         for cartao, letra, pts, outro in ((self.cartao_a, "A", self.placar_a, self.placar_b),
                                           (self.cartao_b, "B", self.placar_b, self.placar_a)):
@@ -547,10 +575,14 @@ class DueloDeConhecimento:
             cp.categoria, cp.texto, cp.numero = p.categoria, p.texto, self.numero
         else:
             cp.categoria, cp.texto, cp.numero = "", "Nenhuma pergunta carregada.", 0
-        cp.desenhar()
+        if mostrar_pergunta:
+            cp.grid()
+            cp.desenhar()
+        else:
+            cp.grid_remove()
 
         for i, c in enumerate(self.cartoes_alt):
-            if p and i < len(p.alternativas):
+            if p and i < len(p.alternativas) and mostrar_pergunta:
                 c.grid()
                 if revelado:
                     estado = "correta" if i == p.correta else "apagada"
@@ -564,8 +596,13 @@ class DueloDeConhecimento:
         self.cartao_explic.texto = p.explicacao if (p and revelado) else ""
         self.cartao_explic.desenhar()
 
+        self._sincronizar_contagem()
+
         msg, cor = (self.aviso, Cor.AVISO) if self.aviso else self._status_padrao()
-        self.rodape.msg, self.rodape.cor_msg, self.rodape.passo = msg, cor, self.fase
+        # -1 desmarca todos os passos: CONTAGEM é uma fase anterior a
+        # AGUARDANDO e não deve acender o passo "Aguardando".
+        passo = -1 if self.fase == FASE_CONTAGEM else self.fase + 1
+        self.rodape.msg, self.rodape.cor_msg, self.rodape.passo = msg, cor, passo
         self.rodape.desenhar()
 
     def avisar(self, texto):
@@ -596,6 +633,56 @@ class DueloDeConhecimento:
             self.root.after_cancel(self._job_aviso)
             self._job_aviso = None
         self.aviso = None
+
+    # -----------------------------------------------------
+    # CONTAGEM DE LARGADA — overlay e sons (a regra é do Jogo)
+    # -----------------------------------------------------
+    def _cancelar_contagem_visual(self):
+        job = getattr(self, "_job_contagem_visual", None)
+        if job:
+            self.root.after_cancel(job)
+            self._job_contagem_visual = None
+
+    def _mostrar_contagem(self, valor):
+        """Exibe o número no overlay central (sem cobrir o placar lateral)."""
+        self._cancelar_contagem_visual()
+        self._contagem_visual = str(valor)
+        overlay = self.overlay_contagem
+        overlay.valor = str(valor)
+        overlay.place(
+            relx=0.5,
+            rely=0.60,
+            anchor="center",
+            relwidth=0.72,
+            relheight=0.54,
+        )
+        overlay.lift()
+        overlay.desenhar()
+        if str(valor) == "JÁ!":
+            self._job_contagem_visual = self.root.after(
+                500, self._ocultar_contagem
+            )
+
+    def _ocultar_contagem(self, renderizar=True):
+        self._cancelar_contagem_visual()
+        self._contagem_visual = None
+        if hasattr(self, "overlay_contagem"):
+            self.overlay_contagem.place_forget()
+        if renderizar and getattr(self, "rodando", False):
+            self.render()
+
+    def _sincronizar_contagem(self):
+        """Mantém o overlay coerente com a fase (chamado pelo render)."""
+        if self.fase == FASE_CONTAGEM:
+            valor = str(self.jogo.contagem_numero())
+            if self._contagem_visual != valor:
+                self._mostrar_contagem(valor)
+        elif self._contagem_visual == "JÁ!":
+            # O "JÁ!" fica visível por alguns instantes; o job o remove e
+            # redesenha a pergunta.
+            pass
+        elif self._contagem_visual is not None:
+            self._ocultar_contagem(renderizar=False)
 
     def piscar(self, letra, n=5):
         cartao = self.cartao_a if letra == "A" else self.cartao_b
@@ -638,11 +725,21 @@ class DueloDeConhecimento:
 
     def _reiniciar_loop_timer(self):
         self._cancelar_job_timer()
-        if self.jogo.timer_ativo:
+        if self.jogo.contagem_ativa or self.jogo.timer_ativo:
             self._tick()
 
     def _tick(self):
         self._job_timer = None
+
+        if self.jogo.contagem_ativa:
+            eventos = self.jogo.tick_contagem()
+            if eventos:
+                self._despachar(eventos)  # número novo ou "largada"
+                return
+            self._atualizar_barra()
+            self._job_timer = self.root.after(100, self._tick)
+            return
+
         if not self.jogo.timer_ativo:
             return
 
@@ -664,6 +761,13 @@ class DueloDeConhecimento:
         if j.estado.pergunta_atual is None:
             return
         b = self.barra
+        if j.estado.fase == FASE_CONTAGEM:
+            b.rotulo = "Contagem de largada"
+            b.frac = j.contagem_fracao()
+            b.segundos = math.ceil(max(0.0, j.contagem_restante()))
+            b.cor = Cor.APOIO
+            b.desenhar()
+            return
         b.rotulo = j.timer_rotulo
         b.frac = j.timer_fracao()
         b.segundos = math.ceil(max(0.0, j.timer_restante_visual()))
@@ -706,7 +810,23 @@ class DueloDeConhecimento:
             elif ev == "proxima_pergunta":
                 self._limpar_aviso()
                 self._ultimo_seg_tick = None
+                self._ocultar_contagem(renderizar=False)
                 self.som.nova_pergunta()
+                if self.jogo.estado.fase == FASE_AGUARDANDO:
+                    # Contagem desativada: já estamos valendo; botões que
+                    # ficaram na fila da rodada anterior não podem ganhar.
+                    self.descartar_botoes_fila()
+            elif ev.startswith("contagem:"):
+                self._mostrar_contagem(ev.split(":", 1)[1])
+                self.som.contagem()
+            elif ev == "largada":
+                self._limpar_aviso()
+                self._ultimo_seg_tick = None
+                self._mostrar_contagem("JÁ!")
+                self.som.largada()
+                # Aperto durante a contagem não vale: remove os BTN_A/B que
+                # a thread serial enfileirou antes do "JÁ!".
+                self.descartar_botoes_fila()
             elif ev == "reiniciou_placar":
                 self._limpar_aviso()
             # "reiniciou_banco" e "led_reacender:*" só têm efeito serial/tela
@@ -774,6 +894,42 @@ class DueloDeConhecimento:
             pass
         if self.rodando:
             self.root.after(20, self.drenar_fila)
+
+    def descartar_botoes_fila(self):
+        """
+        Remove da fila serial os BTN_A/B ainda não processados.
+
+        Chamado ao entrar em AGUARDANDO (no "JÁ!" ou com a contagem
+        desativada). Outros eventos (conexão, placa, revelar, avançar) são
+        preservados na mesma ordem. Devolve quantos foram descartados.
+        """
+        mantidos = []
+        descartados = 0
+        while True:
+            try:
+                item = self.fila.get_nowait()
+            except queue.Empty:
+                break
+            if (
+                isinstance(item, tuple)
+                and len(item) >= 2
+                and item[0] == "evento"
+                and item[1] in ("BTN_A", "BTN_B", "BTN_C", "BTN_D")
+            ):
+                descartados += 1
+                continue
+            mantidos.append(item)
+
+        for item in mantidos:
+            self.fila.put(item)
+
+        if descartados:
+            log.info(
+                "Descartado(s) %d evento(s) de botão de equipe acumulado(s) "
+                "durante a contagem.",
+                descartados,
+            )
+        return descartados
 
     def processar_evento(self, evento):
         # Mapeamento linha-da-serial -> ação é uma função pura (protocolo.py)
@@ -843,6 +999,7 @@ class DueloDeConhecimento:
         # então este flush é no-op e não sobrescreve o estado salvo.
         self._salvador.executar_agora()
         self.rodando = False
+        self._cancelar_contagem_visual()
         self.serial_comm.parar()
         self.som.parar()
         trava = getattr(self, "_trava", None)

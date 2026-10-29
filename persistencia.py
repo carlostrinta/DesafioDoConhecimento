@@ -7,8 +7,8 @@ pasta do script.
 
 O arquivo guarda apenas o necessário para continuar a partida: versão do
 formato, tema/arquivo, placar, nomes, índice/rodada e a ordem do baralho.
-Fase e timer NÃO são restaurados: a pergunta atual volta em AGUARDANDO com o
-tempo cheio.
+Fase e timer NÃO são restaurados: a pergunta atual volta em CONTAGEM (Etapa
+4.6) ou em AGUARDANDO quando a contagem está desativada, com o tempo cheio.
 """
 
 from __future__ import annotations
@@ -293,6 +293,8 @@ def carregar(
     tempo_resposta: int | None = None,
     pontuar_apos_tempo: bool | None = None,
     num_equipes: int | None = None,
+    contagem_largada: int | None = None,
+    mostrar_pergunta_na_contagem: bool | None = None,
     diretorio_base: str | None = None,
     caminho: str | None = None,
 ) -> ResultadoCarga:
@@ -323,6 +325,8 @@ def carregar(
             tempo_resposta=tempo_resposta,
             pontuar_apos_tempo=pontuar_apos_tempo,
             num_equipes=num_equipes,
+            contagem_largada=contagem_largada,
+            mostrar_pergunta_na_contagem=mostrar_pergunta_na_contagem,
         )
     except Exception as exc:  # robustez: estado malformado nunca derruba o app
         return _falha(f"estado salvo inválido ({exc})", caminho_estado)
@@ -338,6 +342,8 @@ def _validar_e_montar(
     tempo_resposta: int | None,
     pontuar_apos_tempo: bool | None,
     num_equipes: int | None,
+    contagem_largada: int | None,
+    mostrar_pergunta_na_contagem: bool | None,
 ) -> ResultadoCarga:
     if not isinstance(dados, dict):
         return _falha("o arquivo não contém um objeto JSON válido", caminho_estado)
@@ -456,6 +462,10 @@ def _validar_e_montar(
         kwargs["tempo_resposta"] = tempo_resposta
     if pontuar_apos_tempo is not None:
         kwargs["pontuar_apos_tempo"] = pontuar_apos_tempo
+    if contagem_largada is not None:
+        kwargs["contagem_largada"] = contagem_largada
+    if mostrar_pergunta_na_contagem is not None:
+        kwargs["mostrar_pergunta_na_contagem"] = mostrar_pergunta_na_contagem
 
     jogo = Jogo.from_dict(dados_jogo, carga.perguntas, **kwargs)
     if jogo.estado.pergunta_atual is None:

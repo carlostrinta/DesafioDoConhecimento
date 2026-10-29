@@ -56,6 +56,8 @@ ARQUIVOS_SOM = {
     "tempo_esgotado": "tempo_esgotado",
     "tick": "tick",
     "tick_final": "tick_final",
+    "contagem": "contagem",
+    "largada": "largada",
     "vitoria": "vitoria",
     "troca_tema": "troca_tema",
 }
@@ -428,6 +430,16 @@ class Som:
                 )
             elif segundos <= 8:
                 self._tocar_evento("tick", ((740, 40),), interromper=False)
+
+    def contagem(self):
+        """Tick curto de cada número da contagem de largada (3, 2, 1)."""
+        self._tocar_evento("contagem", ((660, 60),))
+
+    def largada(self):
+        """Som do "JÁ!": distinto do tick e do sinal de nova pergunta."""
+        self._tocar_evento(
+            "largada", (("C5", 90), ("G5", 90), ("C6", 200))
+        )
 
     def vitoria(self):
         """Som de vitória/fim de partida (a tela de campeão é da Etapa 5)."""

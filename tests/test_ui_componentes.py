@@ -8,6 +8,11 @@ capturado **antes** da movimentação para `ui_componentes.py`.
 O golden é **opt-in** (`DESAFIO_GOLDEN_UI=1`) porque as métricas de fonte
 variam entre PCs e ele é uma guarda de refatoração local, não um teste de CI.
 O dump usa Tk de verdade; em ambiente sem display o teste é pulado.
+
+Na Etapa 4.6 foram acrescentados os casos `contagem_numero` e `contagem_ja`
+(overlay de largada). Os casos `barra_topo_*` são os mais sensíveis às
+métricas de fonte da máquina: se apenas eles divergirem, o layout de
+referência continua válido e não é preciso regenerar o arquivo inteiro.
 """
 
 import json
@@ -138,6 +143,20 @@ CASOS = [
         {"msg": "Ponto confirmado", "cor_msg": "#2BD99F", "passo": 3},
         1000,
         90,
+    ),
+    (
+        "contagem_numero",
+        "OverlayContagem",
+        {"valor": "3"},
+        700,
+        380,
+    ),
+    (
+        "contagem_ja",
+        "OverlayContagem",
+        {"valor": "JÁ!"},
+        700,
+        380,
     ),
 ]
 
@@ -285,6 +304,61 @@ def test_layout_dos_componentes_nao_mudou():
     atual = capturar_componentes(ui_componentes)
     esperado = json.loads(GOLDEN.read_text(encoding="utf-8"))
     assert atual == esperado
+
+
+def test_overlay_contagem_desenha_e_escala_com_a_janela():
+    import tkinter as tk
+
+    import ui_componentes as mod
+
+    try:
+        root = tk.Tk()
+    except tk.TclError as e:
+        pytest.skip(f"Tk indisponível: {e}")
+
+    escala_original = mod.ESCALA
+    try:
+        mod.definir_escala(1.0)
+        widget = mod.OverlayContagem(root)
+        widget.valor = "3"
+        widget.place(x=0, y=0, width=620, height=340)
+        root.update_idletasks()
+        widget.pintar(620, 340)
+        root.update_idletasks()
+
+        def tamanho_do_texto(texto):
+            item = next(
+                item for item in widget.find_all()
+                if widget.type(item) == "text"
+                and widget.itemcget(item, "text") == texto
+            )
+            return abs(int(widget.itemcget(item, "font").rsplit(" ", 2)[-2]))
+
+        pequeno = tamanho_do_texto("3")
+        mod.definir_escala(2.0)
+        widget.delete("all")
+        widget.pintar(620, 340)
+        root.update_idletasks()
+        grande = tamanho_do_texto("3")
+
+        assert grande > pequeno, "o número deve crescer com ESCALA"
+
+        mod.definir_escala(1.0)
+        widget.valor = "JÁ!"
+        widget.delete("all")
+        widget.pintar(620, 340)
+        root.update_idletasks()
+        assert tamanho_do_texto("JÁ!") > 0
+
+        # O overlay é desenhado dentro do próprio Canvas, sem invadir as
+        # coordenadas externas (o placar fica nas colunas laterais da janela).
+        for item in widget.find_all():
+            x1, y1, x2, y2 = widget.bbox(item)
+            assert 0 <= x1 and 0 <= y1
+            assert x2 <= 620 and y2 <= 340
+    finally:
+        mod.definir_escala(escala_original)
+        root.destroy()
 
 
 def test_modulo_visual_nao_importa_logica_de_jogo():

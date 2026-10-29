@@ -1902,5 +1902,211 @@
    "anchor": "center",
    "justify": "left"
   }
+ ],
+ "contagem_numero": [
+  {
+   "tipo": "polygon",
+   "coords": [
+    29.0,
+    3.0,
+    29.0,
+    3.0,
+    671.0,
+    3.0,
+    671.0,
+    3.0,
+    697.0,
+    3.0,
+    697.0,
+    29.0,
+    697.0,
+    29.0,
+    697.0,
+    351.0,
+    697.0,
+    351.0,
+    697.0,
+    377.0,
+    671.0,
+    377.0,
+    671.0,
+    377.0,
+    29.0,
+    377.0,
+    29.0,
+    377.0,
+    3.0,
+    377.0,
+    3.0,
+    351.0,
+    3.0,
+    351.0,
+    3.0,
+    29.0,
+    3.0,
+    29.0,
+    3.0,
+    3.0
+   ],
+   "fill": "#121A33",
+   "outline": "#B9A8FF",
+   "width": "3.0",
+   "smooth": "true"
+  },
+  {
+   "tipo": "text",
+   "coords": [
+    350.0,
+    49.4
+   ],
+   "fill": "#8F9BC4",
+   "width": "0",
+   "text": "CONTAGEM DE LARGADA",
+   "font": "{Segoe UI} 14 normal",
+   "anchor": "center",
+   "justify": "left"
+  },
+  {
+   "tipo": "text",
+   "coords": [
+    354.0,
+    201.6
+   ],
+   "fill": "#050A18",
+   "width": "0",
+   "text": "3",
+   "font": "Bahnschrift 180 bold",
+   "anchor": "center",
+   "justify": "left"
+  },
+  {
+   "tipo": "text",
+   "coords": [
+    350.0,
+    197.6
+   ],
+   "fill": "#B9A8FF",
+   "width": "0",
+   "text": "3",
+   "font": "Bahnschrift 180 bold",
+   "anchor": "center",
+   "justify": "left"
+  },
+  {
+   "tipo": "text",
+   "coords": [
+    350.0,
+    334.4
+   ],
+   "fill": "#8F9BC4",
+   "width": "0",
+   "text": "Aguarde o JÁ! para apertar.",
+   "font": "{Segoe UI} 18 bold",
+   "anchor": "center",
+   "justify": "left"
+  }
+ ],
+ "contagem_ja": [
+  {
+   "tipo": "polygon",
+   "coords": [
+    29.0,
+    3.0,
+    29.0,
+    3.0,
+    671.0,
+    3.0,
+    671.0,
+    3.0,
+    697.0,
+    3.0,
+    697.0,
+    29.0,
+    697.0,
+    29.0,
+    697.0,
+    351.0,
+    697.0,
+    351.0,
+    697.0,
+    377.0,
+    671.0,
+    377.0,
+    671.0,
+    377.0,
+    29.0,
+    377.0,
+    29.0,
+    377.0,
+    3.0,
+    377.0,
+    3.0,
+    351.0,
+    3.0,
+    351.0,
+    3.0,
+    29.0,
+    3.0,
+    29.0,
+    3.0,
+    3.0
+   ],
+   "fill": "#121A33",
+   "outline": "#B9A8FF",
+   "width": "3.0",
+   "smooth": "true"
+  },
+  {
+   "tipo": "text",
+   "coords": [
+    350.0,
+    49.4
+   ],
+   "fill": "#8F9BC4",
+   "width": "0",
+   "text": "CONTAGEM DE LARGADA",
+   "font": "{Segoe UI} 14 normal",
+   "anchor": "center",
+   "justify": "left"
+  },
+  {
+   "tipo": "text",
+   "coords": [
+    354.0,
+    201.6
+   ],
+   "fill": "#050A18",
+   "width": "0",
+   "text": "JÁ!",
+   "font": "Bahnschrift 111 bold",
+   "anchor": "center",
+   "justify": "left"
+  },
+  {
+   "tipo": "text",
+   "coords": [
+    350.0,
+    197.6
+   ],
+   "fill": "#2BD99F",
+   "width": "0",
+   "text": "JÁ!",
+   "font": "Bahnschrift 111 bold",
+   "anchor": "center",
+   "justify": "left"
+  },
+  {
+   "tipo": "text",
+   "coords": [
+    350.0,
+    334.4
+   ],
+   "fill": "#EAF0FF",
+   "width": "0",
+   "text": "Valendo! O primeiro a apertar responde.",
+   "font": "{Segoe UI} 18 bold",
+   "anchor": "center",
+   "justify": "left"
+  }
  ]
 }

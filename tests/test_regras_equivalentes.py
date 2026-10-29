@@ -50,6 +50,7 @@ def jogo(perguntas_exemplo, relogio):
         tempo_pergunta=30,
         tempo_resposta=15,
         clock=relogio,
+        contagem_largada=0,
     )
 
 

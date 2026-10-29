@@ -31,7 +31,7 @@ class TestProtocoloSerial:
 
     def test_mapeamento_evento_para_acao_real(self, perguntas_exemplo):
         """Testa a função pura mapear_evento_arduino (sem UI, sem serial)."""
-        j = Jogo(perguntas_exemplo, num_equipes=2)
+        j = Jogo(perguntas_exemplo, num_equipes=2, contagem_largada=0)
 
         # BTN_A -> apertar_botao("A")
         assert mapear_evento_arduino("BTN_A", j) == ["apertou:A"]
@@ -53,16 +53,16 @@ class TestProtocoloSerial:
         assert j.estado.fase == 0  # FASE_AGUARDANDO
 
     def test_PRONTO_reacende_led_se_quem_apertou(self, perguntas_exemplo):
-        j = Jogo(perguntas_exemplo, num_equipes=2)
+        j = Jogo(perguntas_exemplo, num_equipes=2, contagem_largada=0)
         j.apertar_botao("A")
         assert mapear_evento_arduino("PRONTO", j) == ["led_reacender:A"]
 
     def test_PRONTO_sem_quem_apertou(self, perguntas_exemplo):
-        j = Jogo(perguntas_exemplo, num_equipes=2)
+        j = Jogo(perguntas_exemplo, num_equipes=2, contagem_largada=0)
         assert mapear_evento_arduino("PRONTO", j) == []
 
     def test_evento_desconhecido_retorna_vazio(self, perguntas_exemplo):
-        j = Jogo(perguntas_exemplo, num_equipes=2)
+        j = Jogo(perguntas_exemplo, num_equipes=2, contagem_largada=0)
         assert mapear_evento_arduino("XYZ", j) == []
 
     def test_comandos_para_arduino_mapeia_eventos(self):
