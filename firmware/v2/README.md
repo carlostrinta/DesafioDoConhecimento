@@ -1,8 +1,9 @@
 # Firmware v2 — produção
 
-**Status: EM VALIDAÇÃO.** O firmware só será liberado depois da validação
-física no Arduino Uno e do teste do aplicativo com 4 equipes. O roteiro está
-em [`ROTEIRO_VALIDACAO.md`](ROTEIRO_VALIDACAO.md).
+**Status: validado no Arduino Uno e no Mega 2560.** O clone CH340 ainda não
+foi testado com o firmware v2 e permanece como pendência explícita. O roteiro,
+o resultado e os critérios estão em
+[`ROTEIRO_VALIDACAO.md`](ROTEIRO_VALIDACAO.md).
 
 O firmware v2 usa os **10 botões em D2–D11** e não usa LEDs nem buzzer. O
 feedback visual e sonoro fica no aplicativo; isso libera todos os pinos
@@ -67,12 +68,14 @@ linhas que estouram o buffer são descartadas até o próximo `\n`.
 | v2 | v1 | PC v2 detecta v1, limita a 2 equipes e preserva o caminho v1 (LEDs/buzzer) |
 | v2 | v2 | 2 a 4 equipes; `CONFIG_TEAMS` + ACK `EQUIPES N`; sem comandos de LED/buzzer |
 
-O caminho PC v2 + firmware v2 está **em validação** até a confirmação do Carlos.
+O caminho PC v2 + firmware v2 foi validado no **Arduino Uno e no Mega 2560**.
+O clone CH340 com v2 ainda não foi testado; se o `PRONTO` demorar mais de 3 s
+após o reset por DTR, aumente `serial.timeout_pronto` no `config.json`.
 
 ## Como gravar
 
 1. Abra [`duelo_v2/duelo_v2.ino`](duelo_v2/duelo_v2.ino) na Arduino IDE.
-2. Selecione **Arduino Uno** e a porta correta.
+2. Selecione **Arduino Uno** ou **Arduino Mega 2560** e a porta correta.
 3. Faça o upload e feche o Monitor Serial antes de abrir o jogo.
 4. O aplicativo deve mostrar o status de Arduino conectado e reconhecer
    `VERSAO 2`.
@@ -80,11 +83,15 @@ O caminho PC v2 + firmware v2 está **em validação** até a confirmação do C
 ## Validação
 
 O roteiro completo, incluindo a matriz PC v1/v2 × firmware v1/v2, está em
-[`ROTEIRO_VALIDACAO.md`](ROTEIRO_VALIDACAO.md). A bancada de 10 botões foi
-validada separadamente; o firmware v2 de produção ainda precisa passar pelo
-roteiro com o aplicativo antes da liberação.
+[`ROTEIRO_VALIDACAO.md`](ROTEIRO_VALIDACAO.md). A validação foi concluída no
+**Arduino Uno** e no **Mega 2560**; a bancada de 10 botões também foi validada
+separadamente.
 
-Critérios de aceite:
+O **clone CH340** com v2 é a única pendência de placa. Se o `PRONTO` demorar
+mais de 3 s após o reset por DTR, aumente `serial.timeout_pronto` no
+`config.json`.
+
+Critérios de aceite confirmados:
 
 - os 10 botões são lidos nos pinos D2–D11;
 - `CONFIG_TEAMS 2`, `3` e `4` respondem `EQUIPES N`;
@@ -93,3 +100,10 @@ Critérios de aceite:
 - o PC v2 envia `CONFIG_TEAMS N`, confirma o ACK e não envia LED/BEEP/RESET;
 - reconexão/reset por DTR reenvia `CONFIG_TEAMS N`;
 - a fronteira da contagem não aceita apertos anteriores ao `JÁ!`.
+
+## Limitações
+
+A ordem de chegada das equipes é definida pela **recepção no PC**. O firmware
+não envia timestamp de pressionamento; em empates muito próximos, a ordem pode
+depender do buffer e da porta serial. Para um v3, a sugestão é enviar um
+contador de pressão por botão no firmware e usá-lo como critério de desempate.

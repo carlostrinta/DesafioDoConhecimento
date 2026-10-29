@@ -52,16 +52,18 @@ nos pinos D2–D11, `CONFIG_TEAMS 2/3/4` respondeu `EQUIPES N`, os valores
 inválidos responderam `ERRO EQUIPES` e o debounce de 60 ms não repetiu evento
 com o botão mantido.
 
-## Critério para liberar o v2 de produção (pendente)
+## Liberação do v2 de produção (Uno e Mega; CH340 pendente)
 
-O firmware v2 de produção só deve ser liberado depois que:
+O firmware v2 de produção foi validado no **Arduino Uno** e no **Mega 2560**:
 
-- os 10 botões forem confirmados no firmware de produção;
-- `CONFIG_TEAMS 2`, `3` e `4` responderem `EQUIPES N`;
-- `CONFIG_TEAMS 5`, `X`, `22` e vazio responderem `EQUIPES <atual>`;
-- o debounce de 60 ms não produzir eventos repetidos com o botão mantido;
-- o aplicativo com 4 equipes confirmar o ACK, o reset por DTR e a ausência de
+- os 10 botões foram confirmados no firmware de produção;
+- `CONFIG_TEAMS 2`, `3` e `4` responderam `EQUIPES N`;
+- `CONFIG_TEAMS 5`, `X`, `22` e vazio responderam `EQUIPES <atual>`;
+- o debounce de 60 ms não produziu eventos repetidos com o botão mantido;
+- o aplicativo com 4 equipes confirmou o ACK, o reset por DTR e a ausência de
   comandos de LED/buzzer.
 
-O roteiro completo do v2 está em
+O **clone CH340** com firmware v2 ainda não foi testado. Se o `PRONTO` demorar
+mais de 3 s após o reset por DTR, aumente `serial.timeout_pronto` no
+`config.json`. O roteiro completo do v2 está em
 [`../v2/ROTEIRO_VALIDACAO.md`](../v2/ROTEIRO_VALIDACAO.md).

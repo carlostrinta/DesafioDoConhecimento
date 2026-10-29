@@ -38,27 +38,29 @@ Os testes automatizados usam portas falsas. **Só o hardware real valida:**
 | 11 | Repita 1–10 no **`Desafio do Conhecimento.exe`** | mesmo resultado |
 | 12 | Abra o app **sem placa** e deixe 1 min | console sem varredura infinita de portas; CPU baixa |
 
-## Firmware v2 (em validação)
+## Firmware v2 (validado no Uno e Mega 2560; CH340 pendente)
 
-O firmware v2 de produção ainda **não foi liberado**. O roteiro completo, com
-a matriz PC v1/v2 × firmware v1/v2, está em
+O firmware v2 de produção foi **validado no Arduino Uno e no Mega 2560**. O
+roteiro completo, com a matriz PC v1/v2 × firmware v1/v2, está em
 [`firmware/v2/ROTEIRO_VALIDACAO.md`](firmware/v2/ROTEIRO_VALIDACAO.md). A
-bancada de 10 botões já foi validada separadamente em
+bancada de 10 botões também foi validada separadamente em
 [`firmware/bancada_botoes/README.md`](firmware/bancada_botoes/README.md).
 
-Resumo do que precisa ser confirmado com o firmware v2 gravado:
+Resumo do que foi confirmado com o firmware v2 gravado:
 
-1. Abra o app e confira o log: o Arduino deve enviar `PRONTO` e `VERSAO 2`.
+1. O app recebe `PRONTO` e `VERSAO 2` no log.
 2. Com 4 equipes, o app envia `CONFIG_TEAMS 4` e o Arduino responde
-   `EQUIPES 4`; sem ACK, deve haver uma retentativa e aviso visível.
-3. Teste A/B/C/D, acertos A/B/C/D, `AVANÇAR` e `REVELAR` nos pinos D2–D11.
-4. Em um teste separado, com o app fechado, use o Monitor Serial para enviar
-   `CONFIG_TEAMS 2` e confirme que C/D deixam de gerar eventos; envie
-   `CONFIG_TEAMS 5` e confira `EQUIPES <atual>`.
-5. O v2 não tem LEDs nem buzzer: o feedback visual/sonoro deve continuar no PC
-   e o PC v2 não deve enviar `LED_*`, `BEEP*`, `BUZZER_*` nem `RESET`.
-6. Repita a reconexão (tirar/voltar o cabo), o reset por DTR no meio da rodada
-   e o fechamento do app.
+   `EQUIPES 4`; sem ACK, há uma retentativa e aviso visível.
+3. A/B/C/D, acertos A/B/C/D, `AVANÇAR` e `REVELAR` respondem nos pinos D2–D11.
+4. Com o app fechado, o Monitor Serial confirma `CONFIG_TEAMS 2` (C/D deixam
+   de gerar eventos) e `CONFIG_TEAMS 5` (`EQUIPES <atual>`).
+5. O v2 não tem LEDs nem buzzer: o feedback visual/sonoro fica no PC e o PC v2
+   não envia `LED_*`, `BEEP*`, `BUZZER_*` nem `RESET`.
+6. Reconexão, reset por DTR no meio da rodada e fechamento do app foram
+   testados.
+
+O **clone CH340** com firmware v2 continua pendente. Se o `PRONTO` demorar mais
+de 3 s após o reset por DTR, aumente `serial.timeout_pronto` no `config.json`.
 
 ## Se algo falhar
 

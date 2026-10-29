@@ -1,16 +1,18 @@
 # Desafio do Conhecimento
 
 Jogo de perguntas e respostas para **2 a 4 equipes**, com interface desktop em
-Python/tkinter e botões físicos opcionais no **Arduino Uno**. A equipe que
-apertar primeiro ganha a vez de responder; o tempo controla a rodada e o placar
-fica visível na tela.
+Python/tkinter e botões físicos opcionais no **Arduino Uno ou Mega 2560**. A
+equipe que apertar primeiro ganha a vez de responder; o tempo controla a rodada
+e o placar fica visível na tela.
 
-**Versão atual: 2.7.0** — os metadados oficiais ficam em
+**Versão atual: 2.8.0** — os metadados oficiais ficam em
 [`versao.py`](versao.py). A tela **Sobre** pode ser aberta com `F1`.
 
-> **Estado do hardware:** a parte Python já aceita 2, 3 ou 4 equipes pelo
-> teclado. O firmware/protocolo v1 do Arduino atende 2 equipes; o protocolo v2
-> (4 equipes e botões C/D) está **EM VALIDAÇÃO**. O sketch de bancada em
+> **Estado do hardware:** a parte Python aceita 2, 3 ou 4 equipes pelo teclado.
+> O firmware/protocolo v1 do Arduino atende 2 equipes; o protocolo v2 (4 equipes
+> e botões C/D) foi **validado no Arduino Uno e no Mega 2560**. O clone CH340
+> ainda **não foi testado com o firmware v2** — é uma pendência explícita. O
+> sketch de bancada em
 > [`firmware/bancada_botoes`](firmware/bancada_botoes/bancada_botoes.ino)
 > registra o teste dos 10 botões e do parser de `CONFIG_TEAMS`; o roteiro do
 > firmware de produção está em
@@ -112,7 +114,7 @@ o `JÁ!`.
 
 Para montar a bancada completa de **10 botões** (teclado físico para 4 equipes):
 
-- 1 **Arduino Uno** (original ou clone CH340/CH341);
+- 1 **Arduino Uno** (original ou clone CH340/CH341) ou **Arduino Mega 2560**;
 - 10 botões de pressão (push buttons) momentâneos;
 - 1 protoboard grande ou placa de montagem;
 - jumpers macho-macho;
@@ -122,6 +124,10 @@ Para montar a bancada completa de **10 botões** (teclado físico para 4 equipes
 
 Para o firmware v1 original bastam **6 botões** (A, B, Avançar, Acerto A,
 Acerto B e Revelar), 2 LEDs e o buzzer.
+
+> **Placas validadas no v2:** Arduino Uno e Mega 2560. O clone CH340 ainda não
+> foi testado com o firmware v2; se o `PRONTO` demorar mais de 3 s após o reset
+> por DTR, aumente `serial.timeout_pronto` no `config.json`.
 
 > **Alimentação:** use o Arduino alimentado pelo USB. Não ligue os botões em
 > tensões externas. Os pinos digitais do Uno trabalham em 5 V.
@@ -202,14 +208,18 @@ Para gravar: abra o `.ino` na Arduino IDE, selecione a placa **Arduino Uno** e
 a porta correta e clique em **Upload**. Depois feche o Monitor Serial antes de
 abrir o jogo.
 
-### Firmware v2 de produção (em validação)
+### Firmware v2 de produção (validado no Uno e Mega 2560)
 
 O firmware v2 fica em
 [`firmware/v2/duelo_v2/duelo_v2.ino`](firmware/v2/duelo_v2/duelo_v2.ino)
 e usa o mesmo mapa de 10 botões em `D2–D11`. Ele **não usa LEDs nem buzzer**:
 o feedback fica no aplicativo. O handshake é `PRONTO` + `VERSAO 2`; depois o
-Python envia `CONFIG_TEAMS N` e espera o ACK `EQUIPES N`. **A validação física
-e o teste do aplicativo ainda estão pendentes.**
+Python envia `CONFIG_TEAMS N` e espera o ACK `EQUIPES N`. A validação física e
+o teste do aplicativo foram concluídos no **Arduino Uno e no Mega 2560**.
+
+O **clone CH340** com firmware v2 continua como pendência explícita. Se o
+`PRONTO` demorar mais de 3 s após o reset por DTR, aumente
+`serial.timeout_pronto` no `config.json`.
 
 | Comando | Resposta |
 | --- | --- |
@@ -237,7 +247,7 @@ versionado. O arquivo de versão do PyInstaller (`versao_info.txt`) lê os dados
 de `versao.py` e grava no `.exe`:
 
 - nome do produto: **Desafio do Conhecimento**;
-- versão: **2.7.0**;
+- versão: **2.8.0**;
 - autor/empresa: **Carlos Santos**;
 - copyright: **Copyright (c) 2026 Carlos Santos**.
 
@@ -280,7 +290,7 @@ script, se não houver permissão de escrita).
 | `firmware/README.md` | índice dos sketches e ordem de validação |
 | `firmware/v1/duelo_arduino_v1/` | firmware v1 congelado (ponto de retorno) |
 | `firmware/bancada_botoes/` | sketch e roteiro de validação dos 10 botões |
-| `firmware/v2/duelo_v2/` | firmware v2 em validação (10 botões, 4 equipes, sem LEDs/buzzer) |
+| `firmware/v2/duelo_v2/` | firmware v2 validado no Uno/Mega (10 botões, 4 equipes, sem LEDs/buzzer) |
 | `sons/` | documentação de áudio e registro de licenças |
 | `tests/` | suíte de testes pytest |
 | `Desafio do Conhecimento.spec` | receita de build do PyInstaller |
@@ -351,8 +361,9 @@ revisão de perguntas e melhorias de acessibilidade.
 2. Faça um fork, crie uma branch curta (`fix/...` ou `feat/...`) e mantenha o
    estilo e os nomes já usados no projeto.
 3. Rode `python -m pytest -q` antes de abrir o pull request.
-4. Para mudanças de hardware/firmware, valide na **Arduino Uno** usando
-   `firmware/bancada_botoes` e descreva a placa, o driver e a porta testada.
+4. Para mudanças de hardware/firmware, valide no **Arduino Uno ou Mega 2560**
+   usando `firmware/bancada_botoes` e descreva a placa, o driver e a porta
+   testada.
 5. No pull request, explique **o que mudou**, **como testar** e quais
    limitações permanecem.
 
@@ -407,7 +418,7 @@ Se você redistribuir o jogo, mantenha os arquivos `LICENSE`,
 - [`firmware/v2/README.md`](firmware/v2/README.md) — pinagem, protocolo e
   status do firmware v2.
 - [`firmware/v2/ROTEIRO_VALIDACAO.md`](firmware/v2/ROTEIRO_VALIDACAO.md) —
-  roteiro físico e matriz PC × firmware antes da liberação.
+  roteiro físico, matriz PC × firmware, placas validadas e pendência do CH340.
 - [`LICENCA_PERGUNTAS.md`](LICENCA_PERGUNTAS.md) — licença dos bancos de
   perguntas.
 
@@ -416,16 +427,21 @@ Se você redistribuir o jogo, mantenha os arquivos `LICENSE`,
 ## Limitações conhecidas
 
 - Com firmware v1 (ou sem handshake), a partida cai para **2 equipes** com
-  aviso. Enquanto o firmware v2 está em validação, 3/4 equipes com botões
-  físicos dependem da liberação dele.
+  aviso; 3/4 equipes com botões físicos usam o firmware v2.
+- O firmware v2 foi validado no **Arduino Uno e no Mega 2560**. O clone CH340
+  com v2 ainda é pendência; se o `PRONTO` demorar mais de 3 s após o reset por
+  DTR, aumente `serial.timeout_pronto`.
 - No modo teclado puro, 3/4 equipes já funcionam.
 - `eletrotecnica.json` e `radiologia.json` têm 20 perguntas cada: o baralho
   reinicia rápido.
 - A partida salva retoma a pergunta atual; fase e tempo restante não são
   restaurados.
-- O firmware v2 está em validação no Arduino Uno; o v1 continua na pasta
-  `firmware/v1` como ponto de retorno.
+- A ordem de chegada é definida pela **recepção no PC**; o firmware não envia
+  timestamp de pressionamento. Em empates muito próximos, a ordem pode
+  depender do buffer e da porta serial. Para um v3, a sugestão é enviar um
+  contador de pressão por botão no firmware.
+- O v1 continua na pasta `firmware/v1` como ponto de retorno.
 
 ---
 
-**Autor:** Carlos Santos · **Versão:** 2.7.0 · **Licença do código:** MIT
+**Autor:** Carlos Santos · **Versão:** 2.8.0 · **Licença do código:** MIT
