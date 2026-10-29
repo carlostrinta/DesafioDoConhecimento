@@ -48,12 +48,13 @@ class TravaFalsa:
 class SerialFalsa:
     def __init__(self, fila, log=None):
         self.fila = fila
+        self.enviados = []
 
     def iniciar(self):
         return None
 
     def enviar(self, comando):
-        return None
+        self.enviados.append(comando)
 
     def parar(self):
         return None
@@ -192,6 +193,8 @@ def montar_app(tmp_path, monkeypatch, raiz_tk):
             "_job_aviso",
             "_job_escala",
             "_job_contagem_visual",
+            "_job_versao",
+            "_job_equipes",
         ):
             job = getattr(app, atributo, None)
             if job:
@@ -378,7 +381,7 @@ def test_protocolo_sem_suporte_limita_para_duas_e_avisa(
     assert len(app.rodape.msg) > 0
 
 
-def test_protocolo_v2_mantem_quatro_equipes(montar_app):
+def test_protocolo_v2_mantem_quatro_equipes_e_pede_config(montar_app):
     montar, _banco = montar_app
     app, root, _relogio = montar(num_equipes=4)
 
@@ -394,6 +397,70 @@ def test_protocolo_v2_mantem_quatro_equipes(montar_app):
     assert app.jogo.num_equipes == 4
     assert set(app.cartoes_placar) == {"A", "B", "C", "D"}
     assert app.topo.aviso_protocolo == ""
+    assert app.serial_comm.enviados == ["CONFIG_TEAMS 4"]
+    assert app._job_equipes is not None
+
+    app.processar_evento("EQUIPES 4")
+    root.update()
+    assert app.protocolo_arduino == "v2"
+    assert app._job_equipes is None
+
+
+@pytest.mark.parametrize("ack", ["EQUIPES 5", "EQUIPES X", "ERRO EQUIPES"])
+def test_ack_invalido_de_equipes_cai_para_duas(montar_app, ack):
+    montar, _banco = montar_app
+    app, root, _relogio = montar(num_equipes=4)
+
+    app.processar_evento("VERSAO 2")
+    root.update()
+    assert app._job_equipes is not None
+
+    app.processar_evento(ack)
+    root.update()
+
+    assert app.protocolo_arduino == "sem_handshake"
+    assert app.jogo.num_equipes == 2
+    assert set(app.cartoes_placar) == {"A", "B"}
+    assert app._job_equipes is None
+
+
+def test_timeout_do_ack_de_equipes_cai_para_duas(montar_app):
+    montar, _banco = montar_app
+    relogio = Relogio()
+    app, root, _relogio = montar(
+        num_equipes=4, relogio_protocolo=relogio
+    )
+
+    app.processar_evento("VERSAO 2")
+    root.update()
+    assert app.serial_comm.enviados == ["CONFIG_TEAMS 4"]
+
+    relogio.avancar(desafio.TIMEOUT_PRONTO)
+    app._confirmar_equipes()
+    root.update()
+
+    assert app.protocolo_arduino == "sem_handshake"
+    assert app.jogo.num_equipes == 2
+    assert app._job_equipes is None
+
+
+def test_eventos_seriais_c_d_acionam_e_pontuam(montar_app):
+    montar, banco = montar_app
+    app, root, _relogio = montar(num_equipes=4)
+    _escolher_tema(app, root, banco)
+
+    app.processar_evento("BTN_C")
+    root.update()
+    assert app.fase == FASE_RESPONDENDO
+    assert app.quem_apertou == "C"
+
+    app.processar_evento("BTN_REVELAR")
+    root.update()
+    assert app.fase == FASE_REVELADA
+
+    app.processar_evento("BTN_ACERTO_C")
+    root.update()
+    assert app.jogo.placar["C"] == 1
 
 
 def test_pronto_sem_versao_cai_para_v1(montar_app):

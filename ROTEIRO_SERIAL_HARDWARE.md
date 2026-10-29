@@ -38,10 +38,28 @@ Os testes automatizados usam portas falsas. **Só o hardware real valida:**
 | 11 | Repita 1–10 no **`Desafio do Conhecimento.exe`** | mesmo resultado |
 | 12 | Abra o app **sem placa** e deixe 1 min | console sem varredura infinita de portas; CPU baixa |
 
+## Firmware v2 (validação concluída)
+
+O v2 foi validado no Arduino Uno em 29/10/2026. O roteiro da bancada está em
+[`firmware/bancada_botoes/README.md`](firmware/bancada_botoes/README.md).
+
+Para repetir a validação com o firmware v2 gravado:
+
+1. Abra o app e confira o log: o Arduino deve enviar `PRONTO` e `VERSAO 2`.
+2. Com 4 equipes, o app envia `CONFIG_TEAMS 4` e o Arduino responde
+   `EQUIPES 4`.
+3. Teste A/B/C/D, acertos A/B/C/D, `AVANÇAR` e `REVELAR`.
+4. Em um teste separado, com o app fechado, use o Monitor Serial para enviar
+   `CONFIG_TEAMS 2` e confirme que C/D deixam de gerar eventos; envie
+   `CONFIG_TEAMS 5` e confira `ERRO EQUIPES`.
+5. O v2 não tem LEDs nem buzzer: o feedback visual/sonoro deve continuar no PC.
+6. Repita a reconexão (tirar/voltar o cabo) e o fechamento do app.
+
 ## Se algo falhar
 
 - Porta certa, mas o app não conecta: confira se o firmware manda `PRONTO`
-  no `setup()` (protocolo v1) e se o monitor serial está fechado.
+  no `setup()` (v1) e `PRONTO` + `VERSAO 2` (v2), e se o monitor serial está
+  fechado.
 - Porta fixa: em `config.py`, `PORTA_FORCADA = "COM6"` (tentada primeiro,
   mas ainda exige `PRONTO`).
 - Driver: no Gerenciador de Dispositivos, desinstale a porta e reconecte.

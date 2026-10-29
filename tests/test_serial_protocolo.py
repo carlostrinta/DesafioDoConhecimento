@@ -5,10 +5,16 @@ import pytest
 from protocolo import (
     mapear_evento_arduino,
     comandos_para_arduino,
+    comando_config_equipes,
+    equipes_confirmadas,
     todos_eventos_v1,
     todos_comandos_v1,
+    todos_eventos_v2,
+    todos_comandos_v2,
     EVENTOS_ARDUINO_PC_V1,
     COMANDOS_PC_ARDUINO_V1,
+    EVENTOS_ARDUINO_PC_V2,
+    COMANDOS_PC_ARDUINO_V2,
 )
 from jogo import Jogo
 from perguntas import Pergunta
@@ -79,11 +85,61 @@ class TestProtocoloSerial:
         assert comandos_para_arduino(["apertou:A", "pontuou:A"]) == ["LED_A_ON", "BEEP", "BEEP_LONG"]
 
     def test_botoes_equipes_3_4_nao_existem_no_protocolo_v1(self):
-        """Documentação: BTN_C, BTN_D, BTN_ACERTO_C, BTN_ACERTO_D
-        serão adicionados na Etapa 5 com protocolo v2."""
+        """O v1 continua restrito a A/B; C/D só existem no v2."""
         eventos_v1 = set(EVENTOS_ARDUINO_PC_V1)
         assert "BTN_C" not in eventos_v1
+        assert "BTN_D" not in eventos_v1
         assert "BTN_ACERTO_C" not in eventos_v1
+        assert "BTN_ACERTO_D" not in eventos_v1
+
+    def test_eventos_v2_adicionam_botoes_e_handshake(self):
+        assert todos_eventos_v2() == todos_eventos_v1() | {
+            "BTN_C", "BTN_D", "BTN_ACERTO_C", "BTN_ACERTO_D",
+            "VERSAO 2", "EQUIPES N", "ERRO EQUIPES",
+        }
+        assert {
+            "BTN_C", "BTN_D", "BTN_ACERTO_C", "BTN_ACERTO_D",
+        } <= set(EVENTOS_ARDUINO_PC_V2)
+
+    def test_comandos_v2_incluem_leds_c_d_e_config(self):
+        assert todos_comandos_v2() == todos_comandos_v1() | {
+            "LED_C_ON", "LED_C_OFF", "LED_D_ON", "LED_D_OFF",
+            "CONFIG_TEAMS N",
+        }
+        assert "LED_C_ON" in COMANDOS_PC_ARDUINO_V2
+        assert "LED_D_OFF" in COMANDOS_PC_ARDUINO_V2
+
+    def test_mapeamento_c_d_no_jogo_de_quatro_equipes(self, perguntas_exemplo):
+        j = Jogo(perguntas_exemplo, num_equipes=4, contagem_largada=0)
+
+        assert mapear_evento_arduino("BTN_C", j) == ["apertou:C"]
+        assert j.estado.quem_apertou == "C"
+        assert mapear_evento_arduino("BTN_D", j) == []
+        assert mapear_evento_arduino("BTN_REVELAR", j) == ["revelou"]
+        assert mapear_evento_arduino("BTN_ACERTO_C", j) == ["pontuou:C"]
+        assert j.placar["C"] == 1
+
+    def test_c_d_ignorados_quando_a_partida_tem_duas_equipes(
+        self, perguntas_exemplo
+    ):
+        j = Jogo(perguntas_exemplo, num_equipes=2, contagem_largada=0)
+        assert mapear_evento_arduino("BTN_C", j) == []
+        assert j.estado.quem_apertou is None
+
+    def test_comandos_para_arduino_c_d(self):
+        assert comandos_para_arduino(["apertou:C"]) == ["LED_C_ON", "BEEP"]
+        assert comandos_para_arduino(["apertou:D"]) == ["LED_D_ON", "BEEP"]
+        assert comandos_para_arduino(["led_reacender:C"]) == ["LED_C_ON"]
+
+    def test_configuracao_de_equipes(self):
+        assert comando_config_equipes(2) == "CONFIG_TEAMS 2"
+        assert comando_config_equipes(4) == "CONFIG_TEAMS 4"
+        assert equipes_confirmadas("EQUIPES 2") == 2
+        assert equipes_confirmadas("EQUIPES 4") == 4
+        assert equipes_confirmadas("EQUIPES 5") is None
+        assert equipes_confirmadas("EQUIPES X") is None
+        assert equipes_confirmadas("EQUIPES 22") is None
+        assert equipes_confirmadas("OUTRA COISA") is None
 
 
 class TestProtocoloHeadless:
