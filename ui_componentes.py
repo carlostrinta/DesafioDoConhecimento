@@ -32,10 +32,21 @@ class Cor:
     APAGADO = "#56628F"
     A = "#3BA3FF"
     B = "#FF8F3F"
+    C = "#B388FF"
+    D = "#FF6FB5"
     CERTO = "#2BD99F"
     ERRO = "#FF5470"
     AVISO = "#FFD166"
     APOIO = "#B9A8FF"
+
+
+# Cor de identidade de cada equipe. A ordem A-D é a mesma de `jogo.py`.
+CORES_EQUIPES = {
+    "A": Cor.A,
+    "B": Cor.B,
+    "C": Cor.C,
+    "D": Cor.D,
+}
 
 
 # =========================================================

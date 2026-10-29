@@ -6,13 +6,13 @@ Requisitos: Python 3.9+, pyserial  (pip install pyserial)
 Protocolo serial: IDÊNTICO ao da v1.1 (o firmware do Arduino não muda).
 
 Atalhos de teclado (modo simulação, funcionam junto com o Arduino):
-    A / B      apertar o botão do competidor
-    R          revelar resposta
-    1 / 2      acerto do A / acerto do B
-    N          próxima pergunta
-    S          ligar/desligar som
-    F11        tela cheia  (Esc sai)
-    Ctrl+R     zerar o placar
+    A / B / C / D   apertar o botão da equipe
+    R               revelar resposta
+    1 / 2 / 3 / 4   acerto da equipe A / B / C / D
+    N               próxima pergunta
+    S               ligar/desligar som
+    F11             tela cheia  (Esc sai)
+    Ctrl+R          zerar o placar
 """
 
 import logging
@@ -78,6 +78,7 @@ from ui_componentes import (
     CartaoPergunta,
     CartaoPlacar,
     Cor,
+    CORES_EQUIPES,
     OverlayContagem,
     Rodape,
     escolher_fonte,
@@ -105,7 +106,7 @@ NOME_B = NOMES_EQUIPES["B"]
 MENSAGENS_RECUSA = {
     MOTIVO_CONTAGEM: "Aguarde o JÁ! da contagem de largada.",
     MOTIVO_AVANCAR: "Resolva a pergunta atual (revele ou pontue) antes de avançar.",
-    MOTIVO_REVELAR_AGUARDANDO: "Ninguém apertou ainda. REVELAR só funciona depois que A ou B apertar.",
+    MOTIVO_REVELAR_AGUARDANDO: "Ninguém apertou ainda. REVELAR só funciona depois que uma equipe apertar.",
     MOTIVO_ACERTO_FASE: "Revele a resposta (botão REVELAR) antes de pontuar.",
     MOTIVO_ACERTO_SEM_QUEM: "Ninguém apertou nesta rodada: não há ponto para dar.",
     MOTIVO_ACERTO_OUTRA_EQUIPE: "Só quem apertou pode pontuar (apertou: {equipe}).",
@@ -170,6 +171,9 @@ class DueloDeConhecimento:
         self.arquivo_atual = None
         self.tema_atual = ""
         self.erro_carga = ""
+        self._equipes_configuradas = NUM_EQUIPES
+        self.protocolo_arduino = None
+        self._job_versao = None
         self.jogo = Jogo(
             [],
             num_equipes=NUM_EQUIPES,
@@ -467,9 +471,10 @@ class DueloDeConhecimento:
                 return
             mesmo_arquivo = self.arquivo_atual and (os.path.abspath(info_escolhida["caminho"]) == os.path.abspath(self.arquivo_atual))
 
-            if not inicial and not mesmo_arquivo and (self.placar_a > 0 or self.placar_b > 0):
-                if messagebox.askyesno(TITULO, f"Zerar o placar dos competidores para '{info_escolhida['titulo']}'?", parent=self.root):
-                    self.placar_a = self.placar_b = 0
+            if not inicial and not mesmo_arquivo and any(self.jogo.placar.values()):
+                if messagebox.askyesno(TITULO, f"Zerar o placar das equipes para '{info_escolhida['titulo']}'?", parent=self.root):
+                    for equipe in self.jogo.equipes_ativas:
+                        self.jogo.placar[equipe] = 0
 
             self.carregar_perguntas(info_escolhida["caminho"], info_escolhida["titulo"])
             self.proxima_pergunta(forcar=True)
@@ -505,10 +510,16 @@ class DueloDeConhecimento:
         self.topo = BarraTopo(r, height=64)
         self.topo.grid(row=0, column=0, columnspan=3, sticky="ew", padx=P, pady=(10, 0))
 
-        self.cartao_a = CartaoPlacar(r, NOME_A, Cor.A)
-        self.cartao_a.grid(row=1, column=0, sticky="nsew", padx=(P, 8), pady=10)
-        self.cartao_b = CartaoPlacar(r, NOME_B, Cor.B)
-        self.cartao_b.grid(row=1, column=2, sticky="nsew", padx=(8, P), pady=10)
+        # As colunas laterais são fixas; os cartões dentro delas são
+        # reconstruídos conforme `jogo.equipes_ativas` (2, 3 ou 4 equipes).
+        self.coluna_placar_esq = tk.Frame(r, bg=Cor.FUNDO)
+        self.coluna_placar_esq.grid(
+            row=1, column=0, sticky="nsew", padx=(P, 8), pady=10
+        )
+        self.coluna_placar_dir = tk.Frame(r, bg=Cor.FUNDO)
+        self.coluna_placar_dir.grid(
+            row=1, column=2, sticky="nsew", padx=(8, P), pady=10
+        )
 
         palco = tk.Frame(r, bg=Cor.FUNDO)
         palco.grid(row=1, column=1, sticky="nsew", padx=8, pady=10)
@@ -538,15 +549,67 @@ class DueloDeConhecimento:
         self.rodape = Rodape(r, height=84)
         self.rodape.grid(row=2, column=0, columnspan=3, sticky="ew", padx=P, pady=(0, 14))
 
-        self.telas = [self.topo, self.cartao_a, self.cartao_b, self.barra,
-                      self.cartao_pergunta, *self.cartoes_alt, self.cartao_explic,
-                      self.rodape, self.overlay_contagem]
+        self._montar_cartoes()
+
+    def _montar_cartoes(self):
+        """Cria um cartão por equipe ativa, alternando as colunas A/C e B/D."""
+        for coluna in (self.coluna_placar_esq, self.coluna_placar_dir):
+            for filho in coluna.winfo_children():
+                filho.destroy()
+            coluna.grid_columnconfigure(0, weight=1)
+            for linha in range(4):
+                coluna.grid_rowconfigure(linha, weight=0)
+
+        esquerda = list(self.jogo.equipes_ativas[0::2])
+        direita = list(self.jogo.equipes_ativas[1::2])
+        self.cartoes_placar = {}
+
+        for coluna, equipes in (
+            (self.coluna_placar_esq, esquerda),
+            (self.coluna_placar_dir, direita),
+        ):
+            for linha, equipe in enumerate(equipes):
+                cartao = CartaoPlacar(
+                    coluna,
+                    self.jogo.nomes_equipes.get(equipe, f"Competidor {equipe}"),
+                    CORES_EQUIPES[equipe],
+                )
+                cartao.grid(row=linha, column=0, sticky="nsew", pady=4)
+                coluna.grid_rowconfigure(linha, weight=1)
+                self.cartoes_placar[equipe] = cartao
+
+        # Nomes históricos usados por testes e por trechos antigos da UI.
+        self.cartao_a = self.cartoes_placar.get("A")
+        self.cartao_b = self.cartoes_placar.get("B")
+        self.telas = self._lista_de_telas()
+
+    def _lista_de_telas(self):
+        cartoes = [
+            self.cartoes_placar[equipe]
+            for equipe in self.jogo.equipes_ativas
+            if equipe in self.cartoes_placar
+        ]
+        return [
+            self.topo,
+            *cartoes,
+            self.barra,
+            self.cartao_pergunta,
+            *self.cartoes_alt,
+            self.cartao_explic,
+            self.rodape,
+            self.overlay_contagem,
+        ]
+
+    def _reconstruir_cartoes(self):
+        """Recria os cartões quando o número de equipes muda."""
+        self._montar_cartoes()
+        self.render()
 
     def _nome(self, letra):
-        return NOME_A if letra == "A" else NOME_B
+        return self.jogo.nomes_equipes.get(letra, f"Competidor {letra}")
 
     def _cor(self, letra):
-        return Cor.A if letra == "A" else Cor.B
+        return CORES_EQUIPES.get(letra, Cor.APOIO)
 
     def _status_padrao(self):
         if self.pergunta_atual is None:
@@ -577,8 +640,17 @@ class DueloDeConhecimento:
             not em_contagem or self.jogo.mostrar_pergunta_na_contagem
         )
 
-        for cartao, letra, pts, outro in ((self.cartao_a, "A", self.placar_a, self.placar_b),
-                                          (self.cartao_b, "B", self.placar_b, self.placar_a)):
+        for letra in self.jogo.equipes_ativas:
+            cartao = self.cartoes_placar.get(letra)
+            if cartao is None:
+                continue
+            pts = self.jogo.placar.get(letra, 0)
+            outros = [
+                self.jogo.placar.get(outra, 0)
+                for outra in self.jogo.equipes_ativas
+                if outra != letra
+            ]
+            outro = max(outros, default=0)
             cartao.pontos = pts
             cartao.ativo = (self.quem_apertou == letra)
             cartao.rotulo = "Apertou primeiro" if cartao.ativo else ("Na frente" if pts > outro else "")
@@ -703,7 +775,9 @@ class DueloDeConhecimento:
             self._ocultar_contagem(renderizar=False)
 
     def piscar(self, letra, n=5):
-        cartao = self.cartao_a if letra == "A" else self.cartao_b
+        cartao = self.cartoes_placar.get(letra)
+        if cartao is None:
+            return
 
         def passo(i):
             cartao.brilho = (i % 2 == 1)
@@ -988,7 +1062,9 @@ class DueloDeConhecimento:
         self._despachar(self.jogo.confirmar_acerto(quem))
 
     def reiniciar_placar(self):
-        if messagebox.askyesno(TITULO, "Zerar o placar dos dois competidores?"):
+        n = self.jogo.num_equipes
+        alvo = "das duas equipes" if n == 2 else f"das {n} equipes"
+        if messagebox.askyesno(TITULO, f"Zerar o placar {alvo}?"):
             self._despachar(self.jogo.reiniciar_placar())
 
     

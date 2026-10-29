@@ -19,6 +19,7 @@ import pytest
 import desafio
 import ui_componentes
 from apoio_tk import criar_raiz_tk
+from config import NOMES_EQUIPES
 from jogo import FASE_AGUARDANDO, FASE_CONTAGEM, FASE_RESPONDENDO, Jogo
 from ui_selecao import ModalSelecaoPerguntas
 
@@ -148,20 +149,23 @@ def montar_app(tmp_path, monkeypatch, raiz_tk):
     familias_originais = dict(ui_componentes.FAMILIAS)
     criados = []
 
-    def montar(contagem=3, mostrar_pergunta=False):
+    def montar(contagem=3, mostrar_pergunta=False, num_equipes=2, tamanho=None):
         # Uma raiz só para o módulo: o Tk do Python 3.12 fica instável ao
         # criar/destruir vários `Tk` no mesmo processo. Cada teste ganha um
         # Toplevel novo, que é destruído no teardown.
+        monkeypatch.setattr(desafio, "NUM_EQUIPES", num_equipes)
         root = tk.Toplevel(raiz_tk)
         # Evita "zoomed" no teste.
         root.state = lambda *a: None
+        if tamanho:
+            root.geometry(f"{tamanho[0]}x{tamanho[1]}")
 
         ui_componentes.definir_escala(1.0)
         app = desafio.DueloDeConhecimento(root)
         relogio = Relogio()
         app.jogo = Jogo(
             [],
-            num_equipes=2,
+            num_equipes=num_equipes,
             tempo_pergunta=30,
             tempo_resposta=15,
             clock=relogio,
@@ -170,6 +174,9 @@ def montar_app(tmp_path, monkeypatch, raiz_tk):
         )
         criados.append((app, root))
         root.update()
+        if tamanho:
+            app._aplicar_escala()
+            root.update()
         return app, root, relogio
 
     yield montar, banco
@@ -389,6 +396,25 @@ def test_mostrar_pergunta_na_contagem(montar_app):
     assert app.overlay_contagem.master.winfo_children()[-1] is app.overlay_contagem
 
     _confirmar_contagem(app, root, relogio)
+
+
+def test_cartoes_placar_por_numero_de_equipes(montar_app):
+    montar, _banco = montar_app
+
+    for num_equipes in (2, 3, 4):
+        app, root, _relogio = montar(contagem=0, num_equipes=num_equipes)
+        try:
+            assert len(app.cartoes_placar) == num_equipes
+            assert set(app.cartoes_placar) == set("ABCD"[:num_equipes])
+            for letra, cartao in app.cartoes_placar.items():
+                assert cartao.winfo_ismapped()
+                assert cartao.nome == NOMES_EQUIPES[letra]
+                assert cartao.cor == ui_componentes.CORES_EQUIPES[letra]
+                assert cartao.winfo_width() > 0
+                assert cartao.winfo_height() > 0
+        finally:
+            app.rodando = False
+            root.destroy()
 
 
 def test_redimensionamento_no_meio_da_contagem(montar_app):
