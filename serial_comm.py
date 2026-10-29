@@ -1,5 +1,5 @@
 """
-Comunicação serial com o Arduino (protocolo v1).
+Comunicação serial com o Arduino (protocolos v1 e v2).
 
 Este módulo é dono da thread de leitura, da fila de eventos e da detecção da
 porta. A interface não toca em `serial` diretamente: ela só consome a fila e
