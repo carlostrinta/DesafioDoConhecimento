@@ -38,12 +38,12 @@ Os testes automatizados usam portas falsas. **Só o hardware real valida:**
 | 11 | Repita 1–10 no **`Desafio do Conhecimento.exe`** | mesmo resultado |
 | 12 | Abra o app **sem placa** e deixe 1 min | console sem varredura infinita de portas; CPU baixa |
 
-## Firmware v2 (somente depois da bancada)
+## Firmware v2 (validação concluída)
 
-Antes de liberar o v2, o sketch `firmware/bancada_botoes` precisa passar no
-roteiro de [`firmware/bancada_botoes/README.md`](firmware/bancada_botoes/README.md).
+O v2 foi validado no Arduino Uno em 29/10/2026. O roteiro da bancada está em
+[`firmware/bancada_botoes/README.md`](firmware/bancada_botoes/README.md).
 
-Com o firmware v2 gravado:
+Para repetir a validação com o firmware v2 gravado:
 
 1. Abra o app e confira o log: o Arduino deve enviar `PRONTO` e `VERSAO 2`.
 2. Com 4 equipes, o app envia `CONFIG_TEAMS 4` e o Arduino responde

@@ -1,7 +1,7 @@
 # Firmware v2 — produção
 
-**Status: em validação na branch `etapa5-firmware`.** Não mesclar na `main`
-antes de validar o sketch de bancada no Arduino Uno.
+**Status: validado no Arduino Uno em 29/10/2026 e disponível a partir da
+versão 2.7.0.**
 
 O firmware v2 usa os **10 botões em D2–D11** e não usa LEDs nem buzzer. O
 feedback visual e sonoro fica no aplicativo; isso libera todos os pinos
@@ -65,16 +65,16 @@ O debounce é de **60 ms** e não há `delay()` no loop.
 4. O aplicativo deve mostrar o status de Arduino conectado e reconhecer
    `VERSAO 2`.
 
-## Critério de liberação
+## Validação de liberação
 
-Antes de mesclar na `main`, execute o roteiro
-[`firmware/bancada_botoes/README.md`](../bancada_botoes/README.md) e registre
-no pull request:
+A validação física executada com o roteiro
+[`firmware/bancada_botoes/README.md`](../bancada_botoes/README.md) confirmou:
 
 - os 10 botões e seus eventos;
 - `CONFIG_TEAMS 2`, `3`, `4` com ACK;
-- `CONFIG_TEAMS 5`, `X` e `22` com `ERRO EQUIPES`;
+- `CONFIG_TEAMS 5`, `X`, `22` e vazio com `ERRO EQUIPES`;
 - o debounce de 60 ms sem repetição com o botão mantido.
 
-Depois disso, valide o aplicativo completo com o firmware v2 e só então faça
-o merge, o push e a tag de release.
+O aplicativo completo também foi testado com 4 equipes. A branch
+`etapa5-firmware` foi integrada na `main` e a tag de release foi criada depois
+dessa validação.

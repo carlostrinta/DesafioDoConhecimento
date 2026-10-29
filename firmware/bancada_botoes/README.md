@@ -45,13 +45,16 @@ Use `INPUT_PULLUP`: cada botão fica entre o pino e o **GND**.
 7. Anote placa, porta, driver e qualquer divergência. Se algum pino não
    responder, confira a ligação para GND antes de alterar o firmware.
 
-## Critério para liberar o v2
+## Critério de liberação do v2 (atendido)
 
-O firmware v2 de produção só deve ser mesclado na `main` depois que:
+O firmware v2 de produção foi liberado depois que:
 
-- os 10 botões forem lidos nos pinos D2–D11;
-- `CONFIG_TEAMS 2`, `3` e `4` responderem `EQUIPES N`;
-- `CONFIG_TEAMS 5`, `X`, `22` e vazio responderem `ERRO EQUIPES`;
-- o debounce de 60 ms não produzir eventos repetidos com o botão mantido.
+- os 10 botões foram lidos nos pinos D2–D11;
+- `CONFIG_TEAMS 2`, `3` e `4` responderam `EQUIPES N`;
+- `CONFIG_TEAMS 5`, `X`, `22` e vazio responderam `ERRO EQUIPES`;
+- o debounce de 60 ms não produziu eventos repetidos com o botão mantido.
 
-O resultado deve ser registrado no pull request da branch `etapa5-firmware`.
+## Resultado
+
+Validação física concluída em **29/10/2026** no Arduino Uno. O aplicativo também
+foi testado com o firmware v2 e 4 equipes antes da integração na `main`.

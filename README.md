@@ -10,10 +10,10 @@ fica visível na tela.
 
 > **Estado do hardware:** a parte Python já aceita 2, 3 ou 4 equipes pelo
 > teclado. O firmware/protocolo v1 do Arduino atende 2 equipes; o protocolo v2
-> (4 equipes e botões C/D) está na branch `etapa5-firmware`, aguardando
-> validação física no Arduino Uno. O sketch de bancada em
+> (4 equipes e botões C/D) foi **validado no Arduino Uno** e está disponível
+> nesta versão. O sketch de bancada em
 > [`firmware/bancada_botoes`](firmware/bancada_botoes/bancada_botoes.ino)
-> testa os 10 botões e o parser de `CONFIG_TEAMS` antes da atualização.
+> registra o teste dos 10 botões e do parser de `CONFIG_TEAMS`.
 
 ---
 
@@ -188,7 +188,7 @@ O firmware v1 envia `BTN_*` e `PRONTO` pela serial em **9600 baud** e recebe
 comandos de LED/buzzer. A interface Python detecta o firmware v1 e limita a
 partida a 2 equipes, evitando enviar comandos que ele não conhece.
 
-### Bancada de botões (preparação do v2)
+### Bancada de botões (validação do v2)
 
 O sketch [`firmware/bancada_botoes/bancada_botoes.ino`](firmware/bancada_botoes/bancada_botoes.ino)
 valida apenas os 10 botões, sem LEDs e sem buzzer. Ele responde no Monitor
@@ -201,13 +201,14 @@ Para gravar: abra o `.ino` na Arduino IDE, selecione a placa **Arduino Uno** e
 a porta correta e clique em **Upload**. Depois feche o Monitor Serial antes de
 abrir o jogo.
 
-### Firmware v2 de produção (em validação)
+### Firmware v2 de produção
 
 O firmware v2 fica em
 [`firmware/v2/duelo_arduino_v2/duelo_arduino_v2.ino`](firmware/v2/duelo_arduino_v2/duelo_arduino_v2.ino)
 e usa o mesmo mapa de 10 botões em `D2–D11`. Ele **não usa LEDs nem buzzer**:
 o feedback fica no aplicativo. O handshake é `PRONTO` + `VERSAO 2`; depois o
-Python envia `CONFIG_TEAMS N` e espera o ACK `EQUIPES N`.
+Python envia `CONFIG_TEAMS N` e espera o ACK `EQUIPES N`. A validação física
+foi concluída no Arduino Uno em **29/10/2026**.
 
 | Comando | Resposta |
 | --- | --- |
@@ -216,8 +217,9 @@ Python envia `CONFIG_TEAMS N` e espera o ACK `EQUIPES N`.
 | `RESET` | reinicia o debounce, sem saída física |
 | `LED_*`, `BEEP*`, `BUZZER_*` | ignorados |
 
-O debounce é de **60 ms**. Não mescle a branch `etapa5-firmware` na `main`
-antes de concluir o roteiro da bancada e testar o aplicativo com o v2.
+O debounce é de **60 ms**. O roteiro da bancada e o teste do aplicativo com o
+v2 foram concluídos antes da liberação; consulte
+[`firmware/bancada_botoes/README.md`](firmware/bancada_botoes/README.md).
 
 ---
 
@@ -403,7 +405,7 @@ Se você redistribuir o jogo, mantenha os arquivos `LICENSE`,
 - [`firmware/bancada_botoes/README.md`](firmware/bancada_botoes/README.md) —
   roteiro físico dos 10 botões, `CONFIG_TEAMS` e debounce.
 - [`firmware/v2/README.md`](firmware/v2/README.md) — pinagem, protocolo e
-  critério de liberação do firmware v2.
+  validação do firmware v2.
 - [`LICENCA_PERGUNTAS.md`](LICENCA_PERGUNTAS.md) — licença dos bancos de
   perguntas.
 
@@ -412,14 +414,14 @@ Se você redistribuir o jogo, mantenha os arquivos `LICENSE`,
 ## Limitações conhecidas
 
 - Com firmware v1 (ou sem handshake), a partida cai para **2 equipes** com
-  aviso; 3/4 equipes com botões físicos dependem do protocolo v2.
+  aviso; 3/4 equipes com botões físicos usam o firmware v2 validado.
 - No modo teclado puro, 3/4 equipes já funcionam.
 - `eletrotecnica.json` e `radiologia.json` têm 20 perguntas cada: o baralho
   reinicia rápido.
 - A partida salva retoma a pergunta atual; fase e tempo restante não são
   restaurados.
-- O firmware v2 está na branch `etapa5-firmware` e ainda precisa ser validado
-  na Arduino Uno antes de ser publicado como versão estável.
+- O firmware v2 foi validado no Arduino Uno e está disponível; o v1 continua
+  na pasta `firmware/v1` como ponto de retorno.
 
 ---
 
