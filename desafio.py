@@ -1187,8 +1187,9 @@ class DueloDeConhecimento:
         self._salvador.executar_agora()
         self.rodando = False
         self._cancelar_contagem_visual()
-        if self._job_versao:
-            self.root.after_cancel(self._job_versao)
+        job_versao = getattr(self, "_job_versao", None)
+        if job_versao:
+            self.root.after_cancel(job_versao)
             self._job_versao = None
         self.serial_comm.parar()
         self.som.parar()
