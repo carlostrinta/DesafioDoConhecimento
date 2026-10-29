@@ -23,6 +23,9 @@ from jogo import (
 from ui_selecao import ModalSelecaoPerguntas
 
 
+_INICIAR_FLUXO_ORIGINAL = desafio.DueloDeConhecimento._iniciar_fluxo_inicial
+
+
 class Relogio:
     def __init__(self, agora=100.0):
         self.agora = agora
@@ -373,6 +376,44 @@ def test_pronto_sem_versao_cai_para_v1(montar_app):
 
     assert app.protocolo_arduino == "v1"
     assert app.jogo.num_equipes == 2
+
+
+def test_estado_com_numero_diferente_avisa_e_abre_partida_nova(
+    montar_app, monkeypatch
+):
+    montar, _banco = montar_app
+    app, root, _relogio = montar(num_equipes=2)
+    motivo = (
+        "estado salvo tem 3 equipes, mas o config.json usa 2; "
+        "iniciando uma partida nova"
+    )
+    app._motivo_estado = motivo
+    app._partida_salva = None
+
+    avisos = []
+    removidos = []
+    monkeypatch.setattr(
+        desafio.messagebox,
+        "showwarning",
+        lambda *a, **k: avisos.append((a, k)),
+    )
+    monkeypatch.setattr(
+        desafio.persistencia,
+        "remover_estado",
+        lambda *a, **k: removidos.append((a, k)),
+    )
+
+    _INICIAR_FLUXO_ORIGINAL(app)
+    root.update()
+
+    assert len(avisos) == 1
+    assert "3 equipes" in avisos[0][0][1]
+    assert "nova partida" in avisos[0][0][1]
+    assert len(removidos) == 1
+    assert app._motivo_estado == ""
+    assert any(
+        isinstance(w, ModalSelecaoPerguntas) for w in root.winfo_children()
+    )
 
 
 def _colide(a, b):
