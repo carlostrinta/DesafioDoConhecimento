@@ -185,6 +185,32 @@ class TestTresQuatroEquipes:
         assert j.reiniciar_placar() == ["reiniciou_placar"]
         assert all(v == 0 for v in j.placar.values())
 
+    def test_reduzir_equipes_preserva_ab_e_descarta_cd(self, jogo_4_equipes):
+        j = jogo_4_equipes
+        j.placar = {"A": 5, "B": 3, "C": 2, "D": 1}
+        assert j.reduzir_equipes(2) is True
+        assert j.num_equipes == 2
+        assert j.equipes_ativas == ("A", "B")
+        assert j.placar == {"A": 5, "B": 3}
+
+    def test_reduzir_equipes_durante_resposta_de_c_volta_para_aguardando(
+        self, jogo_4_equipes
+    ):
+        j = jogo_4_equipes
+        assert j.apertar_botao("C") == ["apertou:C"]
+        assert j.estado.fase == FASE_RESPONDENDO
+        assert j.reduzir_equipes(2) is True
+        assert j.estado.fase == FASE_AGUARDANDO
+        assert j.estado.quem_apertou is None
+        assert j.timer_ativo is True
+        assert j.apertar_botao("A") == ["apertou:A"]
+
+    def test_reduzir_equipes_nao_aumenta_nem_repete(self, jogo_2_equipes):
+        j = jogo_2_equipes
+        assert j.reduzir_equipes(2) is False
+        assert j.reduzir_equipes(4) is False
+        assert j.num_equipes == 2
+
     def test_recarregar_perguntas_reinicia_estado(self, perguntas_exemplo):
         j = Jogo(perguntas_exemplo, num_equipes=2, contagem_largada=0)
         j.apertar_botao("A")

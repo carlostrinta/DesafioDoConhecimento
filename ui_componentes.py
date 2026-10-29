@@ -282,6 +282,7 @@ class BarraTopo(Tela):
         self.placa = ""
         self.tema = ""
         self.aviso_porta = ""
+        self.aviso_protocolo = ""
 
     def _largura_texto(self, texto, fonte):
         """Largura real de um texto na fonte, medida pelo próprio Canvas."""
@@ -312,6 +313,8 @@ class BarraTopo(Tela):
         txt, cor = texto_status_serial(
             self.conexao, self.placa, aviso_porta=self.aviso_porta
         )
+        if self.aviso_protocolo:
+            txt, cor = self.aviso_protocolo, Cor.AVISO
         # Status no topo direito e controles no rodapé direito: em 64 px de
         # altura as duas linhas precisam de fontes um pouco menores para não
         # se sobreporem em telas grandes (ESCALA > 1).

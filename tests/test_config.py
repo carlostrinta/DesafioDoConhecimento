@@ -430,32 +430,16 @@ class TestValidacao:
         assert cfg.porta_serial == esperado
         assert cfg.avisos == ()
 
-    @pytest.mark.parametrize("pedido", [3, 4])
-    def test_num_equipes_3_ou_4_gera_um_unico_aviso_e_mantem_ui_com_2(
-        self, tmp_path, logs_config, pedido
-    ):
-        cfg = _carregar(tmp_path, {"jogo": {"num_equipes": pedido}})
-
-        assert cfg.num_equipes == 2
-        assert cfg.num_equipes_configurado == pedido
-        avisos_num_equipes = [
-            aviso for aviso in cfg.avisos if "num_equipes" in aviso
-        ]
-        assert len(avisos_num_equipes) == 1
-        assert len(cfg.avisos) == 1
-        assert "Etapa 5" in avisos_num_equipes[0]
-
-        jogo = Jogo([], num_equipes=cfg.num_equipes)
-        assert jogo.equipes_ativas == ("A", "B")
-
     @pytest.mark.parametrize("pedido", [2, 3, 4])
     def test_num_equipes_na_faixa_e_aceito(self, tmp_path, pedido):
         cfg = _carregar(tmp_path, {"jogo": {"num_equipes": pedido}})
 
+        assert cfg.num_equipes == pedido
         assert cfg.num_equipes_configurado == pedido
-        assert not [
-            a for a in cfg.avisos if "valor inválido" in a
-        ]
+        assert cfg.avisos == ()
+
+        jogo = Jogo([], num_equipes=cfg.num_equipes)
+        assert jogo.equipes_ativas == TODAS_EQUIPES[:pedido]
 
 
 # ─────────────────────────────────────────────────────────

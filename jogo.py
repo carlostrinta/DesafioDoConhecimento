@@ -202,6 +202,39 @@ class Jogo:
             self.placar = {eq: 0 for eq in self.equipes_ativas}
         return ["reiniciou_banco"]
 
+    def reduzir_equipes(self, num_equipes: int = 2) -> bool:
+        """
+        Reduz a partida para 2 equipes quando o protocolo não suporta 3/4.
+
+        Preserva o placar de A/B e descarta C/D. Se a equipe da vez for uma
+        das removidas, a rodada volta para AGUARDANDO com o tempo cheio para
+        A/B disputarem. Devolve True quando houve redução.
+        """
+        if not 2 <= num_equipes < self.num_equipes:
+            return False
+
+        self.num_equipes = num_equipes
+        self.equipes_ativas = TODAS_EQUIPES[:num_equipes]
+        self.placar = {
+            equipe: self.placar.get(equipe, 0) for equipe in self.equipes_ativas
+        }
+
+        if self.estado.quem_apertou not in self.equipes_ativas:
+            self.estado.quem_apertou = None
+            self.estado.tempo_estourou = False
+            if self.estado.fase in (FASE_RESPONDENDO, FASE_REVELADA, FASE_PONTUADA):
+                self.estado.fase = FASE_AGUARDANDO
+                self._parar_timer()
+                self.timer_rotulo = ""
+                self.timer_cor = ""
+                self.timer_motivo = ""
+                self.timer_congelado = 0.0
+                if self.estado.pergunta_atual is not None:
+                    self._iniciar_timer(
+                        self.tempo_pergunta, "Tempo para apertar", ""
+                    )
+        return True
+
     # ─── Timer (usa clock injetável) ───
     @property
     def timer_ativo(self) -> bool:

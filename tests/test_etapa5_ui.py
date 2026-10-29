@@ -314,3 +314,57 @@ def test_ctrl_c_e_ctrl_d_nao_aperam_equipe(montar_app):
     assert app.fase == FASE_AGUARDANDO
     assert app.quem_apertou is None
     assert app.jogo.placar == {"A": 0, "B": 0, "C": 0, "D": 0}
+
+
+@pytest.mark.parametrize(
+    "protocolo, trecho",
+    [
+        ("v1", "Arduino v1"),
+        ("sem_handshake", "Sem handshake"),
+    ],
+)
+def test_protocolo_sem_suporte_limita_para_duas_e_avisa(
+    montar_app, protocolo, trecho
+):
+    montar, _banco = montar_app
+    app, root, _relogio = montar(num_equipes=4)
+
+    app._aplicar_protocolo(protocolo)
+    root.update()
+
+    assert app.jogo.num_equipes == 2
+    assert app.jogo.equipes_ativas == ("A", "B")
+    assert set(app.cartoes_placar) == {"A", "B"}
+    assert trecho in app.topo.aviso_protocolo
+    assert trecho in app.aviso
+    assert len(app.rodape.msg) > 0
+
+
+def test_protocolo_v2_mantem_quatro_equipes(montar_app):
+    montar, _banco = montar_app
+    app, root, _relogio = montar(num_equipes=4)
+
+    app.processar_evento("PRONTO")
+    root.update()
+    assert app._job_versao is not None
+
+    app.processar_evento("VERSAO 2")
+    root.update()
+
+    assert app.protocolo_arduino == "v2"
+    assert app._job_versao is None
+    assert app.jogo.num_equipes == 4
+    assert set(app.cartoes_placar) == {"A", "B", "C", "D"}
+    assert app.topo.aviso_protocolo == ""
+
+
+def test_pronto_sem_versao_cai_para_v1(montar_app):
+    montar, _banco = montar_app
+    app, root, _relogio = montar(num_equipes=4)
+
+    app.processar_evento("PRONTO")
+    app._confirmar_protocolo_v1()
+    root.update()
+
+    assert app.protocolo_arduino == "v1"
+    assert app.jogo.num_equipes == 2

@@ -73,7 +73,6 @@ CONTAGEM_LARGADA_MINIMO = 0
 CONTAGEM_LARGADA_MAXIMO = 10
 DURACAO_OVERLAY_JA_MINIMO = 0.3
 DURACAO_OVERLAY_JA_MAXIMO = 3.0
-NUM_EQUIPES_UI = 2  # a interface (e o Arduino) só usam 2 até a Etapa 5
 
 _SECOES = {
     "tempos": {"tempo_pergunta", "tempo_resposta"},
@@ -219,12 +218,6 @@ def carregar(caminho=None, diretorio_base=None) -> Configuracao:
         jogo, "num_equipes", "jogo.num_equipes",
         NUM_EQUIPES_PADRAO, avisos, minimo=2, maximo=4,
     )
-    if num_pedido > NUM_EQUIPES_UI:
-        _aviso(
-            avisos,
-            f"jogo.num_equipes={num_pedido}: a interface e o Arduino ainda usam "
-            f"{NUM_EQUIPES_UI} equipes (até a Etapa 5); usando {NUM_EQUIPES_UI}.",
-        )
 
     contagem_largada = _ler_inteiro(
         jogo, "contagem_largada", "jogo.contagem_largada",
@@ -278,7 +271,7 @@ def carregar(caminho=None, diretorio_base=None) -> Configuracao:
         tempo_pergunta=tempo_pergunta,
         tempo_resposta=tempo_resposta,
         pontuar_apos_tempo=pontuar_apos_tempo,
-        num_equipes=min(num_pedido, NUM_EQUIPES_UI),
+        num_equipes=num_pedido,
         num_equipes_configurado=num_pedido,
         contagem_largada=contagem_largada,
         mostrar_pergunta_na_contagem=mostrar_pergunta_na_contagem,

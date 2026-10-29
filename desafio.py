@@ -174,6 +174,7 @@ class DueloDeConhecimento:
         self._equipes_configuradas = NUM_EQUIPES
         self.protocolo_arduino = None
         self._job_versao = None
+        self._aviso_protocolo_mostrado = False
         self.jogo = Jogo(
             [],
             num_equipes=NUM_EQUIPES,
@@ -987,6 +988,8 @@ class DueloDeConhecimento:
                     elif tipo == "porta_ausente":
                         self.topo.aviso_porta = valor or ""
                         self.topo.desenhar()
+                    elif tipo == "protocolo":
+                        self._aplicar_protocolo(valor)
                 except Exception:
                     log.exception("Falha ao processar item da fila serial")
         except queue.Empty:
@@ -1044,9 +1047,74 @@ class DueloDeConhecimento:
     def processar_evento(self, evento):
         # Mapeamento linha-da-serial -> ação é uma função pura (protocolo.py)
         log.debug("Evento serial recebido: %s", evento)
+        if evento == "VERSAO 2":
+            self._aplicar_protocolo("v2")
+            return
         if evento == "PRONTO":
             log.info("Arduino reiniciado.")
+            self._agendar_verificacao_versao()
         self._despachar(mapear_evento_arduino(evento, self.jogo))
+
+    # -----------------------------------------------------
+    # PROTOCOLO / NÚMERO DE EQUIPES
+    # -----------------------------------------------------
+    def _agendar_verificacao_versao(self):
+        """Firmware v1 só manda PRONTO; o v2 manda VERSAO 2 logo depois."""
+        if self.protocolo_arduino == "v2":
+            return
+        if self._job_versao:
+            self.root.after_cancel(self._job_versao)
+        self._job_versao = self.root.after(500, self._confirmar_protocolo_v1)
+
+    def _confirmar_protocolo_v1(self):
+        self._job_versao = None
+        if self.protocolo_arduino != "v2":
+            self._aplicar_protocolo("v1")
+
+    def _aplicar_protocolo(self, protocolo):
+        if self._job_versao:
+            self.root.after_cancel(self._job_versao)
+            self._job_versao = None
+
+        if protocolo == "v2":
+            self.protocolo_arduino = "v2"
+            if self._aviso_protocolo_mostrado and self._equipes_configuradas > 2:
+                log.warning(
+                    "VERSAO 2 recebida depois do fallback para 2 equipes; "
+                    "reinicie o aplicativo para voltar a %d equipes.",
+                    self._equipes_configuradas,
+                )
+            else:
+                log.info("Arduino confirmou protocolo v2.")
+                self.topo.aviso_protocolo = ""
+                self.topo.desenhar()
+            return
+
+        if protocolo not in ("v1", "sem_handshake"):
+            return
+
+        self.protocolo_arduino = protocolo
+        if protocolo == "v1":
+            motivo = "Arduino v1 não suporta 3/4 equipes"
+            aviso = "Arduino v1: usando 2 equipes."
+        else:
+            motivo = "Arduino não confirmou o handshake"
+            aviso = "Sem handshake do Arduino: usando 2 equipes."
+
+        if self.jogo.num_equipes > 2:
+            self.jogo.reduzir_equipes(2)
+            self._reconstruir_cartoes()
+            self._atualizar_barra()
+            self._salvador.pedir_imediato()
+            log.warning("%s; partida limitada a 2 equipes.", motivo)
+
+        if self._equipes_configuradas > 2 and not self._aviso_protocolo_mostrado:
+            self._aviso_protocolo_mostrado = True
+            self.topo.aviso_protocolo = aviso
+            self.topo.desenhar()
+            self.avisar(aviso)
+        else:
+            log.info("%s; mantendo 2 equipes.", motivo)
 
     # -----------------------------------------------------
     # AÇÕES DA UI (só delegam ao Jogo e despacham os eventos)
@@ -1119,6 +1187,9 @@ class DueloDeConhecimento:
         self._salvador.executar_agora()
         self.rodando = False
         self._cancelar_contagem_visual()
+        if self._job_versao:
+            self.root.after_cancel(self._job_versao)
+            self._job_versao = None
         self.serial_comm.parar()
         self.som.parar()
         trava = getattr(self, "_trava", None)

@@ -256,7 +256,7 @@ class TestConexao:
             assert esperar(lambda: comm.serial is not None, timeout=0.5) is False
             assert comm.serial is None
             assert modulo.abertas[0].fechado is True
-            assert drenar(fila) == []
+            assert ("protocolo", "sem_handshake") in drenar(fila)
         finally:
             comm.rodando = False
             comm.fechar()
@@ -308,7 +308,7 @@ class TestConexao:
         try:
             assert esperar(lambda: comm.serial is not None, timeout=0.5) is False
             assert comm.serial is None
-            assert drenar(fila) == []
+            assert ("protocolo", "sem_handshake") in drenar(fila)
         finally:
             comm.rodando = False
             comm.fechar()

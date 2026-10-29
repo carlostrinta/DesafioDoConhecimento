@@ -65,6 +65,11 @@ class ComunicacaoSerial:
         ("evento", "BTN_A", ts)   -> linha recebida do Arduino; `ts` é
                                      `time.monotonic()` no instante da leitura
                                      no PC (não é o instante físico do aperto)
+        ("protocolo", "sem_handshake") -> havia porta candidata, mas nenhuma
+                                     confirmou PRONTO; a UI limita a 2 equipes
+
+    Sem porta candidata nenhuma, o jogo segue em modo teclado e a UI mantém
+    o número de equipes do `config.json`.
     """
 
     def __init__(
@@ -103,6 +108,7 @@ class ComunicacaoSerial:
         self.placa_atual = ""
         self._info_portas = {}
         self._porta_ausente_avisada = False
+        self._sem_handshake_avisado = False
         self._parar = threading.Event()
         self._parar.set()  # parado até iniciar()
         self._thread = None
@@ -355,12 +361,19 @@ class ComunicacaoSerial:
             if not (s and s.is_open):
                 if time.monotonic() - ultima_busca >= self.intervalo_reconexao:
                     ultima_busca = time.monotonic()
-                    for porta in self._candidatas():
+                    candidatas = self._candidatas()
+                    conectou = False
+                    for porta in candidatas:
                         if self._tentar_conectar(porta):
+                            self._sem_handshake_avisado = False
                             self.fila.put(("conexao", porta))
                             if self.placa_atual:
                                 self.fila.put(("placa", self.placa_atual))
+                            conectou = True
                             break
+                    if candidatas and not conectou and not self._sem_handshake_avisado:
+                        self._sem_handshake_avisado = True
+                        self.fila.put(("protocolo", "sem_handshake"))
                 self._parar.wait(0.2)
                 continue
             try:
