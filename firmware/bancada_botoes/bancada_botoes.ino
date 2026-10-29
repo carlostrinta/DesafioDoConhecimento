@@ -14,6 +14,7 @@
  *
  * Comandos aceitos:
  *   CONFIG_TEAMS 2|3|4  -> responde "EQUIPES N" (ACK)
+ *   CONFIG_TEAMS 5|X    -> responde "ERRO EQUIPES" (rejeição)
  *
  * Cada aperto (borda de descida) envia o nome do botão. O estado inicial é
  * lido no setup() e cada botão tem lockout de 60 ms. Não há delay().
@@ -118,14 +119,22 @@ void lerSerial() {
 }
 
 void processarComando(const char* cmd) {
-  const uint8_t prefixo = 13;  // "CONFIG_TEAMS "
+  const uint8_t prefixo = 12;  // "CONFIG_TEAMS"
 
-  if (strncmp(cmd, "CONFIG_TEAMS ", prefixo) == 0) {
+  if (strncmp(cmd, "CONFIG_TEAMS", prefixo) == 0) {
     const char* valor = cmd + prefixo;
+    if (*valor == ' ') {
+      ++valor;
+    }
+
+    // Só aceita exatamente um dígito entre 2 e 4. Valores como 5, X, 22
+    // ou vazio (inclusive sem o espaço) são rejeitados para provar o parser.
     if (valor[0] >= '2' && valor[0] <= '4' && valor[1] == '\0') {
       uint8_t equipes = (uint8_t)(valor[0] - '0');
       Serial.print(F("EQUIPES "));
       Serial.println((int)equipes);
+    } else {
+      Serial.println(F("ERRO EQUIPES"));
     }
   }
 }
