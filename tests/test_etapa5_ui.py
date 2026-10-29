@@ -144,7 +144,7 @@ def montar_app(tmp_path, monkeypatch, raiz_tk):
     familias_originais = dict(ui_componentes.FAMILIAS)
     criados = []
 
-    def montar(contagem=0, num_equipes=2):
+    def montar(contagem=0, num_equipes=2, tamanho=None):
         monkeypatch.setattr(desafio, "NUM_EQUIPES", num_equipes)
         root = tk.Toplevel(raiz_tk)
         root.state = lambda *a: None
@@ -162,7 +162,12 @@ def montar_app(tmp_path, monkeypatch, raiz_tk):
         )
         app.render()
         criados.append((app, root))
+        if tamanho:
+            root.geometry(f"{tamanho[0]}x{tamanho[1]}")
         root.update()
+        if tamanho:
+            app._aplicar_escala()
+            root.update()
         return app, root, relogio
 
     yield montar, banco
@@ -368,3 +373,92 @@ def test_pronto_sem_versao_cai_para_v1(montar_app):
 
     assert app.protocolo_arduino == "v1"
     assert app.jogo.num_equipes == 2
+
+
+def _colide(a, b):
+    return not (a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1])
+
+
+def _caixa_widget(widget):
+    x, y = widget.winfo_rootx(), widget.winfo_rooty()
+    return (x, y, x + widget.winfo_width(), y + widget.winfo_height())
+
+
+def _textos_do_topo(app):
+    topo = app.topo
+    textos = {}
+    for item in topo.find_all():
+        if topo.type(item) != "text":
+            continue
+        bb = topo.bbox(item)
+        if bb:
+            textos[topo.itemcget(item, "text")] = bb
+    return textos
+
+
+def _verificar_barra_topo(app):
+    topo = app.topo
+    largura, altura = topo.winfo_width(), topo.winfo_height()
+    textos = _textos_do_topo(app)
+    titulo = next(bb for txt, bb in textos.items() if txt.startswith("Desafio"))
+    status = next(bb for txt, bb in textos.items() if "Arduino" in txt)
+    ajuda = next(bb for txt, bb in textos.items() if "F11" in txt)
+
+    for bb in textos.values():
+        assert 0 <= bb[0] and 0 <= bb[1]
+        assert bb[2] <= largura and bb[3] <= altura
+
+    assert not _colide(titulo, status), "status colidiu com o título"
+    assert not _colide(titulo, ajuda), "ajuda colidiu com o título"
+    assert not _colide(status, ajuda), "ajuda colidiu com o status"
+    assert "Ctrl+T" in next(txt for txt in textos if "F11" in txt)
+
+
+@pytest.mark.parametrize("tamanho", [(1366, 768), (1920, 1080), (900, 600)])
+@pytest.mark.parametrize("num_equipes", [2, 3, 4])
+def test_contagem_placar_e_topo_em_tamanhos_reais(
+    montar_app, tamanho, num_equipes
+):
+    montar, banco = montar_app
+    app, root, relogio = montar(
+        contagem=3, num_equipes=num_equipes, tamanho=tamanho
+    )
+    _escolher_tema(app, root, banco)
+    root.update()
+
+    assert app.fase == FASE_CONTAGEM
+    assert app.overlay_contagem.winfo_ismapped()
+    textos_overlay = [
+        app.overlay_contagem.itemcget(item, "text")
+        for item in app.overlay_contagem.find_all()
+        if app.overlay_contagem.type(item) == "text"
+    ]
+    assert "3" in textos_overlay
+
+    assert len(app.cartoes_placar) == num_equipes
+    caixas = []
+    for equipe, cartao in app.cartoes_placar.items():
+        assert cartao.winfo_ismapped(), f"cartão {equipe} não está visível"
+        caixa = _caixa_widget(cartao)
+        assert caixa[2] > caixa[0] and caixa[3] > caixa[1]
+        caixas.append((equipe, caixa))
+
+    for i, (equipe_a, caixa_a) in enumerate(caixas):
+        for equipe_b, caixa_b in caixas[i + 1 :]:
+            assert not _colide(caixa_a, caixa_b), (
+                f"cartões {equipe_a}/{equipe_b} se sobrepõem em "
+                f"{tamanho[0]}x{tamanho[1]}"
+            )
+
+    raiz = (root.winfo_rootx(), root.winfo_rooty(),
+            root.winfo_rootx() + root.winfo_width(),
+            root.winfo_rooty() + root.winfo_height())
+    overlay = _caixa_widget(app.overlay_contagem)
+    assert raiz[0] <= overlay[0] and raiz[1] <= overlay[1]
+    assert overlay[2] <= raiz[2] and overlay[3] <= raiz[3]
+
+    _verificar_barra_topo(app)
+
+    _confirmar_contagem(app, root, relogio)
+    assert app.overlay_contagem.winfo_ismapped()
+    _verificar_barra_topo(app)

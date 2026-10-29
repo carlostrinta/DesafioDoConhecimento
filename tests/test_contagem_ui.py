@@ -157,8 +157,6 @@ def montar_app(tmp_path, monkeypatch, raiz_tk):
         root = tk.Toplevel(raiz_tk)
         # Evita "zoomed" no teste.
         root.state = lambda *a: None
-        if tamanho:
-            root.geometry(f"{tamanho[0]}x{tamanho[1]}")
 
         ui_componentes.definir_escala(1.0)
         app = desafio.DueloDeConhecimento(root)
@@ -173,6 +171,8 @@ def montar_app(tmp_path, monkeypatch, raiz_tk):
             mostrar_pergunta_na_contagem=mostrar_pergunta,
         )
         criados.append((app, root))
+        if tamanho:
+            root.geometry(f"{tamanho[0]}x{tamanho[1]}")
         root.update()
         if tamanho:
             app._aplicar_escala()
