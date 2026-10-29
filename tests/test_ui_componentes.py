@@ -10,8 +10,9 @@ variam entre PCs e ele é uma guarda de refatoração local, não um teste de CI
 O dump usa Tk de verdade; em ambiente sem display o teste é pulado.
 
 Na Etapa 4.6 foram acrescentados os casos `contagem_numero` e `contagem_ja`
-(overlay de largada). Os casos `barra_topo_*` são os mais sensíveis às
-métricas de fonte da máquina, mas uma divergência nunca deve ser tratada como
+(overlay de largada). Na Etapa 5 foi acrescentado `rodape_aviso_equipes`
+(aviso visível de ACK não confirmado). Os casos `barra_topo_*` são os mais
+sensíveis às métricas de fonte da máquina, mas uma divergência nunca deve ser tratada como
 "deriva de ambiente": primeiro identifique o commit de origem por bisseção.
 Se o layout realmente mudou, regrave apenas os casos afetados em um commit
 separado e justificado.
@@ -159,6 +160,17 @@ CASOS = [
         "rodape_final",
         "Rodape",
         {"msg": "Ponto confirmado", "cor_msg": "#2BD99F", "passo": 3},
+        1000,
+        90,
+    ),
+    (
+        "rodape_aviso_equipes",
+        "Rodape",
+        {
+            "msg": "Arduino não confirmou 4 equipes",
+            "cor_msg": "#FFD166",
+            "passo": 0,
+        },
         1000,
         90,
     ),
