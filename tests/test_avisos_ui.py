@@ -37,7 +37,7 @@ class TestMensagemIgnoradas:
         )
 
 
-def test_barra_de_status_mostra_porta_e_placa():
+def test_barra_de_status_mostra_porta_e_placa_curta():
     from ui_componentes import texto_status_serial
 
     texto, _ = texto_status_serial(
@@ -45,8 +45,9 @@ def test_barra_de_status_mostra_porta_e_placa():
     )
 
     assert "COM7" in texto
-    assert "CH340/CH341" in texto
-    assert "1A86:7523" in texto
+    assert "CH340" in texto
+    # O VID:PID completo fica no log da serial, não na barra.
+    assert "1A86:7523" not in texto
 
 
 def test_barra_de_status_sem_conexao_nao_mostra_placa():

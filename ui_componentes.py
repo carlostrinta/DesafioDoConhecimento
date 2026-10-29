@@ -12,6 +12,7 @@ capturado antes da movimentação.
 
 from __future__ import annotations
 
+import re
 import tkinter as tk
 from tkinter import font as tkfont
 
@@ -200,17 +201,38 @@ class Cartao(Tela):
         pass
 
 
+def nome_curto_placa(placa):
+    """
+    Nome da placa para a barra, sem VID:PID e sem o prefixo "Arduino".
+
+    O VID:PID completo continua no log da serial; a barra precisa de espaço
+    para os controles de som, tela cheia e troca de tema.
+    """
+    nome = (placa or "").strip()
+    if not nome:
+        return ""
+    # Remove "(2341:0042)" e também um VID:PID solto no fim.
+    nome = re.sub(r"\s*\([0-9A-Fa-f]{4}:[0-9A-Fa-f]{4}\)\s*$", "", nome)
+    nome = re.sub(r"\s*[0-9A-Fa-f]{4}:[0-9A-Fa-f]{4}\s*$", "", nome)
+    nome = re.sub(r"\s*\((?:arduino\.org|bootloader)\)\s*$", "", nome, flags=re.I)
+    if nome.lower().startswith("arduino "):
+        nome = nome[8:].strip()
+    if nome.lower().startswith("ch340/ch341"):
+        return "CH340"
+    return nome
+
+
 def texto_status_serial(conexao, placa="", disponivel=None, aviso_porta=""):
     """Texto e cor da barra de status; função pura para facilitar testes."""
     if disponivel is None:
         disponivel = SERIAL_DISPONIVEL
     if not disponivel:
-        return "pyserial não instalado. Modo teclado ativo.", Cor.AVISO
+        return "pyserial ausente · modo teclado", Cor.AVISO
     if aviso_porta:
         if conexao:
+            nome = nome_curto_placa(placa) or "Arduino"
             return (
-                f"Arduino conectado ({conexao}) · "
-                f"porta {aviso_porta} não encontrada",
+                f"{conexao} · {nome} · porta {aviso_porta} não encontrada",
                 Cor.AVISO,
             )
         return (
@@ -219,9 +241,27 @@ def texto_status_serial(conexao, placa="", disponivel=None, aviso_porta=""):
             Cor.AVISO,
         )
     if conexao:
-        detalhe = f" · {placa}" if placa else ""
-        return f"Arduino conectado ({conexao}){detalhe}", Cor.CERTO
-    return "Arduino não conectado. Modo teclado ativo.", Cor.AVISO
+        nome = nome_curto_placa(placa)
+        detalhe = f" · {nome}" if nome else ""
+        return f"{conexao}{detalhe}", Cor.CERTO
+    return "Arduino não conectado · modo teclado", Cor.AVISO
+
+
+# Variantes da linha de ajuda, da mais completa para a mais compacta.
+# As três últimas palavras/atalhos (F11, Ctrl+T, S) nunca são removidos.
+AJUDAS_TOPO = (
+    "F11 tela cheia   Ctrl+R zerar   Ctrl+T temas   S som on/off",
+    "F11 cheia   Ctrl+T temas   S som on/off",
+    "F11   Ctrl+T tema   S som on/off",
+)
+
+
+def escolher_ajuda_topo(medir, largura_max):
+    """Escolhe a variante mais completa que cabe, sem omitir os controles."""
+    for texto in AJUDAS_TOPO:
+        if medir(texto) <= largura_max:
+            return texto
+    return AJUDAS_TOPO[-1]
 
 
 class BarraTopo(Tela):
@@ -261,7 +301,10 @@ class BarraTopo(Tela):
         txt, cor = texto_status_serial(
             self.conexao, self.placa, aviso_porta=self.aviso_porta
         )
-        fonte_status = F("pequena")
+        # Status no topo direito e controles no rodapé direito: em 64 px de
+        # altura as duas linhas precisam de fontes um pouco menores para não
+        # se sobreporem em telas grandes (ESCALA > 1).
+        fonte_status = F("pequena", 0.8)
         r = 5 * min(ESCALA, 1.5)
         largura_max = (w - 6) - x_min_status - (14 + 2 * r)
         if largura_max > 0:
@@ -272,7 +315,7 @@ class BarraTopo(Tela):
             )
             if txt:
                 item = self.create_text(
-                    w - 6, cy - h * 0.16, text=txt, anchor="e",
+                    w - 6, max(2, h * 0.02), text=txt, anchor="ne",
                     fill=Cor.SUAVE, font=fonte_status,
                 )
                 bb = self.bbox(item)
@@ -285,15 +328,23 @@ class BarraTopo(Tela):
                         fill=cor, outline="",
                     )
 
-        # Linha de ajuda: em altura pequena não há espaço vertical para ela
-        # sem colidir com o título; nesse caso é omitida (o status continua).
-        if h >= 80:
-            y_ajuda = h - max(10, h * 0.12)
-            self.create_text(
-                w - 6, y_ajuda, anchor="e", fill=Cor.APAGADO,
-                font=F("pequena", 0.9),
-                text="F11 tela cheia   Ctrl+R zerar   Ctrl+T temas   S som on/off",
+        # Controles de teclado: prioridade sobre o status. A linha é
+        # encurtada progressivamente, mas som, tela cheia e troca de tema
+        # nunca são omitidos. `Ctrl+R` é o primeiro a sair no modo compacto.
+        fonte_ajuda = F("pequena", 0.8)
+        largura_controles = (w - 6) - x_min_status
+        if largura_controles > 0:
+            ajuda = escolher_ajuda_topo(
+                lambda valor: self._largura_texto(valor, fonte_ajuda),
+                largura_controles,
             )
+        else:
+            # Janela patologicamente estreita: ainda desenha a versão mínima.
+            ajuda = AJUDAS_TOPO[-1]
+        self.create_text(
+            w - 6, h - max(8, h * 0.10), text=ajuda, anchor="se",
+            fill=Cor.APAGADO, font=fonte_ajuda,
+        )
 
 
 class CartaoPlacar(Cartao):

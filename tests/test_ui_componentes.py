@@ -255,8 +255,10 @@ def test_barra_topo_nao_sobrepoe_status_ao_titulo_em_janela_pequena():
         pytest.skip(f"Tk indisponível: {e}")
 
     original = mod.SERIAL_DISPONIVEL
+    escala_original = mod.ESCALA
     try:
         mod.SERIAL_DISPONIVEL = True
+        mod.definir_escala(0.7)
         widget = mod.BarraTopo(root)
         widget.place(x=0, y=0, width=760, height=64)
         widget.conexao = "COM6"
@@ -275,7 +277,7 @@ def test_barra_topo_nao_sobrepoe_status_ao_titulo_em_janela_pequena():
 
         titulo = next(bb for txt, bb in textos.items() if txt.startswith(mod.TITULO))
         status = next(
-            (bb for txt, bb in textos.items() if "Arduino conectado" in txt),
+            (bb for txt, bb in textos.items() if txt.startswith("COM6")),
             None,
         )
         ajuda = next(
@@ -283,13 +285,21 @@ def test_barra_topo_nao_sobrepoe_status_ao_titulo_em_janela_pequena():
         )
 
         assert status is not None, "status deveria caber truncado nesta largura"
-        assert status[0] >= titulo[2], "status invadiu o título"
+        assert ajuda is not None, "controles não podem desaparecer"
+        assert "Ctrl+T" in next(txt for txt in textos if "F11" in txt)
+        assert "S som" in next(txt for txt in textos if "F11" in txt)
         assert status[2] <= 760 - 5, "status passou da borda direita"
         assert 0 <= status[1] and status[3] <= 64
-        if ajuda is not None:
-            assert ajuda[1] >= titulo[3], "linha de ajuda colidiu com o título"
+
+        def _colide(a, b):
+            return not (a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1])
+
+        assert not _colide(status, titulo), "status colidiu com o título"
+        assert not _colide(ajuda, titulo), "linha de ajuda colidiu com o título"
+        assert not _colide(ajuda, status), "ajuda colidiu com o status"
     finally:
         mod.SERIAL_DISPONIVEL = original
+        mod.definir_escala(escala_original)
         root.destroy()
 
 
