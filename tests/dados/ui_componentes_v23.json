@@ -166,22 +166,22 @@
    "tipo": "text",
    "coords": [
     994.0,
-    30.6
+    2.0
    ],
    "fill": "#8F9BC4",
    "width": "0",
-   "text": "Arduino conectado (COM6)",
-   "font": "{Segoe UI} 13 normal",
-   "anchor": "e",
+   "text": "COM6",
+   "font": "{Segoe UI} 10 normal",
+   "anchor": "ne",
    "justify": "left"
   },
   {
    "tipo": "oval",
    "coords": [
-    765.0,
-    26.5,
-    775.0,
-    36.5
+    937.0,
+    5.5,
+    947.0,
+    15.5
    ],
    "fill": "#2BD99F",
    "width": "1.0"
@@ -190,13 +190,13 @@
    "tipo": "text",
    "coords": [
     994.0,
-    63.0
+    81.0
    ],
    "fill": "#56628F",
    "width": "0",
-   "text": "F11 tela cheia   Ctrl+R zerar   Ctrl+T temas   S som on/off",
-   "font": "{Segoe UI} 11 normal",
-   "anchor": "e",
+   "text": "F11   Ctrl+T tema   S som on/off",
+   "font": "{Segoe UI} 10 normal",
+   "anchor": "se",
    "justify": "left"
   }
  ],
@@ -316,22 +316,22 @@
    "tipo": "text",
    "coords": [
     994.0,
-    30.6
+    2.0
    ],
    "fill": "#8F9BC4",
    "width": "0",
-   "text": "Arduino não conectado. Modo teclado ativo.",
-   "font": "{Segoe UI} 13 normal",
-   "anchor": "e",
+   "text": "Arduino não conectado · modo teclado",
+   "font": "{Segoe UI} 10 normal",
+   "anchor": "ne",
    "justify": "left"
   },
   {
    "tipo": "oval",
    "coords": [
-    633.0,
-    26.5,
-    643.0,
-    36.5
+    744.0,
+    5.5,
+    754.0,
+    15.5
    ],
    "fill": "#FFD166",
    "width": "1.0"
@@ -340,13 +340,13 @@
    "tipo": "text",
    "coords": [
     994.0,
-    63.0
+    81.0
    ],
    "fill": "#56628F",
    "width": "0",
    "text": "F11 tela cheia   Ctrl+R zerar   Ctrl+T temas   S som on/off",
-   "font": "{Segoe UI} 11 normal",
-   "anchor": "e",
+   "font": "{Segoe UI} 10 normal",
+   "anchor": "se",
    "justify": "left"
   }
  ],
