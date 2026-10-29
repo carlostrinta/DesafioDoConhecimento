@@ -36,7 +36,10 @@ def _texto(caminho):
 def test_v1_fica_somente_em_firmware_e_mantem_o_hash():
     assert V1.exists()
     assert not (RAIZ / "duelo_arduino.ino").exists()
-    assert hashlib.sha256(V1.read_bytes()).hexdigest().upper() == HASH_V1
+    # O Git pode materializar o arquivo com CRLF no Windows; o hash de
+    # referência é o do blob normalizado com LF.
+    conteudo = V1.read_bytes().replace(b"\r\n", b"\n")
+    assert hashlib.sha256(conteudo).hexdigest().upper() == HASH_V1
 
 
 def test_bancada_tem_os_10_botoes_e_debounce_de_60ms():
