@@ -97,6 +97,7 @@ A pasta `logs/` não é versionada (veja `.gitignore`).
 | `1` / `2` / `3` / `4` | ponto para a equipe A / B / C / D |
 | `N` | próxima pergunta |
 | `S` | liga/desliga o som |
+| `F1` | abre a tela Sobre |
 | `F11` | alterna tela cheia |
 | `Esc` | sai da tela cheia |
 | `Ctrl+R` | reinicia o placar (com confirmação) |
@@ -551,6 +552,22 @@ empacotamento de pasta. A distribuição precisa sair com o executável, o
 lado do `.exe`), a pasta `sons/` (com `README.md` e `LICENCAS.md`, mesmo sem
 áudio) e o `README.md`. O script de empacotamento será feito depois da Etapa
 4.5; até lá, copie esses itens manualmente para a pasta de distribuição.
+
+## Licenças e créditos
+
+- **Código-fonte:** licença **MIT**, `Copyright (c) 2026 Carlos Santos`.
+  O texto oficial está em [`LICENSE`](LICENSE).
+- **Bancos de perguntas:** licença **Creative Commons Atribuição 4.0
+  Internacional (CC BY 4.0)**, autor **Carlos Santos**. O aviso de atribuição
+  está em [`LICENCA_PERGUNTAS.md`](LICENCA_PERGUNTAS.md); os arquivos de
+  perguntas são `conhecimentos_gerais.json`, `eletrotecnica.json` e
+  `radiologia.json` (e qualquer outro banco `.json` distribuído com o jogo).
+- **Sons:** cada arquivo de áudio tem sua própria licença e crédito, registrados
+  em [`sons/LICENCAS.md`](sons/LICENCAS.md). O projeto não inclui áudio por
+  padrão.
+- **Autor do projeto:** Carlos Santos.
+- **Metadados:** nome, versão, autor, URL e licença ficam em `versao.py` e são
+  usados pela tela Sobre (F1), pelo log e pelo arquivo de versão do `.exe`.
 
 ## Roadmap (próximas etapas)
 

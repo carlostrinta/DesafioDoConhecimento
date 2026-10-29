@@ -40,4 +40,5 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=['desafio.ico'],
+    version='versao_info.txt',
 )

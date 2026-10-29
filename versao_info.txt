@@ -1,0 +1,35 @@
+# Arquivo de versão lido pelo PyInstaller.
+# Os valores vêm de versao.py para não existir uma segunda cópia dos metadados.
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=tuple(([int(p) for p in __import__("versao").VERSAO.split(".")] + [0, 0, 0])[:4]),
+    prodvers=tuple(([int(p) for p in __import__("versao").VERSAO.split(".")] + [0, 0, 0])[:4]),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo(
+      [
+        StringTable(
+          "040904B0",
+          [
+            StringStruct("CompanyName", __import__("versao").AUTOR),
+            StringStruct("FileDescription", __import__("versao").NOME),
+            StringStruct("FileVersion", __import__("versao").VERSAO),
+            StringStruct("InternalName", "DesafioDoConhecimento"),
+            StringStruct("LegalCopyright", "Copyright (c) 2026 " + __import__("versao").AUTOR),
+            StringStruct("OriginalFilename", __import__("versao").NOME + ".exe"),
+            StringStruct("ProductName", __import__("versao").NOME),
+            StringStruct("ProductVersion", __import__("versao").VERSAO),
+            StringStruct("Comments", __import__("versao").URL)
+          ]
+        )
+      ]
+    ),
+    VarFileInfo([VarStruct("Translation", [1033, 1200])])
+  ]
+)
