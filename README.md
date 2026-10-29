@@ -301,6 +301,13 @@ $env:DESAFIO_GOLDEN_UI=1
 python -m pytest tests/test_ui_componentes.py -q
 ```
 
+> **Regra de divergência do golden:** uma diferença só é aceita depois de
+> identificar o commit de origem por bisseção (`git bisect` ou execução do
+> golden em worktrees dos candidatos). Nunca classifique a diferença como
+> “deriva de ambiente” sem essa prova. Identificado o commit, corrija o código
+> ou o teste; regravar o golden é um commit separado, com a justificativa e
+> apenas os casos afetados.
+
 - o teste de **regressão do entrypoint**, que executa `python main.py` como
   subprocesso com `DESAFIO_AUTO_FECHAR=1` (a janela se fecha após 1 s) e exige
   código de saída 0;
