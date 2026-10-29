@@ -32,28 +32,33 @@ Os testes automatizados usam portas falsas. **Só o hardware real valida:**
 | 5 | **Tire o cabo** | em ~1 s volta para "não conectado"; não assume a COM4 |
 | 6 | **Recoloque o cabo** (mesma porta) | reconecta em até 3 s |
 | 7 | **Troque de porta USB** (ou use o clone) | reconecta na nova porta em até 3 s |
-| 8 | Com o jogo numa rodada, aperte **RESET** na placa | "Arduino reiniciado." e o LED de quem apertou reacende |
-| 9 | Feche o app com a placa conectada | LEDs apagam (`RESET`), porta fecha, processo termina |
+| 8 | Com o jogo numa rodada, aperte **RESET** na placa | "Arduino reiniciado."; no v1 o LED de quem apertou reacende; no v2 o app reenvia `CONFIG_TEAMS` |
+| 9 | Feche o app com a placa conectada | no v1, LEDs apagam (`RESET`); porta fecha e processo termina. No v2, o PC não envia `RESET` |
 | 10 | Repita 1–9 com o **clone CH340** | mesmo resultado (driver CH340 instalado) |
 | 11 | Repita 1–10 no **`Desafio do Conhecimento.exe`** | mesmo resultado |
 | 12 | Abra o app **sem placa** e deixe 1 min | console sem varredura infinita de portas; CPU baixa |
 
-## Firmware v2 (validação concluída)
+## Firmware v2 (em validação)
 
-O v2 foi validado no Arduino Uno em 29/10/2026. O roteiro da bancada está em
+O firmware v2 de produção ainda **não foi liberado**. O roteiro completo, com
+a matriz PC v1/v2 × firmware v1/v2, está em
+[`firmware/v2/ROTEIRO_VALIDACAO.md`](firmware/v2/ROTEIRO_VALIDACAO.md). A
+bancada de 10 botões já foi validada separadamente em
 [`firmware/bancada_botoes/README.md`](firmware/bancada_botoes/README.md).
 
-Para repetir a validação com o firmware v2 gravado:
+Resumo do que precisa ser confirmado com o firmware v2 gravado:
 
 1. Abra o app e confira o log: o Arduino deve enviar `PRONTO` e `VERSAO 2`.
 2. Com 4 equipes, o app envia `CONFIG_TEAMS 4` e o Arduino responde
-   `EQUIPES 4`.
-3. Teste A/B/C/D, acertos A/B/C/D, `AVANÇAR` e `REVELAR`.
+   `EQUIPES 4`; sem ACK, deve haver uma retentativa e aviso visível.
+3. Teste A/B/C/D, acertos A/B/C/D, `AVANÇAR` e `REVELAR` nos pinos D2–D11.
 4. Em um teste separado, com o app fechado, use o Monitor Serial para enviar
    `CONFIG_TEAMS 2` e confirme que C/D deixam de gerar eventos; envie
-   `CONFIG_TEAMS 5` e confira `ERRO EQUIPES`.
-5. O v2 não tem LEDs nem buzzer: o feedback visual/sonoro deve continuar no PC.
-6. Repita a reconexão (tirar/voltar o cabo) e o fechamento do app.
+   `CONFIG_TEAMS 5` e confira `EQUIPES <atual>`.
+5. O v2 não tem LEDs nem buzzer: o feedback visual/sonoro deve continuar no PC
+   e o PC v2 não deve enviar `LED_*`, `BEEP*`, `BUZZER_*` nem `RESET`.
+6. Repita a reconexão (tirar/voltar o cabo), o reset por DTR no meio da rodada
+   e o fechamento do app.
 
 ## Se algo falhar
 
@@ -69,4 +74,5 @@ Para repetir a validação com o firmware v2 gravado:
 `tests/test_serial_comm.py` reproduz, com porta falsa: COM4 Bluetooth sem
 `PRONTO` (nunca aceita), COM6 real, queda e volta em outra porta (COM7),
 ausência total de portas, encerramento sem placa e com driver travado
-(`parar()` em menos de 1,5 s), além de `RESET` ao fechar.
+(`parar()` em menos de 1,5 s), além de `RESET` ao fechar no v1 e ausência de
+`RESET` no v2.

@@ -45,16 +45,23 @@ Use `INPUT_PULLUP`: cada botão fica entre o pino e o **GND**.
 7. Anote placa, porta, driver e qualquer divergência. Se algum pino não
    responder, confira a ligação para GND antes de alterar o firmware.
 
-## Critério de liberação do v2 (atendido)
+## Resultado da bancada (concluído)
 
-O firmware v2 de produção foi liberado depois que:
+Validação física da bancada concluída no Arduino Uno: os 10 botões foram lidos
+nos pinos D2–D11, `CONFIG_TEAMS 2/3/4` respondeu `EQUIPES N`, os valores
+inválidos responderam `ERRO EQUIPES` e o debounce de 60 ms não repetiu evento
+com o botão mantido.
 
-- os 10 botões foram lidos nos pinos D2–D11;
-- `CONFIG_TEAMS 2`, `3` e `4` responderam `EQUIPES N`;
-- `CONFIG_TEAMS 5`, `X`, `22` e vazio responderam `ERRO EQUIPES`;
-- o debounce de 60 ms não produziu eventos repetidos com o botão mantido.
+## Critério para liberar o v2 de produção (pendente)
 
-## Resultado
+O firmware v2 de produção só deve ser liberado depois que:
 
-Validação física concluída em **29/10/2026** no Arduino Uno. O aplicativo também
-foi testado com o firmware v2 e 4 equipes antes da integração na `main`.
+- os 10 botões forem confirmados no firmware de produção;
+- `CONFIG_TEAMS 2`, `3` e `4` responderem `EQUIPES N`;
+- `CONFIG_TEAMS 5`, `X`, `22` e vazio responderem `EQUIPES <atual>`;
+- o debounce de 60 ms não produzir eventos repetidos com o botão mantido;
+- o aplicativo com 4 equipes confirmar o ACK, o reset por DTR e a ausência de
+  comandos de LED/buzzer.
+
+O roteiro completo do v2 está em
+[`../v2/ROTEIRO_VALIDACAO.md`](../v2/ROTEIRO_VALIDACAO.md).

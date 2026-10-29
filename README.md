@@ -10,10 +10,11 @@ fica visível na tela.
 
 > **Estado do hardware:** a parte Python já aceita 2, 3 ou 4 equipes pelo
 > teclado. O firmware/protocolo v1 do Arduino atende 2 equipes; o protocolo v2
-> (4 equipes e botões C/D) foi **validado no Arduino Uno** e está disponível
-> nesta versão. O sketch de bancada em
+> (4 equipes e botões C/D) está **EM VALIDAÇÃO**. O sketch de bancada em
 > [`firmware/bancada_botoes`](firmware/bancada_botoes/bancada_botoes.ino)
-> registra o teste dos 10 botões e do parser de `CONFIG_TEAMS`.
+> registra o teste dos 10 botões e do parser de `CONFIG_TEAMS`; o roteiro do
+> firmware de produção está em
+> [`firmware/v2/ROTEIRO_VALIDACAO.md`](firmware/v2/ROTEIRO_VALIDACAO.md).
 
 ---
 
@@ -201,25 +202,24 @@ Para gravar: abra o `.ino` na Arduino IDE, selecione a placa **Arduino Uno** e
 a porta correta e clique em **Upload**. Depois feche o Monitor Serial antes de
 abrir o jogo.
 
-### Firmware v2 de produção
+### Firmware v2 de produção (em validação)
 
 O firmware v2 fica em
-[`firmware/v2/duelo_arduino_v2/duelo_arduino_v2.ino`](firmware/v2/duelo_arduino_v2/duelo_arduino_v2.ino)
+[`firmware/v2/duelo_v2/duelo_v2.ino`](firmware/v2/duelo_v2/duelo_v2.ino)
 e usa o mesmo mapa de 10 botões em `D2–D11`. Ele **não usa LEDs nem buzzer**:
 o feedback fica no aplicativo. O handshake é `PRONTO` + `VERSAO 2`; depois o
-Python envia `CONFIG_TEAMS N` e espera o ACK `EQUIPES N`. A validação física
-foi concluída no Arduino Uno em **29/10/2026**.
+Python envia `CONFIG_TEAMS N` e espera o ACK `EQUIPES N`. **A validação física
+e o teste do aplicativo ainda estão pendentes.**
 
 | Comando | Resposta |
 | --- | --- |
 | `CONFIG_TEAMS 2`, `3` ou `4` | `EQUIPES N` |
-| `CONFIG_TEAMS 5`, `X`, `22` ou vazio | `ERRO EQUIPES` |
-| `RESET` | reinicia o debounce, sem saída física |
-| `LED_*`, `BEEP*`, `BUZZER_*` | ignorados |
+| `CONFIG_TEAMS 5`, `X`, `22` ou vazio | `EQUIPES <atual>` |
+| `RESET`, `LED_*`, `BEEP*`, `BUZZER_*` | ignorados |
 
-O debounce é de **60 ms**. O roteiro da bancada e o teste do aplicativo com o
-v2 foram concluídos antes da liberação; consulte
-[`firmware/bancada_botoes/README.md`](firmware/bancada_botoes/README.md).
+O firmware começa com **2 equipes** e o debounce é um lockout de **60 ms**.
+O roteiro completo está em
+[`firmware/v2/ROTEIRO_VALIDACAO.md`](firmware/v2/ROTEIRO_VALIDACAO.md).
 
 ---
 
@@ -280,7 +280,7 @@ script, se não houver permissão de escrita).
 | `firmware/README.md` | índice dos sketches e ordem de validação |
 | `firmware/v1/duelo_arduino_v1/` | firmware v1 congelado (ponto de retorno) |
 | `firmware/bancada_botoes/` | sketch e roteiro de validação dos 10 botões |
-| `firmware/v2/duelo_arduino_v2/` | firmware v2 (10 botões, 4 equipes, sem LEDs/buzzer) |
+| `firmware/v2/duelo_v2/` | firmware v2 em validação (10 botões, 4 equipes, sem LEDs/buzzer) |
 | `sons/` | documentação de áudio e registro de licenças |
 | `tests/` | suíte de testes pytest |
 | `Desafio do Conhecimento.spec` | receita de build do PyInstaller |
@@ -405,7 +405,9 @@ Se você redistribuir o jogo, mantenha os arquivos `LICENSE`,
 - [`firmware/bancada_botoes/README.md`](firmware/bancada_botoes/README.md) —
   roteiro físico dos 10 botões, `CONFIG_TEAMS` e debounce.
 - [`firmware/v2/README.md`](firmware/v2/README.md) — pinagem, protocolo e
-  validação do firmware v2.
+  status do firmware v2.
+- [`firmware/v2/ROTEIRO_VALIDACAO.md`](firmware/v2/ROTEIRO_VALIDACAO.md) —
+  roteiro físico e matriz PC × firmware antes da liberação.
 - [`LICENCA_PERGUNTAS.md`](LICENCA_PERGUNTAS.md) — licença dos bancos de
   perguntas.
 
@@ -414,14 +416,15 @@ Se você redistribuir o jogo, mantenha os arquivos `LICENSE`,
 ## Limitações conhecidas
 
 - Com firmware v1 (ou sem handshake), a partida cai para **2 equipes** com
-  aviso; 3/4 equipes com botões físicos usam o firmware v2 validado.
+  aviso. Enquanto o firmware v2 está em validação, 3/4 equipes com botões
+  físicos dependem da liberação dele.
 - No modo teclado puro, 3/4 equipes já funcionam.
 - `eletrotecnica.json` e `radiologia.json` têm 20 perguntas cada: o baralho
   reinicia rápido.
 - A partida salva retoma a pergunta atual; fase e tempo restante não são
   restaurados.
-- O firmware v2 foi validado no Arduino Uno e está disponível; o v1 continua
-  na pasta `firmware/v1` como ponto de retorno.
+- O firmware v2 está em validação no Arduino Uno; o v1 continua na pasta
+  `firmware/v1` como ponto de retorno.
 
 ---
 
