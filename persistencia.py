@@ -381,7 +381,13 @@ def _validar_e_montar(
     num_salvo = _inteiro(jogo_dados.get("num_equipes", 2))
     if num_salvo not in (2, 3, 4):
         return _falha("número de equipes inválido no estado", caminho_estado)
-    num = num_equipes if num_equipes in (2, 3, 4) else num_salvo
+    if num_equipes in (2, 3, 4) and num_salvo != num_equipes:
+        return _falha(
+            f"estado salvo tem {num_salvo} equipes, mas o config.json usa "
+            f"{num_equipes}; iniciando uma partida nova",
+            caminho_estado,
+        )
+    num = num_salvo
 
     indice = _inteiro(jogo_dados.get("indice_pergunta"))
     if indice is None or not 1 <= indice <= total:

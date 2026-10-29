@@ -220,6 +220,32 @@ class TestCarga:
         assert partida.jogo.tempo_resposta == 12
         assert partida.jogo.timer_restante() > 0
 
+    def test_num_equipes_divergente_do_config_inicia_partida_nova(
+        self, tmp_path, logs_persistencia
+    ):
+        _, _, estado = _salvar_estado(tmp_path, num_equipes=2)
+
+        resultado = persistencia.carregar(
+            str(tmp_path), caminho=str(estado), num_equipes=3
+        )
+
+        assert resultado.partida is None
+        assert "2 equipes" in resultado.motivo
+        assert "3" in resultado.motivo
+        assert any("2 equipes" in m for m in logs_persistencia.mensagens)
+
+    def test_num_equipes_igual_ao_config_e_aceito(self, tmp_path):
+        _, jogo, estado = _salvar_estado(tmp_path, num_equipes=4)
+
+        resultado = persistencia.carregar(
+            str(tmp_path), caminho=str(estado), num_equipes=4
+        )
+
+        assert resultado.motivo == ""
+        assert resultado.partida is not None
+        assert resultado.partida.jogo.num_equipes == 4
+        assert resultado.partida.jogo.placar == jogo.placar
+
     def test_estado_ausente_nao_gera_aviso(self, tmp_path, logs_persistencia):
         resultado = persistencia.carregar(
             str(tmp_path), caminho=str(tmp_path / "nao_existe.json")
