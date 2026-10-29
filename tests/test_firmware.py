@@ -11,7 +11,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 V1 = RAIZ / "firmware" / "v1" / "duelo_arduino_v1" / "duelo_arduino_v1.ino"
 BANCADA = RAIZ / "firmware" / "bancada_botoes" / "bancada_botoes.ino"
-V2 = RAIZ / "firmware" / "v2" / "duelo_arduino_v2" / "duelo_arduino_v2.ino"
+V2 = RAIZ / "firmware" / "v2" / "duelo_v2" / "duelo_v2.ino"
 
 HASH_V1 = "761CAF1BA38765DE458B1458D898AFAA60E07794CF45C65908D864B80FCB351A"
 
@@ -59,15 +59,16 @@ def test_v2_faz_handshake_e_aceita_config_teams():
 
     assert 'Serial.println(F("PRONTO"))' in texto
     assert 'Serial.println(F("VERSAO 2"))' in texto
-    assert 'Serial.println(F("ERRO EQUIPES"))' in texto
+    assert 'Serial.print(F("EQUIPES "))' in texto
     assert 'strncmp(cmd, "CONFIG_TEAMS", prefixo)' in texto
-    assert "DEBOUNCE_MS = 60" in texto
+    assert "NUM_EQUIPES_INICIAL = 2" in texto
+    assert "uint16_t DEBOUNCE_MS = 60" in texto
 
     for evento in EVENTOS:
         assert f'"{evento}"' in texto
 
 
-def test_v2_usa_d2_a_d11_sem_saidas_fisicas():
+def test_v2_usa_d2_a_d11_sem_saidas_fisicas_e_sem_reset():
     texto = _texto(V2)
 
     for pino in range(2, 12):
@@ -76,3 +77,9 @@ def test_v2_usa_d2_a_d11_sem_saidas_fisicas():
     assert "pinMode(botoes[i].pino, INPUT_PULLUP)" in texto
     assert "pinMode(LED" not in texto
     assert "pinMode(BUZZER" not in texto
+    assert "resetarDebounce" not in texto
+    assert "delay(" not in texto
+    assert "String " not in texto
+    assert "ERRO EQUIPES" not in texto
+    assert "TAM_BUFFER_SERIAL = 32" in texto
+    assert "bufferEstourado" in texto
