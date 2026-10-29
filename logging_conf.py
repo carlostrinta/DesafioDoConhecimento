@@ -23,6 +23,7 @@ import sys
 from logging.handlers import RotatingFileHandler
 
 from recursos import obter_diretorio_base
+from versao import AUTOR, NOME, VERSAO
 
 NOME_LOGGER = "desafio"
 NOME_ARQUIVO = "desafio.log"
@@ -36,6 +37,11 @@ FORMATO = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 FORMATO_DATA = "%Y-%m-%d %H:%M:%S"
 
 _caminho_log = ""
+
+
+def mensagem_inicio(debug=False):
+    """Primeira linha do log: identifica nome, versão e autor."""
+    return f"{NOME} {VERSAO} - {AUTOR} - iniciando (debug={debug})"
 
 # Enquanto ninguém configurar o logging, os avisos dos módulos ficam mudos
 # (em vez de cair no lastResort/stderr). `configurar()` troca este handler.

@@ -56,7 +56,7 @@ def iniciar(app_cls=None, debug=False):
     """Configura o log, monta a raiz, instancia a aplicação e roda o loop."""
     logger = logging_conf.configurar(debug=debug)
     logging_conf.instalar_excepthook()
-    logger.info("Iniciando aplicação (debug=%s)", debug)
+    logger.info(logging_conf.mensagem_inicio(debug))
 
     # Import tardio: o config.json só é lido depois de o log estar pronto.
     if app_cls is None:

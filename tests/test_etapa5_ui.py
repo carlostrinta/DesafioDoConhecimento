@@ -245,6 +245,33 @@ def _confirmar_contagem(app, root, relogio):
     assert app.fase == FASE_AGUARDANDO
 
 
+def test_f1_abre_sobre_reutiliza_e_respeita_contagem(montar_app):
+    montar, _banco = montar_app
+    app, root, _relogio = montar()
+
+    assert root.bind("<F1>")
+    app.abrir_sobre()
+    root.update()
+
+    janela = app._janela_sobre
+    assert janela is not None
+    assert janela.winfo_exists()
+
+    app.abrir_sobre()
+    root.update()
+    assert app._janela_sobre is janela
+
+    janela.fechar()
+    root.update()
+    assert app._janela_sobre is None
+
+    # Enquanto a contagem (ou o "JÁ!") está visível, o F1 não abre a tela.
+    app._contagem_visual = "JÁ!"
+    app.abrir_sobre()
+    root.update()
+    assert app._janela_sobre is None
+
+
 @pytest.mark.parametrize("num_equipes", [2, 3, 4])
 def test_teclas_de_equipe_respeitam_numero_de_equipes(
     montar_app, num_equipes

@@ -18,6 +18,7 @@ from tkinter import filedialog, messagebox
 from perguntas import inspecionar_arquivo_perguntas, listar_arquivos_perguntas
 from recursos import caminho_recurso, obter_diretorio_base
 from ui_componentes import Cor, obter_icone_tema
+from versao import AUTOR, NOME
 
 
 class ModalSelecaoPerguntas(tk.Toplevel):
@@ -46,7 +47,7 @@ class ModalSelecaoPerguntas(tk.Toplevel):
         self.diretorio = diretorio or obter_diretorio_base()
         self.ao_sair = ao_sair
 
-        self.title("Duelo de Conhecimento — Escolha de Tema")
+        self.title(f"{NOME} — Escolha de Tema")
         self.configure(bg=Cor.FUNDO)
         self.resizable(False, False)
 
@@ -121,6 +122,15 @@ class ModalSelecaoPerguntas(tk.Toplevel):
             bg=Cor.PAINEL,
             anchor="w"
         ).pack(fill="x", pady=(4, 0))
+
+        tk.Label(
+            topo,
+            text=f"{NOME} · {AUTOR}",
+            font=("Segoe UI", 8),
+            fg=Cor.APAGADO,
+            bg=Cor.PAINEL,
+            anchor="e",
+        ).pack(fill="x", pady=(6, 0))
 
         tk.Frame(self, bg=Cor.BORDA, height=2).pack(fill="x")
 

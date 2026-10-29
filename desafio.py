@@ -11,6 +11,7 @@ Atalhos de teclado (modo simulação, funcionam junto com o Arduino):
     1 / 2 / 3 / 4   acerto da equipe A / B / C / D
     N               próxima pergunta
     S               ligar/desligar som
+    F1              tela Sobre
     F11             tela cheia  (Esc sai)
     Ctrl+R          zerar o placar
 """
@@ -85,6 +86,7 @@ from ui_componentes import (
     escolher_fonte,
 )
 from ui_selecao import ModalContinuarPartida, ModalSelecaoPerguntas
+from ui_sobre import TelaSobre
 
 log = logging.getLogger("desafio")
 
@@ -177,6 +179,7 @@ class DueloDeConhecimento:
         self.protocolo_arduino = None
         self._job_versao = None
         self._versao_prazo = 0.0
+        self._janela_sobre = None
         self._aviso_protocolo_mostrado = False
         self._geracao_conexao = 0
         self._geracao_fallback = 0
@@ -253,6 +256,7 @@ class DueloDeConhecimento:
         self.iniciar_thread_serial()
 
         self.root.bind("<Key>", self.tecla_pressionada)
+        self.root.bind("<F1>", lambda e: self.abrir_sobre())
         self.root.bind("<F11>", lambda e: self.alternar_tela_cheia())
         self.root.bind("<Escape>", lambda e: self.root.attributes("-fullscreen", False))
         self.root.bind("<Control-r>", lambda e: self.reiniciar_placar())
@@ -496,6 +500,40 @@ class DueloDeConhecimento:
             diretorio=diretorio,
             ao_sair=self.fechar,
         )
+
+    def abrir_sobre(self):
+        """
+        Abre a tela "Sobre" (F1) sem cobrir placar, topo ou contagem.
+
+        Durante a contagem (inclusive enquanto o "JÁ!" está visível) a janela
+        não é aberta: o overlay precisa continuar legível. O F1 nunca abre
+        uma segunda janela; se ela já existe, apenas recebe o foco.
+        """
+        if self.jogo.contagem_ativa or self._contagem_visual is not None:
+            self.avisar("Aguarde o JÁ! da contagem de largada.")
+            return
+
+        janela = getattr(self, "_janela_sobre", None)
+        if janela is not None:
+            try:
+                if janela.winfo_exists():
+                    janela.lift()
+                    janela.focus_force()
+                    return
+            except tk.TclError:
+                pass
+            self._janela_sobre = None
+
+        self._janela_sobre = TelaSobre(
+            self.root, ao_fechar=self._sobre_fechada
+        )
+
+    def _sobre_fechada(self):
+        self._janela_sobre = None
+        try:
+            self.root.focus_force()
+        except tk.TclError:
+            pass
 
     def proxima_pergunta(self, forcar=False):
         # A regra de bloqueio e o avanço do baralho são do Jogo.
@@ -1267,6 +1305,13 @@ class DueloDeConhecimento:
         trava = getattr(self, "_trava", None)
         if trava is not None:
             trava.liberar()
+        janela_sobre = getattr(self, "_janela_sobre", None)
+        if janela_sobre is not None:
+            try:
+                janela_sobre.destroy()
+            except tk.TclError:
+                pass
+            self._janela_sobre = None
         self.root.destroy()
 
 

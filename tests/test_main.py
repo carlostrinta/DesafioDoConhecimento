@@ -106,6 +106,44 @@ def test_iniciar_instala_captura_de_callback_tk(monkeypatch):
     assert chamadas["args"] == (ValueError, erro, None)
 
 
+def test_iniciar_registra_versao_e_autor_na_primeira_linha(monkeypatch):
+    import main
+    import versao
+
+    linhas = []
+
+    class LoggerCaptura:
+        def info(self, mensagem, *args, **kwargs):
+            linhas.append(mensagem % args if args else mensagem)
+
+    class RootFalsa:
+        def mainloop(self):
+            pass
+
+    class AppFalsa:
+        def __init__(self, root):
+            pass
+
+    monkeypatch.setattr(
+        main.logging_conf,
+        "configurar",
+        lambda debug=False: LoggerCaptura(),
+    )
+    monkeypatch.setattr(main.logging_conf, "instalar_excepthook", lambda: None)
+    monkeypatch.setattr(
+        main.logging_conf, "tratar_excecao_tk", lambda *a, **k: None
+    )
+    monkeypatch.setattr(main.logging, "shutdown", lambda: None)
+    monkeypatch.setattr(main.tk, "Tk", lambda: RootFalsa())
+
+    main.iniciar(AppFalsa)
+
+    assert linhas
+    assert versao.NOME in linhas[0]
+    assert versao.VERSAO in linhas[0]
+    assert versao.AUTOR in linhas[0]
+
+
 def test_main_usa_o_app_do_desafio(monkeypatch):
     import desafio
     import main
