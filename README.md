@@ -9,11 +9,13 @@ e o placar fica visível na tela.
 [`versao.py`](versao.py). A tela **Sobre** pode ser aberta com `F1`.
 
 > **Estado do hardware:** o firmware v2 é o **recomendado** e foi validado no
-> **Arduino Uno e no Mega 2560**, com 2 a 4 equipes e 10 botões. O **clone CH340
-> ainda não foi testado com o v2** — é uma pendência explícita. Se o `PRONTO`
-> demorar mais de 3 s após o reset por DTR, aumente `serial.timeout_pronto` no
-> `config.json`. O firmware v1 continua disponível como caminho legado para
-> 2 equipes com LEDs e buzzer.
+> **Arduino Uno, no Mega 2560 e no clone CH340**, com 2 a 4 equipes e 10 botões.
+> O clone CH340 também foi validado com o **firmware v1**, apenas no modo de
+> **2 equipes**. O v1 em hardware **não** foi validado em Uno/Mega nesta rodada;
+> Uno e Mega foram validados apenas com o v2. O firmware v1 continua disponível
+> como caminho legado para 2 equipes com LEDs e buzzer. Se o `PRONTO` demorar
+> mais de 3 s após o reset por DTR no CH340, aumente `serial.timeout_pronto` no
+> `config.json`.
 
 ---
 
@@ -24,6 +26,7 @@ e o placar fica visível na tela.
 - [Hardware opcional](#hardware-opcional)
 - [Gerar o executável](#gerar-o-executável)
 - [Estrutura do projeto](#estrutura-do-projeto)
+- [Editor de perguntas (em desenvolvimento)](#editor-de-perguntas-em-desenvolvimento)
 - [Configuração e logs](#configuração-e-logs)
 - [Testes](#testes)
 - [Limitações conhecidas](#limitações-conhecidas)
@@ -115,11 +118,11 @@ caminhos, do recomendado ao legado.
 
 O v2 usa **somente botões** em `D2–D11`, sem LEDs, buzzer, resistores ou fonte
 externa. O feedback visual e sonoro fica no aplicativo. Foi validado no
-**Arduino Uno** e no **Mega 2560**; o clone CH340 ainda é pendência.
+**Arduino Uno**, no **Mega 2560** e no **clone CH340**.
 
 #### Lista de materiais do v2
 
-- 1 **Arduino Uno** ou **Arduino Mega 2560**;
+- 1 **Arduino Uno**, **Arduino Mega 2560** ou **clone Uno com CH340**;
 - **6, 8 ou 10 botões** de pressão momentâneos, conforme o modo de equipes;
 - 1 protoboard grande ou placa de montagem;
 - jumpers macho-macho;
@@ -128,8 +131,8 @@ externa. O feedback visual e sonoro fica no aplicativo. Foi validado no
 > **Alimentação:** use o Arduino alimentado pelo USB. Não ligue os botões em
 > tensões externas. Os pinos digitais do Uno e do Mega trabalham em 5 V.
 >
-> **Clone CH340:** ainda não validado com o v2. Se o `PRONTO` demorar mais de
-> 3 s após o reset por DTR, aumente `serial.timeout_pronto` no `config.json`.
+> **Clone CH340:** validado com o v2 (2 a 4 equipes). Se o `PRONTO` demorar mais
+> de 3 s após o reset por DTR, aumente `serial.timeout_pronto` no `config.json`.
 
 #### Botões necessários por modo
 
@@ -204,11 +207,13 @@ está em [`firmware/v2/ROTEIRO_VALIDACAO.md`](firmware/v2/ROTEIRO_VALIDACAO.md).
 O firmware original está em
 [`firmware/v1/duelo_arduino_v1/duelo_arduino_v1.ino`](firmware/v1/duelo_arduino_v1/duelo_arduino_v1.ino)
 (cópia idêntica, mantida como ponto de retorno). Ele atende **2 equipes** e
-continua disponível para quem já tem a montagem antiga.
+continua disponível para quem já tem a montagem antiga. Nesta rodada, o v1 em
+hardware foi validado **apenas no clone CH340**, com **2 equipes**; não foi
+validado em Uno/Mega.
 
 #### Lista de materiais do v1
 
-- 1 **Arduino Uno**;
+- 1 **Arduino Uno** (ou clone Uno com CH340);
 - 6 botões de pressão momentâneos;
 - 2 LEDs;
 - 2 resistores de **220 Ω** ou **330 Ω** para os LEDs;
@@ -293,7 +298,8 @@ script, se não houver permissão de escrita).
 | `ui_selecao.py` | modal de escolha do banco de perguntas |
 | `ui_sobre.py` | tela Sobre (F1) |
 | `jogo.py` | regra de jogo pura: estado, placar, timer e contagem |
-| `perguntas.py` | modelo, carregador/validador e listagem dos bancos |
+| `perguntas.py` | modelo, carregador/validador único e validação por campo do editor |
+| `editor_modelo.py` | modelo puro do editor (E1): CRUD, busca, undo/redo e gravação segura |
 | `persistencia.py` | partida salva em JSON, hash, trava de instância e debounce |
 | `serial_comm.py` | thread serial, detecção de porta, reconexão e fila |
 | `protocolo.py` | protocolo v2: botões, `CONFIG_TEAMS` e ACK de equipes |
@@ -307,7 +313,7 @@ script, se não houver permissão de escrita).
 | `firmware/README.md` | índice dos sketches e ordem de validação |
 | `firmware/v1/duelo_arduino_v1/` | firmware v1 congelado (ponto de retorno) |
 | `firmware/bancada_botoes/` | sketch e roteiro de validação dos 10 botões |
-| `firmware/v2/duelo_v2/` | firmware v2 validado no Uno/Mega (10 botões, 4 equipes, sem LEDs/buzzer) |
+| `firmware/v2/duelo_v2/` | firmware v2 validado no Uno, Mega e clone CH340 (10 botões, 4 equipes, sem LEDs/buzzer) |
 | `sons/` | documentação de áudio e registro de licenças |
 | `tests/` | suíte de testes pytest |
 | `Desafio do Conhecimento.spec` | receita de build do PyInstaller |
@@ -315,7 +321,25 @@ script, se não houver permissão de escrita).
 | `config.exemplo.json` | modelo versionado de configuração |
 | `ROTEIRO_SERIAL_HARDWARE.md` | checklist de validação com Arduino real |
 | `docs/ligacao_v2.svg` | diagrama de ligação dos 10 botões (Uno e Mega) |
-| `docs/PLANO_EDITOR_PERGUNTAS.md` | plano do editor de perguntas (sem código) |
+| `docs/PLANO_EDITOR_PERGUNTAS.md` | plano e decisões do editor de perguntas |
+
+---
+
+## Editor de perguntas (em desenvolvimento)
+
+A Etapa E1 prepara o editor **sem interface gráfica ainda**. O modelo puro
+fica em `editor_modelo.py`: leitura de lista legada ou envelope, criação,
+edição, exclusão, duplicação, reordenação, busca/filtro e undo/redo. A
+validação por campo continua em `perguntas.py`, com os mesmos limites usados
+pelo carregador.
+
+A gravação é segura: escreve `.tmp`, cria `.bak` antes de sobrescrever, usa
+trava de instância e expõe conflito de nome para a futura interface. Os bancos
+distribuídos (`conhecimentos_gerais.json`, `eletrotecnica.json` e
+`radiologia.json`) são **somente leitura**; alterações devem ser salvas como
+cópia na pasta configurada ou na pasta do usuário. Não há tela, atalho ou data
+prometida para a UI nesta etapa. O escopo completo está em
+[`docs/PLANO_EDITOR_PERGUNTAS.md`](docs/PLANO_EDITOR_PERGUNTAS.md).
 
 ---
 
@@ -437,11 +461,11 @@ Se você redistribuir o jogo, mantenha os arquivos `LICENSE`,
 - [`firmware/v2/README.md`](firmware/v2/README.md) — pinagem, protocolo e
   status do firmware v2.
 - [`firmware/v2/ROTEIRO_VALIDACAO.md`](firmware/v2/ROTEIRO_VALIDACAO.md) —
-  roteiro físico, matriz PC × firmware, placas validadas e pendência do CH340.
+  roteiro físico, matriz PC × firmware e placas validadas (Uno, Mega e CH340).
 - [`LICENCA_PERGUNTAS.md`](LICENCA_PERGUNTAS.md) — licença dos bancos de
   perguntas.
-- [`docs/PLANO_EDITOR_PERGUNTAS.md`](docs/PLANO_EDITOR_PERGUNTAS.md) — plano
-  do editor de perguntas (escopo, formato, salvamento, UI, testes e etapas).
+- [`docs/PLANO_EDITOR_PERGUNTAS.md`](docs/PLANO_EDITOR_PERGUNTAS.md) — plano e
+  decisões do editor de perguntas (escopo, formato, salvamento, UI e etapas).
 
 ---
 
@@ -449,9 +473,10 @@ Se você redistribuir o jogo, mantenha os arquivos `LICENSE`,
 
 - Com firmware v1 (ou sem handshake), a partida cai para **2 equipes** com
   aviso; 3/4 equipes com botões físicos usam o firmware v2.
-- O firmware v2 foi validado no **Arduino Uno e no Mega 2560**. O clone CH340
-  com v2 ainda é pendência; se o `PRONTO` demorar mais de 3 s após o reset por
-  DTR, aumente `serial.timeout_pronto`.
+- O firmware v2 foi validado no **Arduino Uno, no Mega 2560 e no clone CH340**.
+  O v1 em hardware foi validado **apenas no clone CH340**, com 2 equipes; Uno e
+  Mega foram validados apenas com o v2. Se o `PRONTO` demorar mais de 3 s após o
+  reset por DTR no CH340, aumente `serial.timeout_pronto`.
 - No modo teclado puro, 3/4 equipes já funcionam.
 - `eletrotecnica.json` e `radiologia.json` têm 20 perguntas cada: o baralho
   reinicia rápido.

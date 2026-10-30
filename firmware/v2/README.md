@@ -1,9 +1,9 @@
 # Firmware v2 — produção
 
-**Status: validado no Arduino Uno e no Mega 2560.** O clone CH340 ainda não
-foi testado com o firmware v2 e permanece como pendência explícita. O roteiro,
-o resultado e os critérios estão em
-[`ROTEIRO_VALIDACAO.md`](ROTEIRO_VALIDACAO.md).
+**Status: validado no Arduino Uno, no Mega 2560 e no clone CH340.** O clone
+CH340 foi validado com o firmware v2 (2 a 4 equipes); o firmware v1 em hardware
+foi validado apenas no CH340, com 2 equipes. O roteiro, o resultado e os
+critérios estão em [`ROTEIRO_VALIDACAO.md`](ROTEIRO_VALIDACAO.md).
 
 O firmware v2 usa os **10 botões em D2–D11** e não usa LEDs nem buzzer. O
 feedback visual e sonoro fica no aplicativo; isso libera todos os pinos
@@ -68,9 +68,9 @@ linhas que estouram o buffer são descartadas até o próximo `\n`.
 | v2 | v1 | PC v2 detecta v1, limita a 2 equipes e preserva o caminho v1 (LEDs/buzzer) |
 | v2 | v2 | 2 a 4 equipes; `CONFIG_TEAMS` + ACK `EQUIPES N`; sem comandos de LED/buzzer |
 
-O caminho PC v2 + firmware v2 foi validado no **Arduino Uno e no Mega 2560**.
-O clone CH340 com v2 ainda não foi testado; se o `PRONTO` demorar mais de 3 s
-após o reset por DTR, aumente `serial.timeout_pronto` no `config.json`.
+O caminho PC v2 + firmware v2 foi validado no **Arduino Uno, no Mega 2560 e no
+clone CH340**. Se o `PRONTO` demorar mais de 3 s após o reset por DTR no CH340,
+aumente `serial.timeout_pronto` no `config.json`.
 
 ## Como gravar
 
@@ -83,13 +83,14 @@ após o reset por DTR, aumente `serial.timeout_pronto` no `config.json`.
 ## Validação
 
 O roteiro completo, incluindo a matriz PC v1/v2 × firmware v1/v2, está em
-[`ROTEIRO_VALIDACAO.md`](ROTEIRO_VALIDACAO.md). A validação foi concluída no
-**Arduino Uno** e no **Mega 2560**; a bancada de 10 botões também foi validada
-separadamente.
+[`ROTEIRO_VALIDACAO.md`](ROTEIRO_VALIDACAO.md). A validação do **firmware v2**
+foi concluída no **Arduino Uno**, no **Mega 2560** e no **clone CH340**; a
+bancada de 10 botões também foi validada separadamente.
 
-O **clone CH340** com v2 é a única pendência de placa. Se o `PRONTO` demorar
-mais de 3 s após o reset por DTR, aumente `serial.timeout_pronto` no
-`config.json`.
+O **firmware v1** em hardware foi validado **apenas no clone CH340**, com
+**2 equipes**. Uno e Mega foram validados apenas com o v2. Se o `PRONTO`
+demorar mais de 3 s após o reset por DTR no CH340, aumente
+`serial.timeout_pronto` no `config.json`.
 
 Critérios de aceite confirmados:
 
@@ -99,7 +100,8 @@ Critérios de aceite confirmados:
 - o debounce de 60 ms não repete evento com o botão mantido;
 - o PC v2 envia `CONFIG_TEAMS N`, confirma o ACK e não envia LED/BEEP/RESET;
 - reconexão/reset por DTR reenvia `CONFIG_TEAMS N`;
-- a fronteira da contagem não aceita apertos anteriores ao `JÁ!`.
+- a fronteira da contagem não aceita apertos anteriores ao `JÁ!`;
+- o firmware v2 foi repetido no clone CH340 com 2 a 4 equipes.
 
 ## Limitações
 

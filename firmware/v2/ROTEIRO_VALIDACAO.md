@@ -1,21 +1,23 @@
 # Roteiro de validação do firmware v2
 
-**Status: validado no Arduino Uno e no Mega 2560; clone CH340 pendente.**
-Este roteiro foi executado no hardware real antes da liberação do firmware v2
-e da tag `v2.8.0-firmware-v2`.
+**Status: firmware v2 validado no Arduino Uno, no Mega 2560 e no clone CH340.**
+O firmware v1 em hardware foi validado **apenas no clone CH340**, com
+**2 equipes**; não foi validado em Uno/Mega nesta rodada. Este roteiro foi
+executado no hardware real antes da liberação do firmware v2 e da tag
+`v2.8.0-firmware-v2`, com a validação do CH340 registrada depois.
 
 Os testes automatizados usam porta falsa e cobrem handshake, ACK, retentativa,
 fallback, reset por DTR e ausência de comandos v1 no modo v2. Eles **não**
-substituem a validação física dos pinos, do clone CH340 e do `.exe`.
+substituem a validação física dos pinos e do `.exe`.
 
 ## 1. Placas e papéis
 
 | Placa | Papel | Situação |
 | --- | --- | --- |
-| Arduino Uno original (`2341:0043`) | placa principal; gravação e teste completo | **validado** |
-| Arduino Mega 2560 (`2341:0042`) | mesma pinagem D2–D11 | **validado** |
-| Clone Uno com CH340 (`1A86:7523`) | driver/porta e repetição do teste principal | **pendente** |
-| Arduino Uno com firmware v1 | regressão do caminho v1 | não registrado nesta rodada |
+| Arduino Uno original (`2341:0043`) | placa principal; gravação e teste completo com v2 | **validado (v2)** |
+| Arduino Mega 2560 (`2341:0042`) | mesma pinagem D2–D11, com v2 | **validado (v2)** |
+| Clone Uno com CH340 (`1A86:7523`) | driver/porta, teste principal com v2 (2 a 4 equipes) e caminho v1 (2 equipes) | **validado (v1 e v2)** |
+| Arduino Uno/Mega com firmware v1 | regressão do caminho v1 | não validado nesta rodada; v1 só foi validado no CH340 |
 
 O firmware v2 usa somente D2–D11 como botões e não usa LEDs nem buzzer. O
 `D0`/`D1` continua reservado para a serial/USB.
@@ -150,30 +152,32 @@ Com `contagem_largada` em 3 (padrão):
 5. Repita com `contagem_largada: 0` e confirme que a pergunta já começa em
    `AGUARDANDO`.
 
-## 8. Mega 2560 (validado) e clone CH340 (pendente)
+## 8. Mega 2560 e clone CH340 (validados)
 
 1. O **Mega 2560** foi validado com a mesma pinagem D2–D11, conferindo apenas a
    porta e a placa selecionada na IDE.
-2. O **clone CH340** com firmware v2 ainda não foi testado. Ao validar, repita
-   as seções 3, 5, 6 e 7; o driver deve abrir a porta sem travar e o app deve
-   reconhecer a placa.
+2. O **clone CH340** foi validado com o firmware v2 nas seções 3, 5, 6 e 7,
+   incluindo o modo de 4 equipes. O app reconheceu a placa e o `PRONTO` chegou
+   dentro do tempo configurado.
 3. Se o `PRONTO` demorar mais de 3 s após o reset por DTR no CH340, aumente
    `serial.timeout_pronto` no `config.json`.
-4. Anote porta, VID/PID, driver e qualquer diferença de tempo de conexão.
+4. Porta e driver exatos não foram registrados nesta rodada; o CH340 usa o
+   VID/PID `1A86:7523`.
 
 ## 9. Regressão do caminho v1
 
-A regressão física do v1 não foi registrada nesta rodada. Quando for repetida:
+O firmware v1 em hardware foi validado **apenas no clone CH340**, com
+**2 equipes**. Não houve validação de v1 em Uno/Mega nesta rodada.
 
-1. Grave o firmware v1 em um Uno (ou use outra placa).
-2. Abra o app desta versão. Ele deve detectar v1, limitar a partida a 2 equipes
-   e continuar enviando `LED_*`, `BEEP` e `RESET` como antes.
-3. Confirme que LEDs e buzzer do v1 continuam funcionando.
-4. Confirme que o fechamento do app no v1 ainda envia `RESET`.
+1. O caminho v1 foi exercitado no CH340 no modo de 2 equipes.
+2. O resultado não se estende a 3/4 equipes: o v1 não as suporta.
+3. Uno e Mega foram validados apenas com o firmware v2; não generalize o
+   resultado do v1 para essas placas.
 
 ## 10. Critérios de aceite
 
-Itens executados no **Uno** e no **Mega 2560**:
+Itens executados no **Uno**, no **Mega 2560** e no **clone CH340** com o
+firmware v2:
 
 - [x] Os 10 botões respondem nos pinos D2–D11, sem fiação antiga de LED/buzzer
       em D8–D10.
@@ -193,22 +197,25 @@ Itens executados no **Uno** e no **Mega 2560**:
 - [x] A fronteira da contagem continua rejeitando apertos antes do `JÁ!`.
 - [x] `pytest` verde em Python 3.12.15 e na versão atual do ambiente.
 - [x] Smoke Tk percorre tema, contagem e `AGUARDANDO`.
-- [x] O teste foi repetido no Uno e no Mega 2560.
+- [x] O teste do firmware v2 foi repetido no Uno, no Mega 2560 e no clone CH340.
+- [x] O clone CH340 foi validado com 2 a 4 equipes.
+- [x] O firmware v1 foi validado no clone CH340, com 2 equipes; não foi testado
+      em Uno/Mega nesta rodada.
 
 Pendências:
 
-- [ ] Validar com o **clone CH340**; se o `PRONTO` demorar mais de 3 s após o
-      reset por DTR, aumentar `serial.timeout_pronto`.
-- [ ] Registrar a regressão física do caminho v1.
+- Nenhuma pendência de placa para o firmware v2. O escopo do v1 em hardware
+  permanece restrito ao clone CH340 e a 2 equipes.
 
 ## 11. Resultado
 
-- Data: **29/10/2026**
-- Placas testadas: **Arduino Uno e Arduino Mega 2560**
-- Portas/drivers: não registrados
+- Data: **30/10/2026** (registro da validação do CH340)
+- Placas testadas: **Arduino Uno e Arduino Mega 2560 (v2); clone CH340 (v1 e v2)**
+- Portas/drivers: não registrados; clone CH340 com VID/PID `1A86:7523`
 - Python usado: **3.12.15 e 3.15.1** (suíte completa e golden opt-in verdes)
-- Observações: clone CH340 com v2 pendente; ordem de chegada definida pela
-  recepção no PC, sem timestamp no firmware.
+- Observações: v2 validado no CH340 com 2 a 4 equipes; v1 validado apenas no
+  CH340 e apenas com 2 equipes; Uno/Mega não foram usados com v1 nesta rodada.
+  A ordem de chegada é definida pela recepção no PC, sem timestamp no firmware.
 - Aprovado por: **Carlos**
 
 ## 12. Limitação conhecida
