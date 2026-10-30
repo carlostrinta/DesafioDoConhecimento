@@ -8,7 +8,7 @@ pelos testes em ambiente headless.
 """
 
 NOME = "Desafio do Conhecimento"
-VERSAO = "2.8.0"
+VERSAO = "2.8.1"
 AUTOR = "Carlos Santos"
 URL = "https://github.com/carlostrinta/DesafioDoConhecimento"
 LICENCA = "MIT"

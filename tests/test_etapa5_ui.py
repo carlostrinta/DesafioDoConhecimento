@@ -608,6 +608,44 @@ def test_modo_v2_nao_envia_led_buzzer_ou_reset(montar_app):
     )
 
 
+def test_v2_nao_gera_comandos_fisicos_para_nenhum_evento_de_dominio(montar_app):
+    montar, _banco = montar_app
+    app, root, _relogio = montar(num_equipes=4)
+
+    app.processar_evento("VERSAO 2")
+    root.update()
+    app.serial_comm.enviados.clear()
+
+    eventos = [
+        "apertou:A",
+        "apertou:B",
+        "apertou:C",
+        "apertou:D",
+        "pontuou:A",
+        "pontuou:B",
+        "pontuou:C",
+        "pontuou:D",
+        "tempo_esgotado",
+        "proxima_pergunta",
+        "reiniciou_banco",
+        "reiniciou_placar",
+        "revelou",
+        "contagem:3",
+        "contagem:2",
+        "contagem:1",
+        "largada",
+        "led_reacender:A",
+        "led_reacender:D",
+    ]
+    app._despachar(eventos)
+    root.update()
+
+    proibidos = ("LED_", "BEEP", "BUZZER_", "RESET")
+    assert not any(
+        cmd.startswith(proibidos) for cmd in app.serial_comm.enviados
+    )
+
+
 def test_eventos_seriais_c_d_acionam_e_pontuam(montar_app):
     montar, banco = montar_app
     app, root, _relogio = montar(num_equipes=4)

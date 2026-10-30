@@ -19,7 +19,11 @@ from jogo import (
     TIMER_MOTIVO_REVELADA,
     TIMER_MOTIVO_TEMPO_ESGOTADO,
 )
-from protocolo import comandos_para_arduino, mapear_evento_arduino
+from protocolo import mapear_evento_arduino
+from protocolo_v1 import (
+    comandos_para_arduino,
+    mapear_evento_arduino as mapear_evento_arduino_v1,
+)
 
 RAIZ = Path(__file__).resolve().parent.parent
 
@@ -252,11 +256,11 @@ class TestLedsPorTransicao:
 
     def test_pronto_reacende_led_de_quem_apertou(self, jogo):
         jogo.apertar_botao("A")
-        assert mapear_evento_arduino("PRONTO", jogo) == ["led_reacender:A"]
+        assert mapear_evento_arduino_v1("PRONTO", jogo) == ["led_reacender:A"]
         assert comandos_para_arduino(["led_reacender:A"]) == ["LED_A_ON"]
 
     def test_pronto_sem_aperto_nao_acende_nada(self, jogo):
-        assert mapear_evento_arduino("PRONTO", jogo) == []
+        assert mapear_evento_arduino_v1("PRONTO", jogo) == []
 
     def test_nenhuma_transicao_apaga_led(self, jogo):
         """No protótipo o LED só era aceso por LED_x_ON; o firmware nunca recebia LED_x_OFF."""

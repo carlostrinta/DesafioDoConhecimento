@@ -5,18 +5,15 @@ Python/tkinter e botões físicos opcionais no **Arduino Uno ou Mega 2560**. A
 equipe que apertar primeiro ganha a vez de responder; o tempo controla a rodada
 e o placar fica visível na tela.
 
-**Versão atual: 2.8.0** — os metadados oficiais ficam em
+**Versão atual: 2.8.1** — os metadados oficiais ficam em
 [`versao.py`](versao.py). A tela **Sobre** pode ser aberta com `F1`.
 
-> **Estado do hardware:** a parte Python aceita 2, 3 ou 4 equipes pelo teclado.
-> O firmware/protocolo v1 do Arduino atende 2 equipes; o protocolo v2 (4 equipes
-> e botões C/D) foi **validado no Arduino Uno e no Mega 2560**. O clone CH340
-> ainda **não foi testado com o firmware v2** — é uma pendência explícita. O
-> sketch de bancada em
-> [`firmware/bancada_botoes`](firmware/bancada_botoes/bancada_botoes.ino)
-> registra o teste dos 10 botões e do parser de `CONFIG_TEAMS`; o roteiro do
-> firmware de produção está em
-> [`firmware/v2/ROTEIRO_VALIDACAO.md`](firmware/v2/ROTEIRO_VALIDACAO.md).
+> **Estado do hardware:** o firmware v2 é o **recomendado** e foi validado no
+> **Arduino Uno e no Mega 2560**, com 2 a 4 equipes e 10 botões. O **clone CH340
+> ainda não foi testado com o v2** — é uma pendência explícita. Se o `PRONTO`
+> demorar mais de 3 s após o reset por DTR, aumente `serial.timeout_pronto` no
+> `config.json`. O firmware v1 continua disponível como caminho legado para
+> 2 equipes com LEDs e buzzer.
 
 ---
 
@@ -29,6 +26,7 @@ e o placar fica visível na tela.
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Configuração e logs](#configuração-e-logs)
 - [Testes](#testes)
+- [Limitações conhecidas](#limitações-conhecidas)
 - [Como contribuir](#como-contribuir)
 - [Licenças e créditos](#licenças-e-créditos)
 - [Documentação adicional](#documentação-adicional)
@@ -110,35 +108,64 @@ o `JÁ!`.
 
 ## Hardware opcional
 
-### Lista de materiais
+O hardware é opcional: sem Arduino, o jogo funciona no teclado. Há três
+caminhos, do recomendado ao legado.
 
-Para montar a bancada completa de **10 botões** (teclado físico para 4 equipes):
+### (a) Firmware v2 — recomendado
 
-- 1 **Arduino Uno** (original ou clone CH340/CH341) ou **Arduino Mega 2560**;
-- 10 botões de pressão (push buttons) momentâneos;
+O v2 usa **somente botões** em `D2–D11`, sem LEDs, buzzer, resistores ou fonte
+externa. O feedback visual e sonoro fica no aplicativo. Foi validado no
+**Arduino Uno** e no **Mega 2560**; o clone CH340 ainda é pendência.
+
+#### Lista de materiais do v2
+
+- 1 **Arduino Uno** ou **Arduino Mega 2560**;
+- **6, 8 ou 10 botões** de pressão momentâneos, conforme o modo de equipes;
 - 1 protoboard grande ou placa de montagem;
 - jumpers macho-macho;
-- cabo USB;
-- opcional para o firmware v1: 2 LEDs e 2 resistores de **220 Ω** ou
-  **330 Ω**, além de 1 buzzer ativo de 5 V.
-
-Para o firmware v1 original bastam **6 botões** (A, B, Avançar, Acerto A,
-Acerto B e Revelar), 2 LEDs e o buzzer.
-
-> **Placas validadas no v2:** Arduino Uno e Mega 2560. O clone CH340 ainda não
-> foi testado com o firmware v2; se o `PRONTO` demorar mais de 3 s após o reset
-> por DTR, aumente `serial.timeout_pronto` no `config.json`.
+- cabo USB.
 
 > **Alimentação:** use o Arduino alimentado pelo USB. Não ligue os botões em
-> tensões externas. Os pinos digitais do Uno trabalham em 5 V.
+> tensões externas. Os pinos digitais do Uno e do Mega trabalham em 5 V.
+>
+> **Clone CH340:** ainda não validado com o v2. Se o `PRONTO` demorar mais de
+> 3 s após o reset por DTR, aumente `serial.timeout_pronto` no `config.json`.
 
-### Diagrama de ligação dos botões (D2 a D11)
+#### Botões necessários por modo
 
-Todos os botões usam o resistor interno de pull-up do Arduino
-(`INPUT_PULLUP`). A ligação é simples:
+| Modo | Botões | Pinos usados |
+| --- | ---: | --- |
+| 2 equipes | 6 | `D2`–`D7` |
+| 3 equipes | 8 | `D2`–`D8` + `D10` (`D9`/`D11` ficam livres) |
+| 4 equipes | 10 | `D2`–`D11` |
+
+Você pode montar os 10 botões de uma vez: o firmware só ativa os botões das
+equipes configuradas em `CONFIG_TEAMS`.
+
+#### Mapa de pinos (Uno e Mega 2560)
+
+Os dois modelos usam os **mesmos pinos D2–D11**. O mapa abaixo serve para
+qualquer um deles:
+
+| Pino | Evento | Função | 2 eq. | 3 eq. | 4 eq. |
+| --- | --- | --- | :---: | :---: | :---: |
+| `D2` | `BTN_A` | botão da equipe A | sim | sim | sim |
+| `D3` | `BTN_B` | botão da equipe B | sim | sim | sim |
+| `D4` | `BTN_AVANCAR` | próxima pergunta | sim | sim | sim |
+| `D5` | `BTN_ACERTO_A` | ponto da equipe A | sim | sim | sim |
+| `D6` | `BTN_ACERTO_B` | ponto da equipe B | sim | sim | sim |
+| `D7` | `BTN_REVELAR` | revelar resposta | sim | sim | sim |
+| `D8` | `BTN_C` | botão da equipe C | — | sim | sim |
+| `D9` | `BTN_D` | botão da equipe D | — | — | sim |
+| `D10` | `BTN_ACERTO_C` | ponto da equipe C | — | sim | sim |
+| `D11` | `BTN_ACERTO_D` | ponto da equipe D | — | — | sim |
+
+Cada botão fica entre o pino indicado e o **GND**, usando o resistor interno
+de pull-up (`INPUT_PULLUP`). Em repouso o pino lê `HIGH`; ao apertar, lê `LOW`.
+Não use resistores externos de pull-up.
 
 ```text
-Arduino Uno                        Botão
+Arduino Uno/Mega 2560              Botão
 D2  ───────────────────────────────[ A ]──────── GND
 D3  ───────────────────────────────[ B ]──────── GND
 D4  ───────────────────────────────[ Avançar ]── GND
@@ -151,32 +178,44 @@ D10 ─────────────────────────�
 D11 ───────────────────────────────[ Acerto D ]─ GND
 ```
 
-Cada botão fica entre o pino indicado e o **GND**. Em repouso o pino lê `HIGH`;
-ao apertar, lê `LOW`. Não use resistores externos de pull-up.
+Diagrama visual em SVG:
+[`docs/ligacao_v2.svg`](docs/ligacao_v2.svg).
 
-Mapa dos 10 botões usado pelo sketch de bancada:
+#### Pinos livres e reservados
 
-| Pino | Evento | Função |
-| --- | --- | --- |
-| `D2` | `BTN_A` | botão da equipe A |
-| `D3` | `BTN_B` | botão da equipe B |
-| `D4` | `BTN_AVANCAR` | próxima pergunta |
-| `D5` | `BTN_ACERTO_A` | ponto da equipe A |
-| `D6` | `BTN_ACERTO_B` | ponto da equipe B |
-| `D7` | `BTN_REVELAR` | revelar resposta |
-| `D8` | `BTN_C` | botão da equipe C |
-| `D9` | `BTN_D` | botão da equipe D |
-| `D10` | `BTN_ACERTO_C` | ponto da equipe C |
-| `D11` | `BTN_ACERTO_D` | ponto da equipe D |
+- **Livres no Uno:** `A0`–`A5`, `D12` e `D13`.
+- **Mega 2560:** usa os mesmos `D2`–`D11`; os demais pinos digitais ficam
+  disponíveis. O I2C em `D20`/`D21` **não é usado** pelo firmware v2.
+- **Reservados:** `D0`/`D1` são a serial/USB. Não ligue botões neles.
 
-> `D0` e `D1` são usados pela serial/USB. Não ligue botões neles.
+#### Handshake do v2
 
-### Firmware v1 (2 equipes)
+1. Ao iniciar, o Arduino envia `PRONTO`.
+2. Em seguida envia `VERSAO 2`.
+3. O PC envia `CONFIG_TEAMS 2`, `3` ou `4`.
+4. O Arduino responde `EQUIPES N` para confirmar o número ativo.
+
+O firmware começa com **2 equipes**. Se o ACK não chegar, o PC faz uma
+retentativa e, na segunda falha, avisa e cai para 2 equipes. O roteiro completo
+está em [`firmware/v2/ROTEIRO_VALIDACAO.md`](firmware/v2/ROTEIRO_VALIDACAO.md).
+
+### (b) Firmware v1 — legado (2 equipes, LEDs e buzzer)
 
 O firmware original está em
 [`firmware/v1/duelo_arduino_v1/duelo_arduino_v1.ino`](firmware/v1/duelo_arduino_v1/duelo_arduino_v1.ino)
-(cópia idêntica, mantida como ponto de retorno). Essa é agora a única cópia
-versionada do v1.
+(cópia idêntica, mantida como ponto de retorno). Ele atende **2 equipes** e
+continua disponível para quem já tem a montagem antiga.
+
+#### Lista de materiais do v1
+
+- 1 **Arduino Uno**;
+- 6 botões de pressão momentâneos;
+- 2 LEDs;
+- 2 resistores de **220 Ω** ou **330 Ω** para os LEDs;
+- 1 buzzer ativo de 5 V;
+- protoboard ou placa de montagem, jumpers e cabo USB.
+
+#### Mapa de pinos do v1
 
 | Pino | Função |
 | --- | --- |
@@ -191,11 +230,11 @@ versionada do v1.
 | `D10` | buzzer ativo (positivo no pino, negativo no GND) |
 | `D11` | livre no firmware v1 |
 
-O firmware v1 envia `BTN_*` e `PRONTO` pela serial em **9600 baud** e recebe
-comandos de LED/buzzer. A interface Python detecta o firmware v1 e limita a
-partida a 2 equipes, evitando enviar comandos que ele não conhece.
+O v1 envia `BTN_*` e `PRONTO` pela serial em **9600 baud** e recebe comandos
+de LED/buzzer. A interface Python detecta o v1 e limita a partida a 2 equipes,
+preservando o caminho legado.
 
-### Bancada de botões (validação do v2)
+### (c) Sketch de bancada
 
 O sketch [`firmware/bancada_botoes/bancada_botoes.ino`](firmware/bancada_botoes/bancada_botoes.ino)
 valida apenas os 10 botões, sem LEDs e sem buzzer. Ele responde no Monitor
@@ -204,32 +243,9 @@ Serial a 9600 baud: `CONFIG_TEAMS 2|3|4` devolve `EQUIPES N` e
 **fechado** enquanto o Monitor Serial estiver aberto. O procedimento completo
 está em [`firmware/bancada_botoes/README.md`](firmware/bancada_botoes/README.md).
 
-Para gravar: abra o `.ino` na Arduino IDE, selecione a placa **Arduino Uno** e
-a porta correta e clique em **Upload**. Depois feche o Monitor Serial antes de
-abrir o jogo.
-
-### Firmware v2 de produção (validado no Uno e Mega 2560)
-
-O firmware v2 fica em
-[`firmware/v2/duelo_v2/duelo_v2.ino`](firmware/v2/duelo_v2/duelo_v2.ino)
-e usa o mesmo mapa de 10 botões em `D2–D11`. Ele **não usa LEDs nem buzzer**:
-o feedback fica no aplicativo. O handshake é `PRONTO` + `VERSAO 2`; depois o
-Python envia `CONFIG_TEAMS N` e espera o ACK `EQUIPES N`. A validação física e
-o teste do aplicativo foram concluídos no **Arduino Uno e no Mega 2560**.
-
-O **clone CH340** com firmware v2 continua como pendência explícita. Se o
-`PRONTO` demorar mais de 3 s após o reset por DTR, aumente
-`serial.timeout_pronto` no `config.json`.
-
-| Comando | Resposta |
-| --- | --- |
-| `CONFIG_TEAMS 2`, `3` ou `4` | `EQUIPES N` |
-| `CONFIG_TEAMS 5`, `X`, `22` ou vazio | `EQUIPES <atual>` |
-| `RESET`, `LED_*`, `BEEP*`, `BUZZER_*` | ignorados |
-
-O firmware começa com **2 equipes** e o debounce é um lockout de **60 ms**.
-O roteiro completo está em
-[`firmware/v2/ROTEIRO_VALIDACAO.md`](firmware/v2/ROTEIRO_VALIDACAO.md).
+Para gravar qualquer um dos sketches: abra o `.ino` na Arduino IDE, selecione
+a placa (**Arduino Uno** ou **Mega 2560**) e a porta correta, clique em
+**Upload** e feche o Monitor Serial antes de abrir o jogo.
 
 ---
 
@@ -247,7 +263,7 @@ versionado. O arquivo de versão do PyInstaller (`versao_info.txt`) lê os dados
 de `versao.py` e grava no `.exe`:
 
 - nome do produto: **Desafio do Conhecimento**;
-- versão: **2.8.0**;
+- versão: **2.8.1**;
 - autor/empresa: **Carlos Santos**;
 - copyright: **Copyright (c) 2026 Carlos Santos**.
 
@@ -280,7 +296,8 @@ script, se não houver permissão de escrita).
 | `perguntas.py` | modelo, carregador/validador e listagem dos bancos |
 | `persistencia.py` | partida salva em JSON, hash, trava de instância e debounce |
 | `serial_comm.py` | thread serial, detecção de porta, reconexão e fila |
-| `protocolo.py` | tradução entre linhas da serial e ações/eventos |
+| `protocolo.py` | protocolo v2: botões, `CONFIG_TEAMS` e ACK de equipes |
+| `protocolo_v1.py` | adaptador legado v1: LEDs, buzzer, `RESET` e reacendimento |
 | `dispositivos.py` | lista única de VID/PID e nomes de placas |
 | `audio.py` | sons externos em `sons/` e fallback sintetizado |
 | `config.py` | leitura e validação de `config.json` |
@@ -297,6 +314,8 @@ script, se não houver permissão de escrita).
 | `versao_info.txt` | metadados de versão/autor gravados no `.exe` |
 | `config.exemplo.json` | modelo versionado de configuração |
 | `ROTEIRO_SERIAL_HARDWARE.md` | checklist de validação com Arduino real |
+| `docs/ligacao_v2.svg` | diagrama de ligação dos 10 botões (Uno e Mega) |
+| `docs/PLANO_EDITOR_PERGUNTAS.md` | plano do editor de perguntas (sem código) |
 
 ---
 
@@ -421,6 +440,8 @@ Se você redistribuir o jogo, mantenha os arquivos `LICENSE`,
   roteiro físico, matriz PC × firmware, placas validadas e pendência do CH340.
 - [`LICENCA_PERGUNTAS.md`](LICENCA_PERGUNTAS.md) — licença dos bancos de
   perguntas.
+- [`docs/PLANO_EDITOR_PERGUNTAS.md`](docs/PLANO_EDITOR_PERGUNTAS.md) — plano
+  do editor de perguntas (escopo, formato, salvamento, UI, testes e etapas).
 
 ---
 
@@ -444,4 +465,4 @@ Se você redistribuir o jogo, mantenha os arquivos `LICENSE`,
 
 ---
 
-**Autor:** Carlos Santos · **Versão:** 2.8.0 · **Licença do código:** MIT
+**Autor:** Carlos Santos · **Versão:** 2.8.1 · **Licença do código:** MIT

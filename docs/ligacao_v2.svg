@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-labelledby="titulo descricao">
+  <title id="titulo">Ligação dos 10 botões do firmware v2 no Arduino Uno e Mega 2560</title>
+  <desc id="descricao">Diagrama original: cada botão liga um pino D2 a D11 ao GND, usando INPUT_PULLUP. Mostra os botões por modo de equipes, pinos livres, pinos reservados e nota sobre o Mega.</desc>
+
+  <rect width="1200" height="900" fill="#0B1220"/>
+  <rect x="24" y="24" width="1152" height="852" rx="20" fill="#101A30" stroke="#263657" stroke-width="2"/>
+
+  <text x="600" y="62" fill="#EAF0FF" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" text-anchor="middle">Ligação dos 10 botões — firmware v2</text>
+  <text x="600" y="94" fill="#8FA2C7" font-family="Arial, Helvetica, sans-serif" font-size="17" text-anchor="middle">Arduino Uno e Mega 2560 · botões entre o pino e o GND · INPUT_PULLUP</text>
+
+  <!-- Placa -->
+  <g id="placa">
+    <rect x="44" y="126" width="248" height="650" rx="18" fill="#123B32" stroke="#2BD99F" stroke-width="2"/>
+    <rect x="88" y="104" width="92" height="30" rx="6" fill="#C7D2E5" stroke="#7F8DA8" stroke-width="2"/>
+    <text x="134" y="124" fill="#0B1220" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" text-anchor="middle">USB</text>
+    <text x="168" y="166" fill="#D7FFF1" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" text-anchor="middle">ARDUINO</text>
+    <text x="168" y="188" fill="#9FE8CF" font-family="Arial, Helvetica, sans-serif" font-size="14" text-anchor="middle">Uno / Mega 2560</text>
+    <text x="168" y="214" fill="#8FA2C7" font-family="Arial, Helvetica, sans-serif" font-size="12" text-anchor="middle">alimentação pelo USB</text>
+
+    <!-- Pinos D2..D11 -->
+    <g font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" text-anchor="end">
+      <text x="270" y="196" fill="#EAF0FF">D2</text>
+      <text x="270" y="248" fill="#EAF0FF">D3</text>
+      <text x="270" y="300" fill="#EAF0FF">D4</text>
+      <text x="270" y="352" fill="#EAF0FF">D5</text>
+      <text x="270" y="404" fill="#EAF0FF">D6</text>
+      <text x="270" y="456" fill="#EAF0FF">D7</text>
+      <text x="270" y="508" fill="#EAF0FF">D8</text>
+      <text x="270" y="560" fill="#EAF0FF">D9</text>
+      <text x="270" y="612" fill="#EAF0FF">D10</text>
+      <text x="270" y="664" fill="#EAF0FF">D11</text>
+    </g>
+    <g fill="#FFD166">
+      <rect x="284" y="184" width="18" height="18" rx="4"/>
+      <rect x="284" y="236" width="18" height="18" rx="4"/>
+      <rect x="284" y="288" width="18" height="18" rx="4"/>
+      <rect x="284" y="340" width="18" height="18" rx="4"/>
+      <rect x="284" y="392" width="18" height="18" rx="4"/>
+      <rect x="284" y="444" width="18" height="18" rx="4"/>
+      <rect x="284" y="496" width="18" height="18" rx="4"/>
+      <rect x="284" y="548" width="18" height="18" rx="4"/>
+      <rect x="284" y="600" width="18" height="18" rx="4"/>
+      <rect x="284" y="652" width="18" height="18" rx="4"/>
+    </g>
+
+    <text x="168" y="714" fill="#FF8F3F" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700" text-anchor="middle">D0/D1: serial/USB</text>
+    <text x="168" y="736" fill="#FF8F3F" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700" text-anchor="middle">NÃO ligar botões</text>
+    <text x="168" y="760" fill="#8FA2C7" font-family="Arial, Helvetica, sans-serif" font-size="11" text-anchor="middle">A0–A5, D12 e D13 livres</text>
+  </g>
+
+  <!-- Botões e fios -->
+  <g id="botoes" font-family="Arial, Helvetica, sans-serif">
+    <!-- 2 equipes: D2..D7 -->
+    <g stroke="#3BA3FF" stroke-width="3" fill="none">
+      <path d="M302 193 H470"/>
+      <path d="M302 245 H470"/>
+      <path d="M302 297 H470"/>
+      <path d="M302 349 H470"/>
+      <path d="M302 401 H470"/>
+      <path d="M302 453 H470"/>
+    </g>
+    <g stroke="#3BA3FF" stroke-width="3" fill="none">
+      <path d="M530 193 H840"/>
+      <path d="M530 245 H840"/>
+      <path d="M530 297 H840"/>
+      <path d="M530 349 H840"/>
+      <path d="M530 401 H840"/>
+      <path d="M530 453 H840"/>
+    </g>
+
+    <!-- 3 equipes: D8 e D10 -->
+    <g stroke="#B388FF" stroke-width="3" fill="none">
+      <path d="M302 505 H470"/>
+      <path d="M302 609 H470"/>
+      <path d="M530 505 H840"/>
+      <path d="M530 609 H840"/>
+    </g>
+
+    <!-- 4 equipes: D9 e D11 -->
+    <g stroke="#FF6FB5" stroke-width="3" fill="none">
+      <path d="M302 557 H470"/>
+      <path d="M302 661 H470"/>
+      <path d="M530 557 H840"/>
+      <path d="M530 661 H840"/>
+    </g>
+
+    <!-- Símbolos dos botões -->
+    <g>
+      <!-- linhas internas do contato -->
+      <g stroke="#EAF0FF" stroke-width="2">
+        <line x1="486" y1="184" x2="486" y2="202"/><line x1="486" y1="236" x2="486" y2="254"/>
+        <line x1="486" y1="288" x2="486" y2="306"/><line x1="486" y1="340" x2="486" y2="358"/>
+        <line x1="486" y1="392" x2="486" y2="410"/><line x1="486" y1="444" x2="486" y2="462"/>
+        <line x1="486" y1="496" x2="486" y2="514"/><line x1="486" y1="548" x2="486" y2="566"/>
+        <line x1="486" y1="600" x2="486" y2="618"/><line x1="486" y1="652" x2="486" y2="670"/>
+        <line x1="514" y1="184" x2="514" y2="202"/><line x1="514" y1="236" x2="514" y2="254"/>
+        <line x1="514" y1="288" x2="514" y2="306"/><line x1="514" y1="340" x2="514" y2="358"/>
+        <line x1="514" y1="392" x2="514" y2="410"/><line x1="514" y1="444" x2="514" y2="462"/>
+        <line x1="514" y1="496" x2="514" y2="514"/><line x1="514" y1="548" x2="514" y2="566"/>
+        <line x1="514" y1="600" x2="514" y2="618"/><line x1="514" y1="652" x2="514" y2="670"/>
+        <line x1="500" y1="172" x2="500" y2="184"/><line x1="500" y1="224" x2="500" y2="236"/>
+        <line x1="500" y1="276" x2="500" y2="288"/><line x1="500" y1="328" x2="500" y2="340"/>
+        <line x1="500" y1="380" x2="500" y2="392"/><line x1="500" y1="432" x2="500" y2="444"/>
+        <line x1="500" y1="484" x2="500" y2="496"/><line x1="500" y1="536" x2="500" y2="548"/>
+        <line x1="500" y1="588" x2="500" y2="600"/><line x1="500" y1="640" x2="500" y2="652"/>
+      </g>
+      <g fill="#101A30" stroke="#EAF0FF" stroke-width="2">
+        <circle cx="500" cy="193" r="15"/><circle cx="500" cy="245" r="15"/>
+        <circle cx="500" cy="297" r="15"/><circle cx="500" cy="349" r="15"/>
+        <circle cx="500" cy="401" r="15"/><circle cx="500" cy="453" r="15"/>
+        <circle cx="500" cy="505" r="15"/><circle cx="500" cy="557" r="15"/>
+        <circle cx="500" cy="609" r="15"/><circle cx="500" cy="661" r="15"/>
+      </g>
+    </g>
+
+    <!-- Nomes dos botões -->
+    <g font-size="12" fill="#8FA2C7" text-anchor="middle">
+      <text x="500" y="166">A</text>
+      <text x="500" y="218">B</text>
+      <text x="500" y="270">Avançar</text>
+      <text x="500" y="322">Acerto A</text>
+      <text x="500" y="374">Acerto B</text>
+      <text x="500" y="426">Revelar</text>
+      <text x="500" y="478">C</text>
+      <text x="500" y="530">D</text>
+      <text x="500" y="582">Acerto C</text>
+      <text x="500" y="634">Acerto D</text>
+    </g>
+  </g>
+
+  <!-- Barramento GND -->
+  <g id="gnd">
+    <line x1="840" y1="160" x2="840" y2="730" stroke="#EAF0FF" stroke-width="5"/>
+    <g fill="#EAF0FF">
+      <circle cx="840" cy="193" r="5"/><circle cx="840" cy="245" r="5"/>
+      <circle cx="840" cy="297" r="5"/><circle cx="840" cy="349" r="5"/>
+      <circle cx="840" cy="401" r="5"/><circle cx="840" cy="453" r="5"/>
+      <circle cx="840" cy="505" r="5"/><circle cx="840" cy="557" r="5"/>
+      <circle cx="840" cy="609" r="5"/><circle cx="840" cy="661" r="5"/>
+    </g>
+    <line x1="840" y1="730" x2="840" y2="756" stroke="#EAF0FF" stroke-width="5"/>
+    <line x1="816" y1="756" x2="864" y2="756" stroke="#EAF0FF" stroke-width="5"/>
+    <line x1="824" y1="766" x2="856" y2="766" stroke="#EAF0FF" stroke-width="5"/>
+    <line x1="832" y1="776" x2="848" y2="776" stroke="#EAF0FF" stroke-width="5"/>
+    <text x="880" y="754" fill="#EAF0FF" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">GND</text>
+    <text x="880" y="774" fill="#8FA2C7" font-family="Arial, Helvetica, sans-serif" font-size="12">comum a todos</text>
+  </g>
+
+  <!-- Painel de notas -->
+  <g id="notas" font-family="Arial, Helvetica, sans-serif">
+    <rect x="938" y="126" width="214" height="178" rx="12" fill="#172441" stroke="#31456E" stroke-width="2"/>
+    <text x="958" y="156" fill="#EAF0FF" font-size="15" font-weight="700">Pinos livres</text>
+    <text x="958" y="182" fill="#B9C8E6" font-size="13">Uno: A0–A5, D12, D13</text>
+    <text x="958" y="204" fill="#B9C8E6" font-size="13">D0/D1: serial/USB</text>
+    <text x="958" y="226" fill="#FF8F3F" font-size="13" font-weight="700">Não ligar botões</text>
+    <text x="958" y="258" fill="#EAF0FF" font-size="15" font-weight="700">Mega 2560</text>
+    <text x="958" y="282" fill="#B9C8E6" font-size="13">Mesmos D2–D11.</text>
+    <text x="958" y="300" fill="#B9C8E6" font-size="13">I2C D20/D21 não usado.</text>
+
+    <rect x="938" y="324" width="214" height="166" rx="12" fill="#172441" stroke="#31456E" stroke-width="2"/>
+    <text x="958" y="354" fill="#EAF0FF" font-size="15" font-weight="700">Botões por modo</text>
+    <text x="958" y="382" fill="#3BA3FF" font-size="13" font-weight="700">2 equipes — 6</text>
+    <text x="958" y="400" fill="#B9C8E6" font-size="13">D2–D7</text>
+    <text x="958" y="428" fill="#B388FF" font-size="13" font-weight="700">3 equipes — 8</text>
+    <text x="958" y="446" fill="#B9C8E6" font-size="13">D2–D8 + D10</text>
+    <text x="958" y="474" fill="#FF6FB5" font-size="13" font-weight="700">4 equipes — 10</text>
+    <text x="958" y="492" fill="#B9C8E6" font-size="13">D2–D11</text>
+  </g>
+
+  <!-- Rodapé -->
+  <g font-family="Arial, Helvetica, sans-serif">
+    <line x1="44" y1="802" x2="1156" y2="802" stroke="#263657" stroke-width="2"/>
+    <text x="60" y="834" fill="#8FA2C7" font-size="14">Cada botão: pino → botão momentâneo → GND (INPUT_PULLUP, sem resistor externo).</text>
+    <text x="60" y="858" fill="#8FA2C7" font-size="14">Feedback de LED, som e placar fica no aplicativo; o firmware v2 não aciona LEDs nem buzzer.</text>
+    <text x="1140" y="858" fill="#56628F" font-size="12" text-anchor="end">Desafio do Conhecimento · firmware v2</text>
+  </g>
+</svg>
