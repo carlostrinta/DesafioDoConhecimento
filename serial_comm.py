@@ -173,7 +173,11 @@ class ComunicacaoSerial:
         def alvo():
             try:
                 if s.is_open and self.protocolo_arduino != "v2":
-                    s.write(b"RESET\n")
+                    # Import local: o adaptador v1 só entra no fechamento e
+                    # não deve contaminar quem importa serial_comm (UI).
+                    from protocolo_v1 import comando_reset
+
+                    s.write(f"{comando_reset()}\n".encode("ascii"))
             except Exception:
                 pass
             try:

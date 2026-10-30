@@ -72,9 +72,12 @@ from perguntas import (
 )
 from protocolo import (
     comando_config_equipes,
-    comandos_para_arduino,
     equipes_confirmadas,
     mapear_evento_arduino,
+)
+from protocolo_v1 import (
+    comandos_para_arduino,
+    mapear_evento_arduino as mapear_evento_arduino_v1,
 )
 from recursos import caminho_recurso
 from serial_comm import SERIAL_DISPONIVEL, ComunicacaoSerial
@@ -930,7 +933,7 @@ class DueloDeConhecimento:
         b.desenhar()
 
     # -----------------------------------------------------
-    # EVENTOS DO JOGO -> LED, som e tela (nenhuma regra aqui)
+    # EVENTOS DO JOGO -> serial v1, som e tela (nenhuma regra aqui)
     # -----------------------------------------------------
     def _despachar(self, eventos):
         if eventos and eventos[0].startswith(PREFIXO_RECUSA):
@@ -942,10 +945,10 @@ class DueloDeConhecimento:
             # pergunta nova, sem esperar uma reconexão.
             self._solicitar_configuracao_equipes(motivo="pergunta")
 
-        for cmd in comandos_para_arduino(
-            eventos, protocolo=self.protocolo_arduino
-        ):
-            self.enviar_serial(cmd)
+        if self.protocolo_arduino != "v2":
+            # LEDs, buzzer e RESET existem apenas no adaptador legado.
+            for cmd in comandos_para_arduino(eventos):
+                self.enviar_serial(cmd)
 
         quem_piscar = None
         for ev in eventos:
@@ -1125,7 +1128,11 @@ class DueloDeConhecimento:
             self._equipes_alvo = 0
             self._equipes_confirmado = False
             self._agendar_verificacao_versao()
-        self._despachar(mapear_evento_arduino(evento, self.jogo))
+        if self.protocolo_arduino == "v2":
+            eventos = mapear_evento_arduino(evento, self.jogo)
+        else:
+            eventos = mapear_evento_arduino_v1(evento, self.jogo)
+        self._despachar(eventos)
 
     # -----------------------------------------------------
     # PROTOCOLO / NÚMERO DE EQUIPES

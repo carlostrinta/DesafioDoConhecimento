@@ -9,7 +9,7 @@ import queue
 
 import pytest
 
-import protocolo
+import protocolo_v1
 import serial_comm
 from apoio_serial import ModuloSerialFalso, Porta, criar_comm, esperar
 from jogo import Jogo
@@ -45,12 +45,12 @@ COMANDOS_POR_EVENTO = {
 
 @pytest.mark.parametrize("evento, esperado", COMANDOS_POR_EVENTO.items())
 def test_comandos_v1_por_evento_de_dominio(evento, esperado):
-    assert protocolo.comandos_para_arduino([evento]) == esperado
+    assert protocolo_v1.comandos_para_arduino([evento]) == esperado
 
 
 @pytest.mark.parametrize("equipe", ["A", "B", "C", "D"])
 def test_comandos_v1_preservam_ordem_de_multiplos_eventos(equipe):
-    assert protocolo.comandos_para_arduino(
+    assert protocolo_v1.comandos_para_arduino(
         [f"apertou:{equipe}", f"pontuou:{equipe}"]
     ) == [f"LED_{equipe}_ON", "BEEP", "BEEP_LONG"]
 
@@ -62,14 +62,14 @@ def test_pronto_reacende_led_da_equipe_na_caracterizacao(
     jogo = Jogo(perguntas_exemplo, num_equipes=4, contagem_largada=0)
     assert jogo.apertar_botao(equipe) == [f"apertou:{equipe}"]
 
-    eventos = protocolo.mapear_evento_arduino("PRONTO", jogo)
+    eventos = protocolo_v1.mapear_evento_arduino("PRONTO", jogo)
     assert eventos == [f"led_reacender:{equipe}"]
-    assert protocolo.comandos_para_arduino(eventos) == [f"LED_{equipe}_ON"]
+    assert protocolo_v1.comandos_para_arduino(eventos) == [f"LED_{equipe}_ON"]
 
 
 def test_pronto_sem_aperto_nao_gera_comando(perguntas_exemplo):
     jogo = Jogo(perguntas_exemplo, num_equipes=4, contagem_largada=0)
-    assert protocolo.mapear_evento_arduino("PRONTO", jogo) == []
+    assert protocolo_v1.mapear_evento_arduino("PRONTO", jogo) == []
 
 
 def test_v1_envia_reset_byte_a_byte_ao_fechar_a_porta():
