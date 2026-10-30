@@ -1,8 +1,8 @@
 # Plano do editor de perguntas
 
-> **Status:** documento de planejamento. Nenhum código do editor foi criado
-> nesta etapa. Este arquivo existe para decidir escopo, formato e riscos antes
-> da implementação.
+> **Status:** plano aprovado. A Etapa E1 (modelo puro, validação por campo e
+> gravação segura) foi implementada; a interface gráfica continua fora desta
+> etapa. Este arquivo registra escopo, formato, decisões e riscos.
 >
 > **Público:** Carlos (decisões de produto) e quem for implementar.
 >

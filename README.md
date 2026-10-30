@@ -26,6 +26,7 @@ e o placar fica visível na tela.
 - [Hardware opcional](#hardware-opcional)
 - [Gerar o executável](#gerar-o-executável)
 - [Estrutura do projeto](#estrutura-do-projeto)
+- [Editor de perguntas (em desenvolvimento)](#editor-de-perguntas-em-desenvolvimento)
 - [Configuração e logs](#configuração-e-logs)
 - [Testes](#testes)
 - [Limitações conhecidas](#limitações-conhecidas)
@@ -297,7 +298,8 @@ script, se não houver permissão de escrita).
 | `ui_selecao.py` | modal de escolha do banco de perguntas |
 | `ui_sobre.py` | tela Sobre (F1) |
 | `jogo.py` | regra de jogo pura: estado, placar, timer e contagem |
-| `perguntas.py` | modelo, carregador/validador e listagem dos bancos |
+| `perguntas.py` | modelo, carregador/validador único e validação por campo do editor |
+| `editor_modelo.py` | modelo puro do editor (E1): CRUD, busca, undo/redo e gravação segura |
 | `persistencia.py` | partida salva em JSON, hash, trava de instância e debounce |
 | `serial_comm.py` | thread serial, detecção de porta, reconexão e fila |
 | `protocolo.py` | protocolo v2: botões, `CONFIG_TEAMS` e ACK de equipes |
@@ -319,7 +321,25 @@ script, se não houver permissão de escrita).
 | `config.exemplo.json` | modelo versionado de configuração |
 | `ROTEIRO_SERIAL_HARDWARE.md` | checklist de validação com Arduino real |
 | `docs/ligacao_v2.svg` | diagrama de ligação dos 10 botões (Uno e Mega) |
-| `docs/PLANO_EDITOR_PERGUNTAS.md` | plano do editor de perguntas (sem código) |
+| `docs/PLANO_EDITOR_PERGUNTAS.md` | plano e decisões do editor de perguntas |
+
+---
+
+## Editor de perguntas (em desenvolvimento)
+
+A Etapa E1 prepara o editor **sem interface gráfica ainda**. O modelo puro
+fica em `editor_modelo.py`: leitura de lista legada ou envelope, criação,
+edição, exclusão, duplicação, reordenação, busca/filtro e undo/redo. A
+validação por campo continua em `perguntas.py`, com os mesmos limites usados
+pelo carregador.
+
+A gravação é segura: escreve `.tmp`, cria `.bak` antes de sobrescrever, usa
+trava de instância e expõe conflito de nome para a futura interface. Os bancos
+distribuídos (`conhecimentos_gerais.json`, `eletrotecnica.json` e
+`radiologia.json`) são **somente leitura**; alterações devem ser salvas como
+cópia na pasta configurada ou na pasta do usuário. Não há tela, atalho ou data
+prometida para a UI nesta etapa. O escopo completo está em
+[`docs/PLANO_EDITOR_PERGUNTAS.md`](docs/PLANO_EDITOR_PERGUNTAS.md).
 
 ---
 
@@ -444,8 +464,8 @@ Se você redistribuir o jogo, mantenha os arquivos `LICENSE`,
   roteiro físico, matriz PC × firmware e placas validadas (Uno, Mega e CH340).
 - [`LICENCA_PERGUNTAS.md`](LICENCA_PERGUNTAS.md) — licença dos bancos de
   perguntas.
-- [`docs/PLANO_EDITOR_PERGUNTAS.md`](docs/PLANO_EDITOR_PERGUNTAS.md) — plano
-  do editor de perguntas (escopo, formato, salvamento, UI, testes e etapas).
+- [`docs/PLANO_EDITOR_PERGUNTAS.md`](docs/PLANO_EDITOR_PERGUNTAS.md) — plano e
+  decisões do editor de perguntas (escopo, formato, salvamento, UI e etapas).
 
 ---
 
