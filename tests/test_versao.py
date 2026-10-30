@@ -12,7 +12,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 
 def test_metadados_oficiais():
     assert versao.NOME == "Desafio do Conhecimento"
-    assert versao.VERSAO == "2.8.0"
+    assert versao.VERSAO == "2.8.1"
     assert versao.AUTOR == "Carlos Santos"
     assert versao.URL == (
         "https://github.com/carlostrinta/DesafioDoConhecimento"

@@ -5,7 +5,7 @@ Python/tkinter e botões físicos opcionais no **Arduino Uno ou Mega 2560**. A
 equipe que apertar primeiro ganha a vez de responder; o tempo controla a rodada
 e o placar fica visível na tela.
 
-**Versão atual: 2.8.0** — os metadados oficiais ficam em
+**Versão atual: 2.8.1** — os metadados oficiais ficam em
 [`versao.py`](versao.py). A tela **Sobre** pode ser aberta com `F1`.
 
 > **Estado do hardware:** o firmware v2 é o **recomendado** e foi validado no
@@ -263,7 +263,7 @@ versionado. O arquivo de versão do PyInstaller (`versao_info.txt`) lê os dados
 de `versao.py` e grava no `.exe`:
 
 - nome do produto: **Desafio do Conhecimento**;
-- versão: **2.8.0**;
+- versão: **2.8.1**;
 - autor/empresa: **Carlos Santos**;
 - copyright: **Copyright (c) 2026 Carlos Santos**.
 
@@ -296,7 +296,8 @@ script, se não houver permissão de escrita).
 | `perguntas.py` | modelo, carregador/validador e listagem dos bancos |
 | `persistencia.py` | partida salva em JSON, hash, trava de instância e debounce |
 | `serial_comm.py` | thread serial, detecção de porta, reconexão e fila |
-| `protocolo.py` | tradução entre linhas da serial e ações/eventos |
+| `protocolo.py` | protocolo v2: botões, `CONFIG_TEAMS` e ACK de equipes |
+| `protocolo_v1.py` | adaptador legado v1: LEDs, buzzer, `RESET` e reacendimento |
 | `dispositivos.py` | lista única de VID/PID e nomes de placas |
 | `audio.py` | sons externos em `sons/` e fallback sintetizado |
 | `config.py` | leitura e validação de `config.json` |
@@ -313,6 +314,8 @@ script, se não houver permissão de escrita).
 | `versao_info.txt` | metadados de versão/autor gravados no `.exe` |
 | `config.exemplo.json` | modelo versionado de configuração |
 | `ROTEIRO_SERIAL_HARDWARE.md` | checklist de validação com Arduino real |
+| `docs/ligacao_v2.svg` | diagrama de ligação dos 10 botões (Uno e Mega) |
+| `docs/PLANO_EDITOR_PERGUNTAS.md` | plano do editor de perguntas (sem código) |
 
 ---
 
@@ -437,6 +440,8 @@ Se você redistribuir o jogo, mantenha os arquivos `LICENSE`,
   roteiro físico, matriz PC × firmware, placas validadas e pendência do CH340.
 - [`LICENCA_PERGUNTAS.md`](LICENCA_PERGUNTAS.md) — licença dos bancos de
   perguntas.
+- [`docs/PLANO_EDITOR_PERGUNTAS.md`](docs/PLANO_EDITOR_PERGUNTAS.md) — plano
+  do editor de perguntas (escopo, formato, salvamento, UI, testes e etapas).
 
 ---
 
@@ -460,4 +465,4 @@ Se você redistribuir o jogo, mantenha os arquivos `LICENSE`,
 
 ---
 
-**Autor:** Carlos Santos · **Versão:** 2.8.0 · **Licença do código:** MIT
+**Autor:** Carlos Santos · **Versão:** 2.8.1 · **Licença do código:** MIT
