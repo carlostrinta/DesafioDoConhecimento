@@ -11,10 +11,11 @@ Arduino IDE. Não há mais cópia do v1 na raiz do projeto.
 
 ## Validação
 
-O firmware v2 de produção foi **validado no Arduino Uno e no Mega 2560**. A
-bancada de 10 botões também foi validada. O **clone CH340** com firmware v2
-continua como pendência explícita: se o `PRONTO` demorar mais de 3 s após o
-reset por DTR, aumente `serial.timeout_pronto` no `config.json`.
+O firmware v2 de produção foi **validado no Arduino Uno, no Mega 2560 e no
+clone CH340**. A bancada de 10 botões também foi validada. O firmware v1 em
+hardware foi validado **apenas no clone CH340**, com **2 equipes**; Uno e Mega
+foram validados apenas com o v2. Se o `PRONTO` demorar mais de 3 s após o reset
+por DTR no CH340, aumente `serial.timeout_pronto` no `config.json`.
 
 O roteiro completo, incluindo a matriz PC v1/v2 × firmware v1/v2, está em
 [`v2/ROTEIRO_VALIDACAO.md`](v2/ROTEIRO_VALIDACAO.md).

@@ -38,10 +38,12 @@ Os testes automatizados usam portas falsas. **Só o hardware real valida:**
 | 11 | Repita 1–10 no **`Desafio do Conhecimento.exe`** | mesmo resultado |
 | 12 | Abra o app **sem placa** e deixe 1 min | console sem varredura infinita de portas; CPU baixa |
 
-## Firmware v2 (validado no Uno e Mega 2560; CH340 pendente)
+## Firmware v2 (validado no Uno, Mega 2560 e CH340)
 
-O firmware v2 de produção foi **validado no Arduino Uno e no Mega 2560**. O
-roteiro completo, com a matriz PC v1/v2 × firmware v1/v2, está em
+O firmware v2 de produção foi **validado no Arduino Uno, no Mega 2560 e no
+clone CH340**. O firmware v1 em hardware foi validado **apenas no clone
+CH340**, com 2 equipes; Uno e Mega foram validados apenas com o v2. O roteiro
+completo, com a matriz PC v1/v2 × firmware v1/v2, está em
 [`firmware/v2/ROTEIRO_VALIDACAO.md`](firmware/v2/ROTEIRO_VALIDACAO.md). A
 bancada de 10 botões também foi validada separadamente em
 [`firmware/bancada_botoes/README.md`](firmware/bancada_botoes/README.md).
@@ -59,8 +61,9 @@ Resumo do que foi confirmado com o firmware v2 gravado:
 6. Reconexão, reset por DTR no meio da rodada e fechamento do app foram
    testados.
 
-O **clone CH340** com firmware v2 continua pendente. Se o `PRONTO` demorar mais
-de 3 s após o reset por DTR, aumente `serial.timeout_pronto` no `config.json`.
+O **clone CH340** foi validado com o firmware v2 (2 a 4 equipes). Se o `PRONTO`
+demorar mais de 3 s após o reset por DTR, aumente `serial.timeout_pronto` no
+`config.json`.
 
 ## Se algo falhar
 
