@@ -8,6 +8,9 @@
 >
 > **Premissa:** o jogo continua funcionando sem o editor. O editor é uma
 > ferramenta interna/acessória, não um requisito para jogar.
+>
+> **Decisões da v1:** registradas em “Perguntas abertas e decisões
+> registradas”, no fim deste documento (aceite da Etapa 6).
 
 ---
 
@@ -598,7 +601,33 @@ depois da UI, vira um segundo caminho de dados e aumenta o retrabalho.
 
 ---
 
-## Perguntas abertas para o Carlos
+## Perguntas abertas e decisões registradas
+
+As respostas abaixo foram registradas no aceite da Etapa 6 (2026-10-29) e
+valem para a v1 do editor. Elas podem ser revistas antes da implementação, mas
+não ficam mais em aberto.
+
+### Decisões do Carlos para a v1
+
+| # | Pergunta | Decisão registrada |
+| ---: | --- | --- |
+| 1 | Editar bancos distribuídos? | **Sim.** O editor abre qualquer banco. Se a pasta não for gravável, abre em leitura e oferece “Salvar como” na pasta do usuário; nunca sobrescreve a instalação protegida. |
+| 2 | Pasta padrão dos bancos novos | Primeiro `perguntas.pasta`; se não existir ou não for gravável, `Documents\Desafio do Conhecimento\perguntas`; `%APPDATA%\DesafioDoConhecimento\perguntas` como último recurso. |
+| 3 | Metadados obrigatórios? | `versao_formato` é sempre gravado em banco novo (valor `1`). `tema`, `autor` e `licenca` são opcionais no formato; o editor pede `autor` ao **criar** banco novo e usa `CC BY 4.0` como licença padrão. |
+| 4 | CSV na v1? Índice da correta? | **Fora da v1.** Se entrar na v1.1, o CSV usa `correta` **1–4** e converte para 0-based no JSON; importação tudo ou nada, com relatório por linha. |
+| 5 | Limites de texto | Enunciado 5–500; alternativa 1–300; explicação 0–1.000; categoria 1–80; 2–4 alternativas; mínimo 1 pergunta; máximo prático 5.000. |
+| 6 | Duplicatas: bloquear ou avisar? | **Avisar, não bloquear.** Normalizar com `strip`, espaços colapsados e caixa; a decisão final é do usuário. |
+| 7 | Editor com partida aberta? | Pode abrir com partida apenas **aberta** (sem rodada). Editar outro banco é livre; editar o banco em uso exige confirmação. Rodada em andamento **bloqueia**. |
+| 8 | Partida salva invalidada | **Renomear** para `estado_partida.invalida-AAAA-MM-DD.json`; não apagar. Avisar na próxima abertura que a partida não pode ser retomada. |
+| 9 | ID persistente por pergunta | **Não na v1.** Gerar ID apenas em memória para duplicar/reordenar; não gravar no JSON. |
+| 10 | Undo/redo | Pilha da sessão, limite de 100 operações. Sobrevive ao salvamento; não sobrevive ao fechamento do aplicativo. |
+| 11 | Autosave | **Não.** Apenas aviso de alterações não salvas ao fechar, trocar de banco ou sair. |
+| 12 | Editor no `.exe` ou separado | **Dentro do aplicativo**, via `F3`, tanto no `.exe` quanto rodando pelo código-fonte. Janela separada fica fora da v1. |
+| 13 | Licença e autor | **CC BY 4.0** como padrão. `autor` é obrigatório para criar banco novo. Outra licença é permitida se declarada explicitamente no campo `licenca`. |
+| 14 | Rede/pasta compartilhada | **Não suportado na v1.** Trava advisory local; documentar a limitação e reavaliar se houver demanda. |
+| 15 | Tema do editor | Seguir o **tema escuro atual**; sem tema claro na v1. |
+
+### Perguntas originais (histórico)
 
 1. O editor deve poder editar os **bancos distribuídos** (`conhecimentos_gerais`,
    `eletrotecnica`, `radiologia`) ou só cópias do usuário? Se puder, a pasta do
@@ -632,12 +661,13 @@ depois da UI, vira um segundo caminho de dados e aumenta o retrabalho.
 
 ## Critérios de aceite do plano
 
-- [ ] Carlos confirmou o escopo da v1 e o que fica fora.
-- [ ] Formato do banco decidido (lista + envelope) e leitor adaptado antes do
-      editor.
-- [ ] Validador único definido, com mensagens e limites aprovados.
-- [ ] Política de salvamento (atômico, `.bak`, trava e permissão) aprovada.
-- [ ] Comportamento durante partida e invalidação da partida salva aprovados.
-- [ ] Layout e atalhos validados em 1366×768 e 1920×1080.
-- [ ] Etapas E1–E6 com critérios de aceite e riscos revisados.
-- [ ] Perguntas abertas acima respondidas ou explicitamente adiadas.
+- [x] Carlos confirmou o escopo da v1 e o que fica fora.
+- [x] Formato do banco decidido (lista + envelope); falta adaptar o leitor
+      antes do editor.
+- [x] Validador único definido, com mensagens e limites aprovados.
+- [x] Política de salvamento (atômico, `.bak`, trava e permissão) aprovada.
+- [x] Comportamento durante partida e invalidação da partida salva aprovados.
+- [ ] Layout e atalhos validados em 1366×768 e 1920×1080 (validação de
+      implementação).
+- [x] Etapas E1–E6 com critérios de aceite e riscos revisados.
+- [x] Perguntas abertas acima respondidas (decisões registradas na v1).
