@@ -540,6 +540,10 @@ class ModalSelecaoPerguntas(tk.Toplevel):
     def fechar_para_editor(self):
         """Fecha o modal sem tratá-lo como cancelamento/saída do jogo."""
         self._limpar_mousewheel()
+        try:
+            self.grab_release()
+        except tk.TclError:
+            pass
         self.destroy()
 
     def _confirmar(self):

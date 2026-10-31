@@ -551,6 +551,7 @@ class DueloDeConhecimento:
             # Fecha o seletor antes de abrir o editor.
             try:
                 modal.fechar_para_editor()
+                self.root.update()
             except Exception:
                 pass
 
@@ -573,9 +574,7 @@ class DueloDeConhecimento:
             self._janela_editor = EditorPerguntas(
                 self.root,
                 banco,
-                ao_fechar=lambda b: self._ao_fechar_editor_novo(
-                    b, inicial_flag
-                ),
+                ao_fechar=lambda b: _ao_fechar_editor_novo(b, inicial_flag),
                 estado_path=persistencia.localizar_estado(PASTA_PERGUNTAS),
                 diretorio_base=PASTA_PERGUNTAS,
                 diretorio_aplicacao=obter_diretorio_base(),

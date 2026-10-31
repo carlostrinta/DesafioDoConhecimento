@@ -1168,3 +1168,35 @@ def test_seletor_layout_botoes_visiveis(montar_app, monkeypatch, tamanho):
 
     modal.fechar_para_editor()
     root.update()
+
+def test_caminho_completo_criar_salvar_jogar(montar_app, monkeypatch, tmp_path):
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    montar, _banco = montar_app
+    app, root, _relogio = montar()
+
+    app.abrir_seletor_tema(inicial=True)
+    root.update()
+    modal = next(w for w in root.winfo_children() if isinstance(w, ModalSelecaoPerguntas))
+
+    respostas = iter(["NovoTema", "Autor Teste"])
+    monkeypatch.setattr(desafio.simpledialog, "askstring", lambda *a, **k: next(respostas))
+    monkeypatch.setattr("tkinter.messagebox.showwarning", lambda *a, **k: None)
+    monkeypatch.setattr("tkinter.messagebox.askyesno", lambda *a, **k: True)
+    monkeypatch.setattr(desafio.em, "resolver_pasta_salvamento", lambda *a, **k: str(tmp_path))
+
+    modal._criar()
+    root.update_idletasks()
+
+    assert app._janela_editor is not None
+    editor = app._janela_editor
+
+    result = editor._preparar_para_salvar()
+    if result:
+        result = editor.salvar_como_copia()
+    root.update_idletasks()
+
+    editor._fechar()
+    root.update_idletasks()
+
+    modais = [w for w in root.winfo_children() if isinstance(w, ModalSelecaoPerguntas)]
+    assert len(modais) >= 1
