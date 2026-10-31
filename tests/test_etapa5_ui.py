@@ -832,7 +832,7 @@ def _verificar_barra_topo(app):
     largura, altura = topo.winfo_width(), topo.winfo_height()
     textos = _textos_do_topo(app)
     titulo = next(bb for txt, bb in textos.items() if txt.startswith("Desafio"))
-    status = next(bb for txt, bb in textos.items() if "Arduino" in txt or "pyserial" in txt or "não conectado" in txt)
+    status = next(bb for txt, bb in textos.items() if "Arduino" in txt or "pyserial" in txt or "não conectado" in txt or "COM" in txt or "Mega" in txt)
     ajuda = next(bb for txt, bb in textos.items() if "F11" in txt)
 
     for bb in textos.values():

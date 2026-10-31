@@ -236,9 +236,7 @@ def nome_curto_placa(placa):
 def texto_status_serial(conexao, placa="", disponivel=None, aviso_porta=""):
     """Texto e cor da barra de status; função pura para facilitar testes."""
     if disponivel is None:
-        # Se uma conexão foi explicitamente configurada, assume disponível
-        # (permite testar sem pyserial instalado).
-        disponivel = SERIAL_DISPONIVEL or bool(conexao)
+        disponivel = SERIAL_DISPONIVEL
     if not disponivel:
         return "pyserial ausente · modo teclado", Cor.AVISO
     if aviso_porta:

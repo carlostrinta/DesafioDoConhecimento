@@ -44,8 +44,10 @@ def _montar(raiz, largura, altura, conexao, placa, tema="Conhecimentos Gerais"):
     mod.definir_escala(max(0.6, min(largura / 1280, altura / 800, 2.2)))
     janela = tk.Toplevel(raiz)
     janela.withdraw()
-    barra = mod.BarraTopo(janela, height=64)
+    # Isola do pyserial real: força disponível para testar renderização.
+    mod.SERIAL_DISPONIVEL = True
     largura_barra = largura - 32
+    barra = mod.BarraTopo(janela, height=64)
     barra.place(x=16, y=10, width=largura_barra, height=64)
     barra.conexao = conexao
     barra.placa = placa
@@ -118,6 +120,7 @@ def test_barra_em_tela_cheia_mostra_controles(raiz_tk):
         janela.update()
         largura, altura = janela.winfo_width(), janela.winfo_height()
         mod.definir_escala(max(0.6, min(largura / 1280, altura / 800, 2.2)))
+        mod.SERIAL_DISPONIVEL = True
         barra = mod.BarraTopo(janela, height=64)
         largura_barra = largura - 32
         barra.place(x=16, y=10, width=largura_barra, height=64)
@@ -158,3 +161,14 @@ def test_nome_curto_da_placa_remove_vid_pid():
         == "CH340"
     )
     assert mod.nome_curto_placa("") == ""
+
+def test_texto_status_serial_sem_pyserial_nao_mostra_conectado():
+    """Sem pyserial, barra nao mostra conectado mesmo com conexao configurada."""
+    import ui_componentes as mod
+    # Sem disponivel: pyserial ausente
+    txt, cor = mod.texto_status_serial("COM6", "Arduino Mega", disponivel=False)
+    assert "pyserial ausente" in txt
+    assert "COM6" not in txt
+    # Com disponivel: mostra conexao
+    txt2, cor2 = mod.texto_status_serial("COM6", "Arduino Mega", disponivel=True)
+    assert "COM6" in txt2
