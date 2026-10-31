@@ -1,8 +1,9 @@
 # Plano do editor de perguntas
 
-> **Status:** plano aprovado. A Etapa E1 (modelo puro, validação por campo e
-> gravação segura) foi implementada; a interface gráfica continua fora desta
-> etapa. Este arquivo registra escopo, formato, decisões e riscos.
+> **Status:** plano aprovado. As etapas de modelo, gravação segura, lista,
+> formulário e integração com o jogo foram implementadas. O CSV e o
+> empacotamento do editor no `.exe` continuam fora do escopo desta rodada.
+> Este arquivo registra escopo, formato, decisões e riscos.
 >
 > **Público:** Carlos (decisões de produto) e quem for implementar.
 >

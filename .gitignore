@@ -4,6 +4,8 @@ __pycache__/
 *.pyo
 *.pyd
 .venv/
+.coverage
+htmlcov/
 
 # Build / Dist
 build/
@@ -16,6 +18,7 @@ Desafio do Conhecimento.exe
 *.log
 logs/
 estado_partida.json
+estado_partida.invalida-*.json
 *.tmp
 estado_partida.lock
 

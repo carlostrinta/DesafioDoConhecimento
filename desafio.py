@@ -13,6 +13,7 @@ Atalhos de teclado (modo simulação, funcionam junto com o Arduino):
     N               próxima pergunta
     S               ligar/desligar som
     F1              tela Sobre
+    F3              abrir/fechar o editor de perguntas
     F11             tela cheia  (Esc sai)
     Ctrl+R          zerar o placar
 """
@@ -25,6 +26,7 @@ import time
 import tkinter as tk
 from tkinter import messagebox
 
+import editor_modelo as em
 import persistencia
 import ui_componentes
 from audio import Som
@@ -79,7 +81,7 @@ from protocolo_v1 import (
     comandos_para_arduino,
     mapear_evento_arduino as mapear_evento_arduino_v1,
 )
-from recursos import caminho_recurso
+from recursos import caminho_recurso, obter_diretorio_base
 from serial_comm import SERIAL_DISPONIVEL, ComunicacaoSerial
 from ui_componentes import (
     BarraTempo,
@@ -94,6 +96,7 @@ from ui_componentes import (
     Rodape,
     escolher_fonte,
 )
+from ui_editor import EditorPerguntas
 from ui_selecao import ModalContinuarPartida, ModalSelecaoPerguntas
 from ui_sobre import TelaSobre
 
@@ -135,6 +138,27 @@ def mensagem_ignoradas(quantidade, nome_arquivo):
         return None
     substantivo = "pergunta ignorada" if quantidade == 1 else "perguntas ignoradas"
     return f"{quantidade} {substantivo} em {nome_arquivo}."
+
+
+def rodada_em_andamento(
+    fase,
+    timer_ativo: bool,
+    contagem_ativa: bool,
+    contagem_visual: bool = False,
+) -> bool:
+    """
+    True quando o editor de perguntas não pode ser aberto.
+
+    A rodada começa quando a fase deixa de ser AGUARDANDO, quando o tempo de
+    resposta está correndo ou quando a contagem de largada (inclusive o
+    overlay visual do "JÁ!") ainda está na tela.
+    """
+    return bool(
+        contagem_ativa
+        or contagem_visual
+        or timer_ativo
+        or fase != FASE_AGUARDANDO
+    )
 
 
 def escolher_arquivo_inicial(arquivos, arquivo_atual, pasta, arquivo_padrao):
@@ -194,6 +218,7 @@ class DueloDeConhecimento:
         self._equipes_alvo = 0
         self._equipes_confirmado = False
         self._janela_sobre = None
+        self._janela_editor = None
         self._aviso_protocolo_mostrado = False
         self._geracao_conexao = 0
         self._geracao_fallback = 0
@@ -271,6 +296,7 @@ class DueloDeConhecimento:
 
         self.root.bind("<Key>", self.tecla_pressionada)
         self.root.bind("<F1>", lambda e: self.abrir_sobre())
+        self.root.bind("<F3>", lambda e: self.abrir_editor_perguntas())
         self.root.bind("<F11>", lambda e: self.alternar_tela_cheia())
         self.root.bind("<Escape>", lambda e: self.root.attributes("-fullscreen", False))
         self.root.bind("<Control-r>", lambda e: self.reiniciar_placar())
@@ -548,6 +574,129 @@ class DueloDeConhecimento:
             self.root.focus_force()
         except tk.TclError:
             pass
+
+    # -----------------------------------------------------
+    # EDITOR DE PERGUNTAS (Etapa E2)
+    # -----------------------------------------------------
+    def esta_em_rodada(self) -> bool:
+        """Atalho para a regra pura `rodada_em_andamento`."""
+        return rodada_em_andamento(
+            self.fase,
+            bool(getattr(self.jogo, "timer_ativo", False)),
+            bool(getattr(self.jogo, "contagem_ativa", False)),
+            self._contagem_visual is not None,
+        )
+
+    @staticmethod
+    def _hash_arquivo(caminho) -> str:
+        if not caminho or not os.path.isfile(caminho):
+            return ""
+        try:
+            return persistencia.hash_arquivo(caminho)
+        except OSError:
+            return ""
+
+    def abrir_editor_perguntas(self):
+        """Abre o editor modal (F3), bloqueado durante uma rodada."""
+        janela = getattr(self, "_janela_editor", None)
+        if janela is not None:
+            try:
+                if janela.winfo_exists():
+                    janela.lift()
+                    janela.focus_force()
+                    return
+            except tk.TclError:
+                pass
+            self._janela_editor = None
+
+        if self.esta_em_rodada():
+            self.avisar(
+                "Termine a pergunta atual antes de abrir o editor (F3)."
+            )
+            return
+
+        caminho = self.arquivo_atual
+        if not caminho:
+            candidato = os.path.join(PASTA_PERGUNTAS, ARQUIVO_PERGUNTAS)
+            if os.path.isfile(candidato):
+                caminho = candidato
+
+        banco_em_uso = bool(
+            caminho
+            and self.arquivo_atual
+            and os.path.normcase(os.path.abspath(caminho))
+            == os.path.normcase(os.path.abspath(self.arquivo_atual))
+        )
+        if (
+            banco_em_uso
+            and not os.environ.get("DESAFIO_AUTO_FECHAR")
+            and not messagebox.askyesno(
+                TITULO,
+                "Este é o banco em uso nesta partida.\n\n"
+                "Salvar alterações nele pode invalidar a partida salva. "
+                "Deseja abrir o editor mesmo assim?",
+                parent=self.root,
+                icon="warning",
+            )
+        ):
+            return
+
+        banco = None
+        if caminho:
+            try:
+                banco = em.carregar_banco(
+                    caminho,
+                    diretorio_aplicacao=obter_diretorio_base(),
+                )
+            except (OSError, ValueError) as exc:
+                log.error("Não foi possível abrir o banco no editor: %s", exc)
+                if not os.environ.get("DESAFIO_AUTO_FECHAR"):
+                    messagebox.showerror(
+                        TITULO,
+                        "Não foi possível abrir o banco de perguntas no "
+                        f"editor:\n\n{exc}",
+                        parent=self.root,
+                    )
+                return
+
+        hash_antes = self._hash_arquivo(caminho)
+
+        def ao_fechar(banco_editado):
+            self._janela_editor = None
+            try:
+                self.root.focus_force()
+            except tk.TclError:
+                pass
+
+            destino = caminho
+            if not destino and banco_editado is not None:
+                destino = banco_editado.caminho_origem
+            self._recarregar_apos_editor(destino, hash_antes)
+
+        self._janela_editor = EditorPerguntas(
+            self.root,
+            banco,
+            ao_fechar=ao_fechar,
+            estado_path=persistencia.localizar_estado(PASTA_PERGUNTAS),
+            diretorio_base=PASTA_PERGUNTAS,
+            diretorio_aplicacao=obter_diretorio_base(),
+            pasta_config=PASTA_PERGUNTAS,
+            rodando_partida=False,
+            banco_em_uso_caminho=caminho,
+        )
+
+    def _recarregar_apos_editor(self, caminho, hash_antes: str):
+        """Recarrega o jogo quando o arquivo atual mudou dentro do editor."""
+        if not caminho or not os.path.isfile(caminho):
+            return
+        hash_depois = self._hash_arquivo(caminho)
+        if hash_depois == hash_antes:
+            return
+        self.carregar_perguntas(caminho)
+        if self.jogo.perguntas:
+            self.proxima_pergunta(forcar=True)
+        self.render()
+        self.avisar("Banco de perguntas recarregado do editor.")
 
     def proxima_pergunta(self, forcar=False):
         # A regra de bloqueio e o avanço do baralho são do Jogo.
@@ -1500,6 +1649,13 @@ class DueloDeConhecimento:
             except tk.TclError:
                 pass
             self._janela_sobre = None
+        janela_editor = getattr(self, "_janela_editor", None)
+        if janela_editor is not None:
+            try:
+                janela_editor.destroy()
+            except tk.TclError:
+                pass
+            self._janela_editor = None
         self.root.destroy()
 
 

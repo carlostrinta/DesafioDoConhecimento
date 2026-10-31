@@ -94,6 +94,7 @@ O ponto de entrada é **`main.py`**. O arquivo `desafio.py` contém a interface
 | `N` | próxima pergunta |
 | `S` | liga/desliga o som |
 | `F1` | abre a tela Sobre |
+| `F3` | abre/fecha o editor de perguntas |
 | `F11` | alterna tela cheia |
 | `Esc` | sai da tela cheia |
 | `Ctrl+R` | reinicia o placar (com confirmação) |
@@ -300,6 +301,9 @@ script, se não houver permissão de escrita).
 | `jogo.py` | regra de jogo pura: estado, placar, timer e contagem |
 | `perguntas.py` | modelo, carregador/validador único e validação por campo do editor |
 | `editor_modelo.py` | modelo puro do editor (E1): CRUD, busca, undo/redo e gravação segura |
+| `ui_editor.py` | janela modal do editor (E2): debounce, atalhos, salvamento e fechamento |
+| `ui_editor_lista.py` | lista lateral: busca, filtro, seleção, botões ↑/↓ e arrastar-e-soltar |
+| `ui_editor_form.py` | formulário da pergunta com validação inline por campo |
 | `persistencia.py` | partida salva em JSON, hash, trava de instância e debounce |
 | `serial_comm.py` | thread serial, detecção de porta, reconexão e fila |
 | `protocolo.py` | protocolo v2: botões, `CONFIG_TEAMS` e ACK de equipes |
@@ -325,20 +329,28 @@ script, se não houver permissão de escrita).
 
 ---
 
-## Editor de perguntas (em desenvolvimento)
+## Editor de perguntas
 
-A Etapa E1 prepara o editor **sem interface gráfica ainda**. O modelo puro
-fica em `editor_modelo.py`: leitura de lista legada ou envelope, criação,
-edição, exclusão, duplicação, reordenação, busca/filtro e undo/redo. A
-validação por campo continua em `perguntas.py`, com os mesmos limites usados
-pelo carregador.
+O editor está disponível pela tecla **`F3`**. Ele abre uma janela modal com a
+lista de perguntas à esquerda e o formulário à direita. A lista permite buscar por texto, filtrar por categoria,
+selecionar, reordenar com os botões ↑/↓ ou arrastando, duplicar, excluir e criar
+uma pergunta nova. O formulário valida cada campo em tempo real com as mesmas
+regras do carregador; as quatro alternativas ficam sempre editáveis.
+
+Atalhos dentro do editor: `Ctrl+S` salva, `Ctrl+Z` desfaz, `Ctrl+Y` refaz,
+`Esc` fecha (com confirmação se houver alterações) e `F3` também fecha. Também
+funcionam `Ctrl+N` (nova pergunta), `Ctrl+D` (duplicar), `Ctrl+F` (buscar),
+`Delete` (excluir) e `Alt+↑`/`Alt+↓` (mover). As edições usam um pequeno
+debounce para que uma sequência de teclas gere um único passo de desfazer.
 
 A gravação é segura: escreve `.tmp`, cria `.bak` antes de sobrescrever, usa
-trava de instância e expõe conflito de nome para a futura interface. Os bancos
+trava de instância e pede confirmação em conflito de nome. Os bancos
 distribuídos (`conhecimentos_gerais.json`, `eletrotecnica.json` e
-`radiologia.json`) são **somente leitura**; alterações devem ser salvas como
-cópia na pasta configurada ou na pasta do usuário. Não há tela, atalho ou data
-prometida para a UI nesta etapa. O escopo completo está em
+`radiologia.json`) são **somente leitura**; alterações neles são salvas como
+cópia na pasta configurada ou na pasta do usuário. Se o banco estiver em uso na
+partida, o editor pede confirmação antes de abrir; salvar o banco usado pode
+invalidar a partida salva, que é renomeada e não apagada. O editor não abre
+durante uma rodada em andamento. O escopo completo está em
 [`docs/PLANO_EDITOR_PERGUNTAS.md`](docs/PLANO_EDITOR_PERGUNTAS.md).
 
 ---
