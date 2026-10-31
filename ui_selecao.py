@@ -352,6 +352,19 @@ class ModalSelecaoPerguntas(tk.Toplevel):
             )
             lbl_sub.pack(fill="x")
 
+            # Indica a pasta de origem quando não é a pasta principal.
+            origem = os.path.dirname(os.path.abspath(info["caminho"]))
+            if origem and os.path.normcase(origem) != os.path.normcase(self.diretorio):
+                lbl_origem = tk.Label(
+                    col,
+                    text="📁 " + os.path.basename(origem),
+                    font=("Segoe UI", 8),
+                    fg=Cor.APAGADO,
+                    bg=cor_bg,
+                    anchor="w"
+                )
+                lbl_origem.pack(fill="x")
+
             if info.get("categorias"):
                 cats = ", ".join(info["categorias"][:3])
                 if len(info["categorias"]) > 3:
@@ -498,7 +511,7 @@ class ModalSelecaoPerguntas(tk.Toplevel):
             self._selecionar_indice(encontrado_idx)
 
     def _atualizar_lista(self):
-        self.lista_arquivos = listar_arquivos_perguntas(self.diretorio)
+        self.lista_arquivos = listar_arquivos_perguntas(self.diretorio, buscar_candidatas=True)
         self._reconstruir_cards()
         if self.lista_arquivos:
             self._selecionar_indice(0)

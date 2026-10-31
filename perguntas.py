@@ -580,31 +580,51 @@ def inspecionar_arquivo_perguntas(caminho):
         return None
 
 
-def listar_arquivos_perguntas(diretorio_base):
+def listar_arquivos_perguntas(diretorio_base, pastas_extras=None, buscar_candidatas=False):
     """
-    Lista todos os arquivos JSON de perguntas na pasta da aplicação e subpastas comuns.
+    Lista todos os arquivos JSON de perguntas na pasta da aplicação e,
+    opcionalmente, nas pastas candidatas de salvamento.
     """
     arquivos = []
-    if not os.path.exists(diretorio_base):
-        return arquivos
+    pastas = [diretorio_base]
+    if pastas_extras:
+        pastas.extend(pastas_extras)
 
-    candidatos = []
-    try:
-        for f in os.listdir(diretorio_base):
-            if f.lower().endswith(".json"):
-                candidatos.append(os.path.join(diretorio_base, f))
-    except Exception as e:
-        log.warning("Erro ao listar pasta base %s: %s", diretorio_base, e)
-
-    # Também inspeciona subpasta 'perguntas' caso exista
-    subpasta = os.path.join(diretorio_base, "perguntas")
-    if os.path.isdir(subpasta):
+    if buscar_candidatas:
         try:
-            for f in os.listdir(subpasta):
-                if f.lower().endswith(".json"):
-                    candidatos.append(os.path.join(subpasta, f))
+            from editor_modelo import pastas_salvamento_candidatas
+            pastas.extend(pastas_salvamento_candidatas(diretorio_base))
         except Exception:
             pass
+
+    vistos_pastas = set()
+    pastas_unicas = []
+    for p in pastas:
+        ap = os.path.abspath(p)
+        if ap not in vistos_pastas:
+            vistos_pastas.add(ap)
+            pastas_unicas.append(ap)
+
+    candidatos = []
+    for pasta in pastas_unicas:
+        if not os.path.exists(pasta):
+            continue
+        try:
+            for f in os.listdir(pasta):
+                if f.lower().endswith(".json"):
+                    candidatos.append(os.path.join(pasta, f))
+        except Exception as e:
+            log.warning("Erro ao listar pasta %s: %s", pasta, e)
+
+        # Também inspeciona subpasta 'perguntas' caso exista.
+        subpasta = os.path.join(pasta, "perguntas")
+        if os.path.isdir(subpasta):
+            try:
+                for f in os.listdir(subpasta):
+                    if f.lower().endswith(".json"):
+                        candidatos.append(os.path.join(subpasta, f))
+            except Exception:
+                pass
 
     candidatos_unicos = []
     vistos = set()
