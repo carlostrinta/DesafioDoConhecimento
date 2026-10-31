@@ -94,7 +94,7 @@ O ponto de entrada é **`main.py`**. O arquivo `desafio.py` contém a interface
 | `N` | próxima pergunta |
 | `S` | liga/desliga o som |
 | `F1` | abre a tela Sobre |
-| `F3` | abre/fecha o editor de perguntas |
+| `F3` | fecha o editor de perguntas (dentro do editor) |
 | `F11` | alterna tela cheia |
 | `Esc` | sai da tela cheia |
 | `Ctrl+R` | reinicia o placar (com confirmação) |
@@ -331,11 +331,15 @@ script, se não houver permissão de escrita).
 
 ## Editor de perguntas
 
-O editor está disponível pela tecla **`F3`**. Ele abre uma janela modal com a
-lista de perguntas à esquerda e o formulário à direita. A lista permite buscar por texto, filtrar por categoria,
-selecionar, reordenar com os botões ↑/↓ ou arrastando, duplicar, excluir e criar
-uma pergunta nova. O formulário valida cada campo em tempo real com as mesmas
-regras do carregador; as quatro alternativas ficam sempre editáveis.
+O editor está disponível na tela de seleção de tema (**`Ctrl+T`** ou no início do
+jogo). Cada tema da lista tem um botão **"Editar"** (🔒 para bancos
+distribuídos, que abrem em somente leitura); o rodapé tem um botão **"Criar"**
+para novos bancos. Teclado no seletor: `E` edita o tema selecionado, `Ctrl+N`
+cria um novo banco. O editor abre uma janela modal com a lista de perguntas à
+esquerda e o formulário à direita. A lista permite buscar por texto, filtrar por
+categoria, selecionar, reordenar com os botões ↑/↓ ou arrastando, duplicar,
+excluir e criar uma pergunta nova. O formulário valida cada campo em tempo real
+com as mesmas regras do carregador; as quatro alternativas ficam sempre editáveis.
 
 Atalhos dentro do editor: `Ctrl+S` salva, `Ctrl+Z` desfaz, `Ctrl+Y` refaz,
 `Esc` fecha (com confirmação se houver alterações) e `F3` também fecha. Também
@@ -350,7 +354,8 @@ distribuídos (`conhecimentos_gerais.json`, `eletrotecnica.json` e
 cópia na pasta configurada ou na pasta do usuário. Se o banco estiver em uso na
 partida, o editor pede confirmação antes de abrir; salvar o banco usado pode
 invalidar a partida salva, que é renomeada e não apagada. O editor não abre
-durante uma rodada em andamento. O escopo completo está em
+durante uma rodada em andamento (só a partir do seletor de tema).
+O escopo completo está em
 [`docs/PLANO_EDITOR_PERGUNTAS.md`](docs/PLANO_EDITOR_PERGUNTAS.md).
 
 ---
