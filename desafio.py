@@ -489,7 +489,7 @@ class DueloDeConhecimento:
             self._cancelar_job_timer()
 
         diretorio = PASTA_PERGUNTAS
-        arquivos = listar_arquivos_perguntas(diretorio)
+        arquivos = listar_arquivos_perguntas(diretorio, buscar_candidatas=True)
 
         atual = None
         if caminho_selecionar:
