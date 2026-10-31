@@ -36,6 +36,8 @@ class ModalSelecaoPerguntas(tk.Toplevel):
         inicial=False,
         diretorio=None,
         ao_sair=None,
+        ao_editar=None,
+        ao_criar=None,
     ):
         super().__init__(parent)
         self.parent = parent
@@ -46,6 +48,8 @@ class ModalSelecaoPerguntas(tk.Toplevel):
         self.inicial = inicial
         self.diretorio = diretorio or obter_diretorio_base()
         self.ao_sair = ao_sair
+        self.ao_editar = ao_editar
+        self.ao_criar = ao_criar
 
         self.title(f"{NOME} — Escolha de Tema")
         self.configure(bg=Cor.FUNDO)
@@ -72,6 +76,10 @@ class ModalSelecaoPerguntas(tk.Toplevel):
         self.bind("<KP_Enter>", lambda e: self._confirmar())
         self.bind("<Up>", lambda e: self._mover_selecao(-1))
         self.bind("<Down>", lambda e: self._mover_selecao(1))
+        self.bind("<Control-n>", lambda e: self._criar())
+        self.bind("<Control-N>", lambda e: self._criar())
+        self.bind("e", lambda e: self._editar_selecionado())
+        self.bind("E", lambda e: self._editar_selecionado())
         if self.permitir_cancelar:
             self.bind("<Escape>", lambda e: self._cancelar())
 
@@ -208,6 +216,23 @@ class ModalSelecaoPerguntas(tk.Toplevel):
             command=self._atualizar_lista
         )
         btn_atualizar.pack(side="left")
+
+        btn_criar = tk.Button(
+            rodape,
+            text="➕ Criar",
+            font=("Segoe UI", 9, "bold"),
+            bg="#1A3A2A",
+            fg="#5CFF8A",
+            activebackground="#2A4A3A",
+            activeforeground="#FFFFFF",
+            relief="flat",
+            bd=0,
+            padx=12,
+            pady=8,
+            cursor="hand2",
+            command=self._criar,
+        )
+        btn_criar.pack(side="left", padx=(8, 0))
 
         btn_iniciar = tk.Button(
             rodape,
@@ -351,6 +376,26 @@ class ModalSelecaoPerguntas(tk.Toplevel):
             )
             lbl_badge.pack(side="right", padx=(10, 0))
 
+            # Botão Editar por tema.
+            eh_distribuido = self._eh_distribuido(info["caminho"])
+            txt_editar = "🔒 Editar" if eh_distribuido else "✏ Editar"
+            btn_editar = tk.Button(
+                card,
+                text=txt_editar,
+                font=("Segoe UI", 9, "bold"),
+                bg="#2A3A66",
+                fg=Cor.TEXTO,
+                activebackground="#3A4A77",
+                activeforeground="#FFFFFF",
+                relief="flat",
+                bd=0,
+                padx=10,
+                pady=4,
+                cursor="hand2",
+                command=lambda c=info["caminho"]: self._editar(c),
+            )
+            btn_editar.pack(side="right", padx=(0, 4))
+
             card_info = {
                 "idx": idx,
                 "info": info,
@@ -460,6 +505,39 @@ class ModalSelecaoPerguntas(tk.Toplevel):
             self.canvas.unbind_all("<MouseWheel>")
         except Exception:
             pass
+
+    def _eh_distribuido(self, caminho):
+        """Verifica se o caminho é um banco distribuído."""
+        if not caminho:
+            return False
+        nome = os.path.basename(caminho).casefold()
+        return nome in {"conhecimentos_gerais.json", "eletrotecnica.json", "radiologia.json"}
+
+    def _editar(self, caminho):
+        """Abre o editor para o banco indicado."""
+        if self.ao_editar is not None:
+            self.ao_editar(caminho)
+
+    def _editar_selecionado(self):
+        """Edita o tema selecionado (atalho E)."""
+        if self.arquivo_selecionado:
+            self._editar(self.arquivo_selecionado["caminho"])
+        return "break"
+
+    def _criar(self):
+        """Cria um novo banco (atalho Ctrl+N)."""
+        if self.ao_criar is not None:
+            self.ao_criar()
+        return "break"
+
+    def _acionar_f3(self):
+        """Compatibilidade: não faz nada (F3 removido)."""
+        return "break"
+
+    def fechar_para_editor(self):
+        """Fecha o modal sem tratá-lo como cancelamento/saída do jogo."""
+        self._limpar_mousewheel()
+        self.destroy()
 
     def _confirmar(self):
         if not self.arquivo_selecionado:
