@@ -140,26 +140,6 @@ def mensagem_ignoradas(quantidade, nome_arquivo):
     return f"{quantidade} {substantivo} em {nome_arquivo}."
 
 
-def rodada_em_andamento(
-    fase,
-    timer_ativo: bool,
-    contagem_ativa: bool,
-    contagem_visual: bool = False,
-) -> bool:
-    """
-    True quando há uma rodada em andamento (editor não pode abrir).
-
-    Regra simples: se a fase não é AGUARDANDO, ou o timer/contagem está ativo,
-    ou o overlay visual do "JÁ!" está na tela, há rodada em andamento.
-    """
-    return bool(
-        contagem_ativa
-        or contagem_visual
-        or timer_ativo
-        or fase != FASE_AGUARDANDO
-    )
-
-
 def escolher_arquivo_inicial(arquivos, arquivo_atual, pasta, arquivo_padrao):
     """
     Item pré-selecionado no seletor de temas.

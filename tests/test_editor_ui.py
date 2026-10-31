@@ -18,7 +18,7 @@ import ui_editor
 import ui_editor_form
 import ui_editor_lista
 from apoio_tk import criar_raiz_tk
-from jogo import FASE_AGUARDANDO, FASE_CONTAGEM, FASE_RESPONDENDO
+from jogo import FASE_AGUARDANDO
 from perguntas import ErroCampo
 
 
@@ -176,21 +176,6 @@ def _digitar(editor, campo, valor):
 # =========================================================
 # Regra pura / integração sem Tk
 # =========================================================
-def test_rodada_em_andamento_regra_pura():
-    # AGUARDANDO sem contagem/timer: pode abrir.
-    assert not desafio.rodada_em_andamento(FASE_AGUARDANDO, False, False)
-    # CONTAGEM bloqueia.
-    assert desafio.rodada_em_andamento(FASE_CONTAGEM, False, False)
-    # AGUARDANDO com timer ativo bloqueia.
-    assert desafio.rodada_em_andamento(FASE_AGUARDANDO, True, False)
-    # AGUARDANDO com contagem ativa bloqueia.
-    assert desafio.rodada_em_andamento(FASE_AGUARDANDO, False, True)
-    # AGUARDANDO com contagem visual bloqueia.
-    assert desafio.rodada_em_andamento(FASE_AGUARDANDO, False, False, True)
-    # RESPONDENDO bloqueia.
-    assert desafio.rodada_em_andamento(FASE_RESPONDENDO, False, False)
-
-
 def test_hash_e_recarga_apos_editor(tmp_path):
     caminho = tmp_path / "banco.json"
     caminho.write_text("[]", encoding="utf-8")
