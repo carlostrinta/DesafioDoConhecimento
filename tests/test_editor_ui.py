@@ -18,7 +18,7 @@ import ui_editor
 import ui_editor_form
 import ui_editor_lista
 from apoio_tk import criar_raiz_tk
-from jogo import FASE_AGUARDANDO, FASE_RESPONDENDO
+from jogo import FASE_AGUARDANDO, FASE_CONTAGEM, FASE_RESPONDENDO
 from perguntas import ErroCampo
 
 
@@ -177,10 +177,17 @@ def _digitar(editor, campo, valor):
 # Regra pura / integração sem Tk
 # =========================================================
 def test_rodada_em_andamento_regra_pura():
+    # AGUARDANDO sem contagem/timer: pode abrir.
     assert not desafio.rodada_em_andamento(FASE_AGUARDANDO, False, False)
+    # CONTAGEM bloqueia.
+    assert desafio.rodada_em_andamento(FASE_CONTAGEM, False, False)
+    # AGUARDANDO com timer ativo bloqueia.
     assert desafio.rodada_em_andamento(FASE_AGUARDANDO, True, False)
+    # AGUARDANDO com contagem ativa bloqueia.
     assert desafio.rodada_em_andamento(FASE_AGUARDANDO, False, True)
+    # AGUARDANDO com contagem visual bloqueia.
     assert desafio.rodada_em_andamento(FASE_AGUARDANDO, False, False, True)
+    # RESPONDENDO bloqueia.
     assert desafio.rodada_em_andamento(FASE_RESPONDENDO, False, False)
 
 
@@ -199,6 +206,7 @@ def test_hash_e_recarga_apos_editor(tmp_path):
         proxima_pergunta=lambda forcar=False: None,
         render=lambda: None,
         avisar=lambda texto: avisos.append(texto),
+        arquivo_atual=str(caminho),
     )
     fake._hash_arquivo = desafio.DueloDeConhecimento._hash_arquivo
 
@@ -730,6 +738,7 @@ def _app_falso(raiz_tk, caminho, tmp_path):
     )
     app._contagem_visual = None
     app._janela_editor = None
+    app.arquivo_atual = str(caminho)
     app._avisos = []
     app.avisar = lambda texto: app._avisos.append(texto)
     app.carregar_perguntas = lambda caminho=None: None
@@ -738,7 +747,7 @@ def _app_falso(raiz_tk, caminho, tmp_path):
     return app
 
 
-def test_f3_abre_editor_e_bloqueia_rodada(
+def test_abrir_editor_perguntas_com_caminho(
     raiz_tk, tmp_path, mensagens, monkeypatch
 ):
     banco, caminho = criar_banco(tmp_path)
@@ -749,7 +758,7 @@ def test_f3_abre_editor_e_bloqueia_rodada(
     )
     mensagens.yes = True
 
-    app.abrir_editor_perguntas()
+    app.abrir_editor_perguntas(caminho=caminho)
     raiz_tk.update()
     editor = app._janela_editor
     assert isinstance(editor, ui_editor.EditorPerguntas)
@@ -757,12 +766,6 @@ def test_f3_abre_editor_e_bloqueia_rodada(
     editor._fechar()
     raiz_tk.update()
     assert app._janela_editor is None
-
-    app.jogo.timer_ativo = True
-    app.abrir_editor_perguntas()
-    raiz_tk.update()
-    assert app._janela_editor is None
-    assert app._avisos
 
 
 def test_abrir_editor_perguntas_erro_de_banco(

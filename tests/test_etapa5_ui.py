@@ -7,6 +7,8 @@ trava e persistência falsos. Em ambiente sem display são pulados.
 
 import json
 import logging
+import os
+import tkinter as tk
 from types import SimpleNamespace
 
 import pytest
@@ -17,6 +19,7 @@ from apoio_tk import criar_raiz_tk
 from jogo import (
     FASE_AGUARDANDO,
     FASE_CONTAGEM,
+    FASE_PONTUADA,
     FASE_REVELADA,
     FASE_RESPONDENDO,
     Jogo,
@@ -887,3 +890,135 @@ def test_contagem_placar_e_topo_em_tamanhos_reais(
     _confirmar_contagem(app, root, relogio)
     assert app.overlay_contagem.winfo_ismapped()
     _verificar_barra_topo(app)
+
+
+# =========================================================
+# Regressão E2: editor abre a partir do seletor de tema
+# =========================================================
+def _abrir_editor_via_seletor(app, root, caminho=None):
+    """Abre o seletor de tema e clica em 'Editar' no tema indicado."""
+    app.abrir_seletor_tema(inicial=True)
+    root.update()
+    modal = next(
+        w for w in root.winfo_children()
+        if isinstance(w, ModalSelecaoPerguntas)
+    )
+    if caminho is not None:
+        for item in modal.lista_arquivos:
+            if os.path.abspath(item["caminho"]) == os.path.abspath(caminho):
+                modal.arquivo_selecionado = item
+                modal._selecionar_indice(modal.lista_arquivos.index(item))
+                break
+    # Clica no botão Editar do card selecionado.
+    for card_info in modal.cards_widgets:
+        if modal.arquivo_selecionado and card_info["info"]["caminho"] == modal.arquivo_selecionado["caminho"]:
+            # Encontra o botão Editar dentro do card.
+            for child in card_info["card"].winfo_children():
+                if isinstance(child, tk.Button) and "Editar" in str(child.cget("text")):
+                    child.invoke()
+                    root.update()
+                    return
+    # Fallback: usa o atalho E.
+    modal.focus_force()
+    modal.update()
+    modal.event_generate("<KeyPress>", keysym="e")
+    modal.update()
+
+
+def test_editor_abre_pela_selecao_de_tema(montar_app, monkeypatch):
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    montar, banco = montar_app
+    app, root, _relogio = montar()
+    app.abrir_seletor_tema(inicial=True)
+    root.update()
+    modal = next(
+        w for w in root.winfo_children()
+        if isinstance(w, ModalSelecaoPerguntas)
+    )
+    # Seleciona o banco e clica Editar.
+    _abrir_editor_via_seletor(app, root, banco)
+    assert app._janela_editor is not None
+
+    app._janela_editor._fechar()
+    root.update()
+
+
+def test_editor_nao_abre_com_f3_no_jogo(montar_app, monkeypatch):
+    """F3 não tem efeito durante o jogo (removido)."""
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    montar, banco = montar_app
+    app, root, relogio = montar(contagem=0, num_equipes=2)
+    _escolher_tema(app, root, banco)
+
+    # F3 não abre editor.
+    root.focus_force()
+    root.update()
+    root.event_generate("<KeyPress>", keysym="F3")
+    root.update()
+    assert app._janela_editor is None
+
+
+def test_teclas_do_jogo_nao_afetam_com_editor_aberto(
+    montar_app, monkeypatch
+):
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    montar, banco = montar_app
+    app, root, relogio = montar(contagem=0, num_equipes=2)
+    _escolher_tema(app, root, banco)
+    _tecla(root, "a")
+    _tecla(root, "r")
+    _tecla(root, "1")
+    assert app.fase == FASE_PONTUADA
+
+    # Abre o editor via Ctrl+T -> seletor -> Editar.
+    root.focus_force()
+    root.update()
+    root.event_generate("<Control-t>")
+    root.update()
+    modal = next(
+        w for w in root.winfo_children()
+        if isinstance(w, ModalSelecaoPerguntas)
+    )
+    _abrir_editor_via_seletor(app, root, banco)
+    editor = app._janela_editor
+    assert editor is not None
+
+    antes = (
+        app.fase,
+        dict(app.jogo.placar),
+        app.indice,
+        app.pergunta_atual,
+        app.quem_apertou,
+        app.tempo_estourou,
+        app.som.ativo,
+    )
+
+    editor.focus_force()
+    editor.update()
+    for keysym, state in (
+        ("a", 0), ("A", 0x1), ("b", 0), ("B", 0x1),
+        ("c", 0), ("C", 0x1), ("d", 0), ("D", 0x1),
+        ("1", 0), ("2", 0), ("3", 0), ("4", 0),
+        ("r", 0), ("R", 0x1),
+        ("n", 0), ("N", 0x1),
+        ("s", 0), ("S", 0x1),
+        ("r", 0x4), ("R", 0x5),
+        ("t", 0x4), ("T", 0x5),
+    ):
+        editor.event_generate("<KeyPress>", keysym=keysym, state=state)
+        editor.update()
+
+    depois = (
+        app.fase,
+        dict(app.jogo.placar),
+        app.indice,
+        app.pergunta_atual,
+        app.quem_apertou,
+        app.tempo_estourou,
+        app.som.ativo,
+    )
+    assert depois == antes
+    assert app._janela_editor is editor
+
+    editor._fechar()
+    root.update()
