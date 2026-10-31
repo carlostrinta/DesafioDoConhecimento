@@ -1055,7 +1055,11 @@ def salvar_banco(
 # ─────────────────────────────────────────────────────────
 def sanitizar_nome_arquivo(nome: str) -> str:
     """Gera um nome `.json` seguro para Windows, sem pastas."""
-    base = os.path.basename(_texto_seguro(nome)).strip()
+    base = _texto_seguro(nome).strip()
+    # Troca separadores de pasta por "_" ANTES de basename, evitando perda
+    # silenciosa do prefixo (ex.: "a/b" não vira "b.json").
+    base = base.replace(os.sep, "_").replace("/", "_").replace("\\", "_")
+    base = os.path.basename(base)
     if base.casefold().endswith(EXTENSAO_JSON):
         base = base[: -len(EXTENSAO_JSON)]
     decomposto = unicodedata.normalize("NFKD", base)
