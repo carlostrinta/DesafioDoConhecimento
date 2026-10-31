@@ -503,14 +503,24 @@ class DueloDeConhecimento:
         if caminho:
             log.debug("Estado da partida salvo em %s.", caminho)
 
-    def abrir_seletor_tema(self, inicial=False):
+    def abrir_seletor_tema(self, inicial=False, caminho_selecionar=None):
         """Abre a tela modal para escolha de tema/arquivo de perguntas."""
+        if self._job_timer:
+            self._cancelar_job_timer()
+
         diretorio = PASTA_PERGUNTAS
         arquivos = listar_arquivos_perguntas(diretorio)
 
-        atual = escolher_arquivo_inicial(
-            arquivos, self.arquivo_atual, PASTA_PERGUNTAS, ARQUIVO_PERGUNTAS
-        )
+        atual = None
+        if caminho_selecionar:
+            for arq in arquivos:
+                if os.path.abspath(arq["caminho"]) == os.path.abspath(caminho_selecionar):
+                    atual = arq
+                    break
+        if atual is None:
+            atual = escolher_arquivo_inicial(
+                arquivos, self.arquivo_atual, PASTA_PERGUNTAS, ARQUIVO_PERGUNTAS
+            )
 
         def ao_confirmar(info_escolhida):
             if not info_escolhida:
@@ -594,6 +604,9 @@ class DueloDeConhecimento:
                 self.root.focus_force()
             except tk.TclError:
                 pass
+            destino = None
+            if banco_editado is not None:
+                destino = banco_editado.caminho_origem
             self.root.after_idle(
                 lambda: self.abrir_seletor_tema(
                     inicial=inicial_flag,
