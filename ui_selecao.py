@@ -328,9 +328,12 @@ class ModalSelecaoPerguntas(tk.Toplevel):
             col = tk.Frame(card, bg=cor_bg)
             col.pack(side="left", fill="both", expand=True)
 
+            titulo = info["titulo"]
+            if len(titulo) > 40:
+                titulo = titulo[:37] + "…"
             lbl_tit = tk.Label(
                 col,
-                text=info["titulo"],
+                text=titulo,
                 font=("Segoe UI", 12, "bold"),
                 fg=Cor.TEXTO,
                 bg=cor_bg,

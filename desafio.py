@@ -568,6 +568,12 @@ class DueloDeConhecimento:
                 )
                 return
 
+            # Fecha o seletor antes de abrir o editor.
+            try:
+                modal.fechar_para_editor()
+            except Exception:
+                pass
+
             # Cria o banco em memória.
             banco = em.criar_banco_novo(
                 tema=nome.strip(),

@@ -42,8 +42,11 @@ class Relogio:
 
 
 class TravaFalsa:
+    def __init__(self, *args, **kwargs):
+        pass
+
     def adquirir(self):
-        return None
+        return True
 
     def liberar(self):
         return None
@@ -1022,3 +1025,83 @@ def test_teclas_do_jogo_nao_afetam_com_editor_aberto(
 
     editor._fechar()
     root.update()
+
+def test_ctrl_t_no_meio_de_rodada_mantem_estado(montar_app, monkeypatch):
+    """Ctrl+T durante rodada abre seletor; cancelar mantem rodada/placar."""
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    montar, banco = montar_app
+    app, root, relogio = montar(contagem=0, num_equipes=2)
+    _escolher_tema(app, root, banco)
+
+    _tecla(root, "a")
+    assert app.fase == FASE_RESPONDENDO
+    placar_antes = dict(app.jogo.placar)
+
+    root.focus_force()
+    root.update()
+    root.event_generate("<Control-t>")
+    root.update()
+    modal = next(
+        w for w in root.winfo_children()
+        if isinstance(w, ModalSelecaoPerguntas)
+    )
+    assert modal is not None
+
+    modal.focus_force()
+    modal.update()
+    modal.event_generate("<Escape>")
+    root.update()
+
+    assert app.fase == FASE_RESPONDENDO
+    assert dict(app.jogo.placar) == placar_antes
+    assert app.pergunta_atual is not None
+
+def test_caminho_completo_seletor_editar_salvar_voltar_jogar(montar_app, monkeypatch, tmp_path):
+    """Seletor -> Editar -> salvar -> voltar -> jogar."""
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    montar, banco = montar_app
+    app, root, relogio = montar(contagem=0, num_equipes=2)
+    _escolher_tema(app, root, banco)
+    assert app.fase == FASE_AGUARDANDO
+
+    # Abre seletor e edita o banco.
+    root.focus_force()
+    root.update()
+    root.event_generate("<Control-t>")
+    root.update()
+    modal = next(w for w in root.winfo_children() if isinstance(w, ModalSelecaoPerguntas))
+
+    # Seleciona o banco e clica Editar.
+    for item in modal.lista_arquivos:
+        if os.path.abspath(item["caminho"]) == os.path.abspath(banco):
+            modal.arquivo_selecionado = item
+            modal._selecionar_indice(modal.lista_arquivos.index(item))
+            break
+    for card_info in modal.cards_widgets:
+        if modal.arquivo_selecionado and card_info["info"]["caminho"] == modal.arquivo_selecionado["caminho"]:
+            for child in card_info["card"].winfo_children():
+                if isinstance(child, tk.Button) and "Editar" in str(child.cget("text")):
+                    child.invoke()
+                    root.update()
+                    break
+    assert app._janela_editor is not None
+    editor = app._janela_editor
+
+    # Salva (sem alteracoes, apenas confirma).
+    editor.salvar()
+    root.update()
+
+    # Fecha o editor.
+    editor._fechar()
+    root.update()
+
+    # Seletor reabre.
+    modal2 = next(w for w in root.winfo_children() if isinstance(w, ModalSelecaoPerguntas))
+    assert modal2 is not None
+
+    # Confirma o tema e joga.
+    modal2._confirmar()
+    root.update()
+    assert app.fase == FASE_AGUARDANDO
+    assert app.pergunta_atual is not None
+
