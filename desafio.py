@@ -24,7 +24,7 @@ import os
 import queue
 import time
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 
 import editor_modelo as em
 import persistencia
@@ -147,11 +147,10 @@ def rodada_em_andamento(
     contagem_visual: bool = False,
 ) -> bool:
     """
-    True quando o editor de perguntas não pode ser aberto.
+    True quando há uma rodada em andamento (editor não pode abrir).
 
-    A rodada começa quando a fase deixa de ser AGUARDANDO, quando o tempo de
-    resposta está correndo ou quando a contagem de largada (inclusive o
-    overlay visual do "JÁ!") ainda está na tela.
+    Regra simples: se a fase não é AGUARDANDO, ou o timer/contagem está ativo,
+    ou o overlay visual do "JÁ!" está na tela, há rodada em andamento.
     """
     return bool(
         contagem_ativa
@@ -296,7 +295,6 @@ class DueloDeConhecimento:
 
         self.root.bind("<Key>", self.tecla_pressionada)
         self.root.bind("<F1>", lambda e: self.abrir_sobre())
-        self.root.bind("<F3>", lambda e: self.abrir_editor_perguntas())
         self.root.bind("<F11>", lambda e: self.alternar_tela_cheia())
         self.root.bind("<Escape>", lambda e: self.root.attributes("-fullscreen", False))
         self.root.bind("<Control-r>", lambda e: self.reiniciar_placar())
@@ -507,9 +505,6 @@ class DueloDeConhecimento:
 
     def abrir_seletor_tema(self, inicial=False):
         """Abre a tela modal para escolha de tema/arquivo de perguntas."""
-        if self._job_timer:
-            self._cancelar_job_timer()
-
         diretorio = PASTA_PERGUNTAS
         arquivos = listar_arquivos_perguntas(diretorio)
 
@@ -530,6 +525,82 @@ class DueloDeConhecimento:
             self.carregar_perguntas(info_escolhida["caminho"], info_escolhida["titulo"])
             self.proxima_pergunta(forcar=True)
 
+        def ao_editar(caminho, inicial_flag=inicial):
+            self.abrir_editor_perguntas(
+                caminho=caminho,
+                ao_fechar_extra=lambda destino: self.root.after_idle(
+                    lambda: self.abrir_seletor_tema(
+                        inicial=inicial_flag,
+                        caminho_selecionar=destino,
+                    )
+                ),
+            )
+
+        def ao_criar(inicial_flag=inicial):
+            # Pergunta nome do tema e autor.
+            nome = simpledialog.askstring(
+                "Novo banco",
+                "Nome do tema:",
+                parent=self.root,
+            )
+            if not nome or not nome.strip():
+                return
+            autor = simpledialog.askstring(
+                "Novo banco",
+                "Autor (obrigatório):",
+                parent=self.root,
+            )
+            if not autor or not autor.strip():
+                messagebox.showwarning(
+                    TITULO,
+                    "O autor é obrigatório para criar um banco novo.",
+                    parent=self.root,
+                )
+                return
+
+            # Cria o banco em memória.
+            banco = em.criar_banco_novo(
+                tema=nome.strip(),
+                autor=autor.strip(),
+                licenca="CC BY 4.0",
+            )
+            banco.adicionar(
+                texto="",
+                alternativas=["", ""],
+                correta=0,
+                categoria=nome.strip(),
+            )
+
+            # Abre o editor com o banco novo.
+            self._janela_editor = None
+            hash_antes = ""
+            self._janela_editor = EditorPerguntas(
+                self.root,
+                banco,
+                ao_fechar=lambda b: self._ao_fechar_editor_novo(
+                    b, inicial_flag
+                ),
+                estado_path=persistencia.localizar_estado(PASTA_PERGUNTAS),
+                diretorio_base=PASTA_PERGUNTAS,
+                diretorio_aplicacao=obter_diretorio_base(),
+                pasta_config=PASTA_PERGUNTAS,
+                rodando_partida=False,
+                banco_em_uso_caminho=None,
+            )
+
+        def _ao_fechar_editor_novo(banco_editado, inicial_flag):
+            self._janela_editor = None
+            try:
+                self.root.focus_force()
+            except tk.TclError:
+                pass
+            self.root.after_idle(
+                lambda: self.abrir_seletor_tema(
+                    inicial=inicial_flag,
+                    caminho_selecionar=destino,
+                )
+            )
+
         modal = ModalSelecaoPerguntas(
             parent=self.root,
             lista_arquivos=arquivos,
@@ -539,6 +610,8 @@ class DueloDeConhecimento:
             inicial=inicial,
             diretorio=diretorio,
             ao_sair=self.fechar,
+            ao_editar=ao_editar,
+            ao_criar=ao_criar,
         )
 
     def abrir_sobre(self):
@@ -578,15 +651,6 @@ class DueloDeConhecimento:
     # -----------------------------------------------------
     # EDITOR DE PERGUNTAS (Etapa E2)
     # -----------------------------------------------------
-    def esta_em_rodada(self) -> bool:
-        """Atalho para a regra pura `rodada_em_andamento`."""
-        return rodada_em_andamento(
-            self.fase,
-            bool(getattr(self.jogo, "timer_ativo", False)),
-            bool(getattr(self.jogo, "contagem_ativa", False)),
-            self._contagem_visual is not None,
-        )
-
     @staticmethod
     def _hash_arquivo(caminho) -> str:
         if not caminho or not os.path.isfile(caminho):
@@ -596,8 +660,8 @@ class DueloDeConhecimento:
         except OSError:
             return ""
 
-    def abrir_editor_perguntas(self):
-        """Abre o editor modal (F3), bloqueado durante uma rodada."""
+    def abrir_editor_perguntas(self, caminho=None, ao_fechar_extra=None):
+        """Abre o editor modal para o banco no caminho indicado."""
         janela = getattr(self, "_janela_editor", None)
         if janela is not None:
             try:
@@ -609,13 +673,8 @@ class DueloDeConhecimento:
                 pass
             self._janela_editor = None
 
-        if self.esta_em_rodada():
-            self.avisar(
-                "Termine a pergunta atual antes de abrir o editor (F3)."
-            )
-            return
-
-        caminho = self.arquivo_atual
+        if not caminho:
+            caminho = self.arquivo_atual
         if not caminho:
             candidato = os.path.join(PASTA_PERGUNTAS, ARQUIVO_PERGUNTAS)
             if os.path.isfile(candidato):
@@ -658,6 +717,14 @@ class DueloDeConhecimento:
                         parent=self.root,
                     )
                 return
+        else:
+            banco = em.criar_banco_novo(licenca="CC BY 4.0")
+            banco.adicionar(
+                texto="",
+                alternativas=["", ""],
+                correta=0,
+                categoria="Geral",
+            )
 
         hash_antes = self._hash_arquivo(caminho)
 
@@ -671,7 +738,14 @@ class DueloDeConhecimento:
             destino = caminho
             if not destino and banco_editado is not None:
                 destino = banco_editado.caminho_origem
+
             self._recarregar_apos_editor(destino, hash_antes)
+
+            if ao_fechar_extra is not None:
+                try:
+                    ao_fechar_extra(destino)
+                except Exception:
+                    pass
 
         self._janela_editor = EditorPerguntas(
             self.root,
@@ -692,11 +766,16 @@ class DueloDeConhecimento:
         hash_depois = self._hash_arquivo(caminho)
         if hash_depois == hash_antes:
             return
-        self.carregar_perguntas(caminho)
-        if self.jogo.perguntas:
-            self.proxima_pergunta(forcar=True)
-        self.render()
-        self.avisar("Banco de perguntas recarregado do editor.")
+        # Só recarrega se o banco editado é o que está em uso.
+        arquivo_atual = getattr(self, "arquivo_atual", None)
+        if arquivo_atual and os.path.normcase(
+            os.path.abspath(caminho)
+        ) == os.path.normcase(os.path.abspath(arquivo_atual)):
+            self.carregar_perguntas(caminho)
+            if self.jogo.perguntas:
+                self.proxima_pergunta(forcar=True)
+            self.render()
+            self.avisar("Banco de perguntas recarregado do editor.")
 
     def proxima_pergunta(self, forcar=False):
         # A regra de bloqueio e o avanço do baralho são do Jogo.
