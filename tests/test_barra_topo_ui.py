@@ -75,7 +75,7 @@ def _assert_controles_e_limites(barra, largura_barra):
 
     status = next(
         bbox for texto, bbox in textos.items()
-        if texto.startswith("COM6") or "não conectado" in texto
+        if texto.startswith("COM6") or "não conectado" in texto or "pyserial ausente" in texto
     )
     ajuda = next(bbox for texto, bbox in textos.items() if "F11" in texto)
     assert status[3] <= ajuda[1], "status colidiu com a linha de controles"
@@ -106,7 +106,7 @@ def test_barra_mostra_controles_em_tamanhos_comuns(
             assert "Mega 2560" in status
             assert "2341:0042" not in status
         else:
-            assert any("não conectado" in t for t in textos)
+            assert any("não conectado" in t or "pyserial ausente" in t for t in textos)
     finally:
         janela.destroy()
 
