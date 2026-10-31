@@ -1105,3 +1105,66 @@ def test_caminho_completo_seletor_editar_salvar_voltar_jogar(montar_app, monkeyp
     assert app.fase == FASE_AGUARDANDO
     assert app.pergunta_atual is not None
 
+
+
+
+def test_conflito_nome_com_confirmacao(montar_app, monkeypatch, tmp_path):
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    montar, banco = montar_app
+    app, root, _relogio = montar()
+
+    app.abrir_seletor_tema(inicial=True)
+    root.update()
+    modal = next(w for w in root.winfo_children() if isinstance(w, ModalSelecaoPerguntas))
+    for item in modal.lista_arquivos:
+        if os.path.abspath(item["caminho"]) == os.path.abspath(banco):
+            modal.arquivo_selecionado = item
+            modal._selecionar_indice(modal.lista_arquivos.index(item))
+            break
+    for card_info in modal.cards_widgets:
+        if modal.arquivo_selecionado and card_info["info"]["caminho"] == modal.arquivo_selecionado["caminho"]:
+            for child in card_info["card"].winfo_children():
+                if isinstance(child, tk.Button) and "Editar" in str(child.cget("text")):
+                    child.invoke()
+                    root.update()
+                    break
+    assert app._janela_editor is not None
+    editor = app._janela_editor
+
+    monkeypatch.setattr("tkinter.messagebox.askyesno", lambda *a, **k: True)
+    editor.salvar()
+    root.update()
+
+    editor._fechar()
+    root.update()
+
+@pytest.mark.parametrize("tamanho", [(1366, 768), (1920, 1080), (900, 600)])
+def test_seletor_layout_botoes_visiveis(montar_app, monkeypatch, tamanho):
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    montar, banco = montar_app
+    app, root, _relogio = montar()
+    root.geometry("%dx%d" % (tamanho[0], tamanho[1]))
+    root.update()
+
+    app.abrir_seletor_tema(inicial=True)
+    root.update()
+    modal = next(w for w in root.winfo_children() if isinstance(w, ModalSelecaoPerguntas))
+    modal.geometry("%dx%d" % (min(tamanho[0], 700), min(tamanho[1], 540)))
+    modal.update()
+
+    for card_info in modal.cards_widgets:
+        btns = [w for w in card_info["card"].winfo_children() if isinstance(w, tk.Button)]
+        assert len(btns) >= 1
+        for btn in btns:
+            assert btn.winfo_ismapped()
+
+    criar_encontrado = False
+    for frame in modal.winfo_children():
+        for child in frame.winfo_children():
+            if isinstance(child, tk.Button) and "Criar" in str(child.cget("text")):
+                criar_encontrado = True
+                assert child.winfo_ismapped()
+    assert criar_encontrado
+
+    modal.fechar_para_editor()
+    root.update()
