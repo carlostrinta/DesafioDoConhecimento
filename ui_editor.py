@@ -425,9 +425,14 @@ class EditorPerguntas(tk.Toplevel):
         except tk.TclError:
             pass
         titulo = "Editor de Perguntas — Desafio do Conhecimento"
-        if self.banco.alterado:
-            titulo = "• " + titulo
+        if self.banco.alterado or self._tem_alteracoes_pendentes():
+            titulo = "* " + titulo
         self.title(titulo)
+
+    def _tem_alteracoes_pendentes(self) -> bool:
+        """True enquanto há edição digitada e ainda não aplicada ao banco."""
+        pendente = self._pendente
+        return bool(pendente and pendente[1])
 
     # ──────────────────────────────────────────────────────────
     # Debounce das edições

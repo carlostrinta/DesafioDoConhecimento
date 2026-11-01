@@ -930,6 +930,11 @@ def salvar_banco(
         diretorio_aplicacao=diretorio_aplicacao,
         distribuidos=distribuidos,
     ):
+        log.warning(
+            "Salvamento recusado (somente leitura) em %s: banco distribuído "
+            "ou somente leitura.",
+            destino,
+        )
         return ResultadoSalvamento(
             ok=False,
             caminho=destino,
@@ -950,6 +955,10 @@ def salvar_banco(
         and destino != origem
         and not permitir_sobrescrever
     ):
+        log.warning(
+            "Salvamento recusado (conflito de nome) em %s: o arquivo já existe.",
+            destino,
+        )
         return ResultadoSalvamento(
             ok=False,
             caminho=destino,
@@ -979,6 +988,12 @@ def salvar_banco(
             erro="A pasta de destino não existe.",
         )
     if not _pasta_gravavel(pasta_destino):
+        log.warning(
+            "Salvamento recusado (permissão) em %s: a pasta %s não tem "
+            "permissão de escrita.",
+            destino,
+            pasta_destino,
+        )
         return ResultadoSalvamento(
             ok=False,
             caminho=destino,
@@ -996,6 +1011,10 @@ def salvar_banco(
 
     trava = persistencia.TravaInstancia(caminho=destino + ".lock")
     if not trava.adquirir():
+        log.warning(
+            "Salvamento recusado (trava) em %s: banco aberto em outra instância.",
+            destino,
+        )
         return ResultadoSalvamento(
             ok=False,
             caminho=destino,
@@ -1140,8 +1159,10 @@ def pastas_salvamento_candidatas(
 def _pasta_gravavel(caminho: str) -> bool:
     try:
         if not os.path.isdir(caminho):
+            log.warning("Pasta de salvamento inexistente: %s", caminho)
             return False
         if not os.access(caminho, os.W_OK | os.X_OK):
+            log.warning("Pasta de salvamento sem permissão de escrita: %s", caminho)
             return False
         teste = os.path.join(
             caminho,
@@ -1151,7 +1172,8 @@ def _pasta_gravavel(caminho: str) -> bool:
             arquivo.write(b"x")
         os.remove(teste)
         return True
-    except OSError:
+    except OSError as exc:
+        log.warning("Não foi possível testar a escrita em %s: %s", caminho, exc)
         return False
 
 
