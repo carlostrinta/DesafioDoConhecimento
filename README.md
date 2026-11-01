@@ -5,7 +5,7 @@ Python/tkinter e botões físicos opcionais no **Arduino Uno ou Mega 2560**. A
 equipe que apertar primeiro ganha a vez de responder; o tempo controla a rodada
 e o placar fica visível na tela.
 
-**Versão atual: 2.8.1** — os metadados oficiais ficam em
+**Versão atual: 2.10.0** — os metadados oficiais ficam em
 [`versao.py`](versao.py). A tela **Sobre** pode ser aberta com `F1`.
 
 > **Estado do hardware:** o firmware v2 é o **recomendado** e foi validado no
@@ -26,7 +26,7 @@ e o placar fica visível na tela.
 - [Hardware opcional](#hardware-opcional)
 - [Gerar o executável](#gerar-o-executável)
 - [Estrutura do projeto](#estrutura-do-projeto)
-- [Editor de perguntas (em desenvolvimento)](#editor-de-perguntas-em-desenvolvimento)
+- [Editor de perguntas](#editor-de-perguntas)
 - [Configuração e logs](#configuração-e-logs)
 - [Testes](#testes)
 - [Limitações conhecidas](#limitações-conhecidas)
@@ -269,7 +269,7 @@ versionado. O arquivo de versão do PyInstaller (`versao_info.txt`) lê os dados
 de `versao.py` e grava no `.exe`:
 
 - nome do produto: **Desafio do Conhecimento**;
-- versão: **2.8.1**;
+- versão: **2.10.0**;
 - autor/empresa: **Carlos Santos**;
 - copyright: **Copyright (c) 2026 Carlos Santos**.
 
@@ -351,11 +351,21 @@ A gravação é segura: escreve `.tmp`, cria `.bak` antes de sobrescrever, usa
 trava de instância e pede confirmação em conflito de nome. Os bancos
 distribuídos (`conhecimentos_gerais.json`, `eletrotecnica.json` e
 `radiologia.json`) são **somente leitura**; alterações neles são salvas como
-cópia na pasta configurada ou na pasta do usuário. Se o banco estiver em uso na
-partida, o editor pede confirmação antes de abrir; salvar o banco usado pode
-invalidar a partida salva, que é renomeada e não apagada. O editor não abre
-durante uma rodada em andamento (só a partir do seletor de tema).
-O escopo completo está em
+cópia na pasta configurada ou na pasta do usuário. Bancos novos e cópias vão
+para a primeira pasta gravável na ordem da decisão nº 2: `perguntas.pasta`,
+`Documents\Desafio do Conhecimento\perguntas` e, por último,
+`%APPDATA%\DesafioDoConhecimento\perguntas`. O seletor de tema lista essas
+mesmas pastas candidatas, sem duplicar arquivos e mostrando de qual pasta cada
+banco veio.
+
+Decisões nº 7 e nº 12 do plano: o editor abre **somente** pelo seletor de tema
+(nunca por `F3` durante o jogo) e faz parte do próprio aplicativo, tanto rodando
+pelo código-fonte quanto no `.exe`; janela separada fica fora da v1.
+
+Se o banco estiver em uso na partida, o editor pede confirmação antes de abrir;
+salvar o banco usado pode invalidar a partida salva, que é renomeada e não
+apagada. O editor não abre durante uma rodada em andamento (só a partir do
+seletor de tema). O escopo completo está em
 [`docs/PLANO_EDITOR_PERGUNTAS.md`](docs/PLANO_EDITOR_PERGUNTAS.md).
 
 ---
@@ -507,4 +517,4 @@ Se você redistribuir o jogo, mantenha os arquivos `LICENSE`,
 
 ---
 
-**Autor:** Carlos Santos · **Versão:** 2.8.1 · **Licença do código:** MIT
+**Autor:** Carlos Santos · **Versão:** 2.10.0 · **Licença do código:** MIT
