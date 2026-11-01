@@ -161,3 +161,92 @@ class TestListar:
 
     def test_diretorio_inexistente_devolve_lista_vazia(self, tmp_path):
         assert listar_arquivos_perguntas(str(tmp_path / "nao_existe")) == []
+
+    def test_buscar_candidatas_inclui_pastas_sem_duplicar(
+        self, tmp_path, monkeypatch
+    ):
+        import editor_modelo as em
+
+        base = tmp_path / "app"
+        config = tmp_path / "config"
+        escrever_banco(base / "raiz.json")
+        escrever_banco(config / "extra.json")
+        escrever_banco(config / "perguntas" / "dentro.json")
+        # A mesma pasta aparece duas vezes: não pode duplicar arquivos.
+        monkeypatch.setattr(
+            em,
+            "pastas_salvamento_candidatas",
+            lambda *a, **k: [str(config), str(config)],
+        )
+
+        infos = listar_arquivos_perguntas(str(base), buscar_candidatas=True)
+
+        caminhos = [i["caminho"] for i in infos]
+        assert len(caminhos) == len(set(caminhos)) == 3
+        assert sorted(i["arquivo"] for i in infos) == [
+            "dentro.json",
+            "extra.json",
+            "raiz.json",
+        ]
+        # A origem é distinguível por pasta.
+        origens = {
+            i["arquivo"]: str(Path(i["caminho"]).parent) for i in infos
+        }
+        assert origens["raiz.json"] == str(base.resolve())
+        assert origens["extra.json"] == str(config.resolve())
+        assert origens["dentro.json"] == str((config / "perguntas").resolve())
+
+    def test_buscar_candidatas_false_nao_le_fora_da_pasta(
+        self, tmp_path, monkeypatch
+    ):
+        import editor_modelo as em
+
+        base = tmp_path / "app"
+        config = tmp_path / "config"
+        escrever_banco(base / "raiz.json")
+        escrever_banco(config / "extra.json")
+        monkeypatch.setattr(
+            em,
+            "pastas_salvamento_candidatas",
+            lambda *a, **k: [str(config)],
+        )
+
+        infos = listar_arquivos_perguntas(str(base))
+
+        assert [i["arquivo"] for i in infos] == ["raiz.json"]
+
+    def test_listar_usa_a_mesma_fonte_de_pastas_candidatas(
+        self, tmp_path, monkeypatch
+    ):
+        """desafio.py e perguntas.py compartilham uma única definição."""
+        import editor_modelo as em
+
+        base = tmp_path / "app"
+        config = tmp_path / "config"
+        escrever_banco(base / "raiz.json")
+        escrever_banco(config / "extra.json")
+        chamadas = []
+
+        def fake(pasta_config=None, *, diretorio_aplicacao=None):
+            chamadas.append((pasta_config, diretorio_aplicacao))
+            return [str(config)]
+
+        monkeypatch.setattr(em, "pastas_salvamento_candidatas", fake)
+        infos = listar_arquivos_perguntas(str(base), buscar_candidatas=True)
+
+        assert chamadas == [(str(base), None)]
+        assert sorted(i["arquivo"] for i in infos) == [
+            "extra.json",
+            "raiz.json",
+        ]
+
+    def test_unica_definicao_de_pastas_candidatas(self):
+        definicoes = {
+            p.name: p.read_text(encoding="utf-8").count(
+                "def pastas_salvamento_candidatas("
+            )
+            for p in RAIZ.glob("*.py")
+        }
+        assert {
+            n: c for n, c in definicoes.items() if c
+        } == {"editor_modelo.py": 1}

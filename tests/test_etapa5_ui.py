@@ -247,6 +247,19 @@ def _tecla(root, keysym, state=0):
     root.update()
 
 
+def _preencher_editor(editor, texto):
+    """Preenche o formulário do editor com uma pergunta válida."""
+    formulario = editor.formulario
+    formulario._set_texto("pergunta", texto)
+    for var, alternativa in zip(
+        formulario._vars_alternativas, ["Alternativa A", "Alternativa B"]
+    ):
+        var.set(alternativa)
+    formulario._var_correta.set(0)
+    formulario._var_categoria.set("Geral")
+    formulario._ao_digitar("pergunta")
+
+
 def _avancar(app, root, relogio, segundos):
     relogio.avancar(segundos)
     app._cancelar_job_timer()
@@ -1057,8 +1070,12 @@ def test_ctrl_t_no_meio_de_rodada_mantem_estado(montar_app, monkeypatch):
     assert app.pergunta_atual is not None
 
 def test_caminho_completo_seletor_editar_salvar_voltar_jogar(montar_app, monkeypatch, tmp_path):
-    """Seletor -> Editar -> salvar -> voltar -> jogar."""
+    """Seletor -> Editar -> alterar -> salvar -> reler disco -> voltar -> jogar."""
     monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    # Não lista pastas reais do usuário em teste.
+    monkeypatch.setattr(
+        desafio.em, "pastas_salvamento_candidatas", lambda *a, **k: [str(tmp_path)]
+    )
     montar, banco = montar_app
     app, root, relogio = montar(contagem=0, num_equipes=2)
     _escolher_tema(app, root, banco)
@@ -1087,23 +1104,39 @@ def test_caminho_completo_seletor_editar_salvar_voltar_jogar(montar_app, monkeyp
     assert app._janela_editor is not None
     editor = app._janela_editor
 
-    # Salva (sem alteracoes, apenas confirma).
-    editor.salvar()
+    # Altera a pergunta e salva de verdade (sem mock de salvar_banco).
+    editor.formulario._set_texto("pergunta", "Pergunta editada no fluxo completo")
+    editor.formulario._ao_digitar("pergunta")
+    root.update()
+    assert editor.title().startswith("*")
+    assert str(editor.btn_salvar.cget("state")) == "normal"
+    assert editor.salvar() is True
     root.update()
 
-    # Fecha o editor.
+    # Relê o arquivo do disco e confere.
+    depois = json.loads(banco.read_text(encoding="utf-8"))
+    if isinstance(depois, dict):
+        textos = [p["pergunta"] for p in depois["perguntas"]]
+    else:
+        textos = [p["pergunta"] for p in depois]
+    assert "Pergunta editada no fluxo completo" in textos
+    assert "Pergunta 1?" not in textos
+    assert banco.with_name(banco.name + ".bak").is_file()
+    print(f"[fluxo editar] gravado em: {banco}")
+
+    # Fecha o editor; o seletor reabre e lista o banco.
     editor._fechar()
     root.update()
-
-    # Seletor reabre.
     modal2 = next(w for w in root.winfo_children() if isinstance(w, ModalSelecaoPerguntas))
-    assert modal2 is not None
+    caminhos = [os.path.abspath(i["caminho"]) for i in modal2.lista_arquivos]
+    assert os.path.abspath(str(banco)) in caminhos
 
     # Confirma o tema e joga.
     modal2._confirmar()
     root.update()
     assert app.fase == FASE_AGUARDANDO
     assert app.pergunta_atual is not None
+
 
 
 
@@ -1170,7 +1203,12 @@ def test_seletor_layout_botoes_visiveis(montar_app, monkeypatch, tamanho):
     root.update()
 
 def test_caminho_completo_criar_salvar_jogar(montar_app, monkeypatch, tmp_path):
+    """Seletor -> Criar -> preencher -> salvar -> reler disco -> voltar -> jogar."""
     monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    # Sem pastas reais do usuário: todas as candidatas ficam no tmp_path.
+    monkeypatch.setattr(
+        desafio.em, "pastas_salvamento_candidatas", lambda *a, **k: [str(tmp_path)]
+    )
     montar, _banco = montar_app
     app, root, _relogio = montar()
 
@@ -1180,23 +1218,105 @@ def test_caminho_completo_criar_salvar_jogar(montar_app, monkeypatch, tmp_path):
 
     respostas = iter(["NovoTema", "Autor Teste"])
     monkeypatch.setattr(desafio.simpledialog, "askstring", lambda *a, **k: next(respostas))
-    monkeypatch.setattr("tkinter.messagebox.showwarning", lambda *a, **k: None)
-    monkeypatch.setattr("tkinter.messagebox.askyesno", lambda *a, **k: True)
-    monkeypatch.setattr(desafio.em, "resolver_pasta_salvamento", lambda *a, **k: str(tmp_path))
+    monkeypatch.setattr(desafio.messagebox, "showwarning", lambda *a, **k: None)
+    monkeypatch.setattr(desafio.messagebox, "askyesno", lambda *a, **k: True)
 
     modal._criar()
-    root.update_idletasks()
+    root.update()
 
     assert app._janela_editor is not None
     editor = app._janela_editor
 
-    result = editor._preparar_para_salvar()
-    if result:
-        result = editor.salvar_como_copia()
-    root.update_idletasks()
+    # O banco novo nasce com uma pergunta em branco: preenche para salvar.
+    _preencher_editor(editor, "Pergunta criada pela UI?")
+    root.update()
+    assert str(editor.btn_salvar.cget("state")) == "normal"
+    assert editor.salvar() is True
+    root.update()
+
+    destino = editor._ultimo_caminho_salvo
+    assert destino, "o editor não registrou o caminho gravado"
+    assert os.path.isfile(destino)
+    lido = json.loads(open(destino, encoding="utf-8").read())
+    assert lido["perguntas"][0]["pergunta"] == "Pergunta criada pela UI?"
+    print(f"[fluxo criar] gravado em: {destino}")
 
     editor._fechar()
-    root.update_idletasks()
+    root.update()
+    # O seletor é reaberto via after_idle.
+    root.update()
+    modal2 = next(w for w in root.winfo_children() if isinstance(w, ModalSelecaoPerguntas))
+    caminhos = [os.path.abspath(i["caminho"]) for i in modal2.lista_arquivos]
+    assert os.path.abspath(destino) in caminhos
 
-    modais = [w for w in root.winfo_children() if isinstance(w, ModalSelecaoPerguntas)]
-    assert len(modais) >= 1
+    item = next(
+        i for i in modal2.lista_arquivos
+        if os.path.abspath(i["caminho"]) == os.path.abspath(destino)
+    )
+    modal2.arquivo_selecionado = item
+    modal2._selecionar_indice(modal2.lista_arquivos.index(item))
+    modal2._confirmar()
+    root.update()
+    assert app.fase == FASE_AGUARDANDO
+    assert app.pergunta_atual is not None
+
+
+def test_caminho_completo_salvar_como_copia_e_listar(montar_app, monkeypatch, tmp_path):
+    """Editar -> Salvar como cópia -> reler disco -> seletor lista a cópia."""
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    monkeypatch.setattr(
+        desafio.em, "pastas_salvamento_candidatas", lambda *a, **k: [str(tmp_path)]
+    )
+    montar, _banco = montar_app
+    app, root, _relogio = montar()
+
+    origem = tmp_path / "origem"
+    origem.mkdir()
+    banco_path = origem / "banco_origem.json"
+    dados = {
+        "tema": "Tema Copia",
+        "autor": "Ana",
+        "licenca": "CC BY 4.0",
+        "perguntas": [
+            {
+                "pergunta": "Pergunta original?",
+                "alternativas": ["A", "B"],
+                "correta": 0,
+                "categoria": "Cat",
+                "explicacao": "",
+            }
+        ],
+    }
+    banco_path.write_text(json.dumps(dados, ensure_ascii=False), encoding="utf-8")
+
+    app.abrir_editor_perguntas(
+        caminho=str(banco_path),
+        ao_fechar_extra=lambda destino: root.after_idle(
+            lambda: app.abrir_seletor_tema(
+                inicial=True, caminho_selecionar=destino
+            )
+        ),
+    )
+    root.update()
+    editor = app._janela_editor
+    assert editor is not None
+
+    editor.formulario._set_texto("pergunta", "Pergunta copiada pela UI")
+    editor.formulario._ao_digitar("pergunta")
+    assert editor.salvar_como_copia() is True
+    root.update()
+
+    destino = editor._ultimo_caminho_salvo
+    assert os.path.isfile(destino)
+    assert os.path.abspath(destino) != os.path.abspath(str(banco_path))
+    lido = json.loads(open(destino, encoding="utf-8").read())
+    assert lido["perguntas"][0]["pergunta"] == "Pergunta copiada pela UI"
+    print(f"[fluxo copia] gravado em: {destino}")
+
+    editor._fechar()
+    root.update()
+    root.update()
+    modal = next(w for w in root.winfo_children() if isinstance(w, ModalSelecaoPerguntas))
+    caminhos = [os.path.abspath(i["caminho"]) for i in modal.lista_arquivos]
+    assert os.path.abspath(destino) in caminhos
+
