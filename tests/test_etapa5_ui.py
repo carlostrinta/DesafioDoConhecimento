@@ -7,6 +7,8 @@ trava e persistência falsos. Em ambiente sem display são pulados.
 
 import json
 import logging
+import os
+import tkinter as tk
 from types import SimpleNamespace
 
 import pytest
@@ -17,6 +19,7 @@ from apoio_tk import criar_raiz_tk
 from jogo import (
     FASE_AGUARDANDO,
     FASE_CONTAGEM,
+    FASE_PONTUADA,
     FASE_REVELADA,
     FASE_RESPONDENDO,
     Jogo,
@@ -39,8 +42,11 @@ class Relogio:
 
 
 class TravaFalsa:
+    def __init__(self, *args, **kwargs):
+        pass
+
     def adquirir(self):
-        return None
+        return True
 
     def liberar(self):
         return None
@@ -239,6 +245,19 @@ def _tecla(root, keysym, state=0):
     root.update()
     root.event_generate("<KeyPress>", keysym=keysym, state=state)
     root.update()
+
+
+def _preencher_editor(editor, texto):
+    """Preenche o formulário do editor com uma pergunta válida."""
+    formulario = editor.formulario
+    formulario._set_texto("pergunta", texto)
+    for var, alternativa in zip(
+        formulario._vars_alternativas, ["Alternativa A", "Alternativa B"]
+    ):
+        var.set(alternativa)
+    formulario._var_correta.set(0)
+    formulario._var_categoria.set("Geral")
+    formulario._ao_digitar("pergunta")
 
 
 def _avancar(app, root, relogio, segundos):
@@ -826,7 +845,7 @@ def _verificar_barra_topo(app):
     largura, altura = topo.winfo_width(), topo.winfo_height()
     textos = _textos_do_topo(app)
     titulo = next(bb for txt, bb in textos.items() if txt.startswith("Desafio"))
-    status = next(bb for txt, bb in textos.items() if "Arduino" in txt)
+    status = next(bb for txt, bb in textos.items() if "Arduino" in txt or "pyserial" in txt or "não conectado" in txt or "COM" in txt or "Mega" in txt)
     ajuda = next(bb for txt, bb in textos.items() if "F11" in txt)
 
     for bb in textos.values():
@@ -887,3 +906,417 @@ def test_contagem_placar_e_topo_em_tamanhos_reais(
     _confirmar_contagem(app, root, relogio)
     assert app.overlay_contagem.winfo_ismapped()
     _verificar_barra_topo(app)
+
+
+# =========================================================
+# Regressão E2: editor abre a partir do seletor de tema
+# =========================================================
+def _abrir_editor_via_seletor(app, root, caminho=None):
+    """Abre o seletor de tema e clica em 'Editar' no tema indicado."""
+    app.abrir_seletor_tema(inicial=True)
+    root.update()
+    modal = next(
+        w for w in root.winfo_children()
+        if isinstance(w, ModalSelecaoPerguntas)
+    )
+    if caminho is not None:
+        for item in modal.lista_arquivos:
+            if os.path.abspath(item["caminho"]) == os.path.abspath(caminho):
+                modal.arquivo_selecionado = item
+                modal._selecionar_indice(modal.lista_arquivos.index(item))
+                break
+    # Clica no botão Editar do card selecionado.
+    for card_info in modal.cards_widgets:
+        if modal.arquivo_selecionado and card_info["info"]["caminho"] == modal.arquivo_selecionado["caminho"]:
+            # Encontra o botão Editar dentro do card.
+            for child in card_info["card"].winfo_children():
+                if isinstance(child, tk.Button) and "Editar" in str(child.cget("text")):
+                    child.invoke()
+                    root.update()
+                    return
+    # Fallback: usa o atalho E.
+    modal.focus_force()
+    modal.update()
+    modal.event_generate("<KeyPress>", keysym="e")
+    modal.update()
+
+
+def test_editor_abre_pela_selecao_de_tema(montar_app, monkeypatch):
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    montar, banco = montar_app
+    app, root, _relogio = montar()
+    app.abrir_seletor_tema(inicial=True)
+    root.update()
+    modal = next(
+        w for w in root.winfo_children()
+        if isinstance(w, ModalSelecaoPerguntas)
+    )
+    # Seleciona o banco e clica Editar.
+    _abrir_editor_via_seletor(app, root, banco)
+    assert app._janela_editor is not None
+
+    app._janela_editor._fechar()
+    root.update()
+
+
+def test_editor_nao_abre_com_f3_no_jogo(montar_app, monkeypatch):
+    """F3 não tem efeito durante o jogo (removido)."""
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    montar, banco = montar_app
+    app, root, relogio = montar(contagem=0, num_equipes=2)
+    _escolher_tema(app, root, banco)
+
+    # F3 não abre editor.
+    root.focus_force()
+    root.update()
+    root.event_generate("<KeyPress>", keysym="F3")
+    root.update()
+    assert app._janela_editor is None
+
+
+def test_teclas_do_jogo_nao_afetam_com_editor_aberto(
+    montar_app, monkeypatch
+):
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    montar, banco = montar_app
+    app, root, relogio = montar(contagem=0, num_equipes=2)
+    _escolher_tema(app, root, banco)
+    _tecla(root, "a")
+    _tecla(root, "r")
+    _tecla(root, "1")
+    assert app.fase == FASE_PONTUADA
+
+    # Abre o editor via Ctrl+T -> seletor -> Editar.
+    root.focus_force()
+    root.update()
+    root.event_generate("<Control-t>")
+    root.update()
+    modal = next(
+        w for w in root.winfo_children()
+        if isinstance(w, ModalSelecaoPerguntas)
+    )
+    _abrir_editor_via_seletor(app, root, banco)
+    editor = app._janela_editor
+    assert editor is not None
+
+    antes = (
+        app.fase,
+        dict(app.jogo.placar),
+        app.indice,
+        app.pergunta_atual,
+        app.quem_apertou,
+        app.tempo_estourou,
+        app.som.ativo,
+    )
+
+    editor.focus_force()
+    editor.update()
+    for keysym, state in (
+        ("a", 0), ("A", 0x1), ("b", 0), ("B", 0x1),
+        ("c", 0), ("C", 0x1), ("d", 0), ("D", 0x1),
+        ("1", 0), ("2", 0), ("3", 0), ("4", 0),
+        ("r", 0), ("R", 0x1),
+        ("n", 0), ("N", 0x1),
+        ("s", 0), ("S", 0x1),
+        ("r", 0x4), ("R", 0x5),
+        ("t", 0x4), ("T", 0x5),
+    ):
+        editor.event_generate("<KeyPress>", keysym=keysym, state=state)
+        editor.update()
+
+    depois = (
+        app.fase,
+        dict(app.jogo.placar),
+        app.indice,
+        app.pergunta_atual,
+        app.quem_apertou,
+        app.tempo_estourou,
+        app.som.ativo,
+    )
+    assert depois == antes
+    assert app._janela_editor is editor
+
+    editor._fechar()
+    root.update()
+
+def test_ctrl_t_no_meio_de_rodada_mantem_estado(montar_app, monkeypatch):
+    """Ctrl+T durante rodada abre seletor; cancelar mantem rodada/placar."""
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    montar, banco = montar_app
+    app, root, relogio = montar(contagem=0, num_equipes=2)
+    _escolher_tema(app, root, banco)
+
+    _tecla(root, "a")
+    assert app.fase == FASE_RESPONDENDO
+    placar_antes = dict(app.jogo.placar)
+
+    root.focus_force()
+    root.update()
+    root.event_generate("<Control-t>")
+    root.update()
+    modal = next(
+        w for w in root.winfo_children()
+        if isinstance(w, ModalSelecaoPerguntas)
+    )
+    assert modal is not None
+
+    modal.focus_force()
+    modal.update()
+    modal.event_generate("<Escape>")
+    root.update()
+
+    assert app.fase == FASE_RESPONDENDO
+    assert dict(app.jogo.placar) == placar_antes
+    assert app.pergunta_atual is not None
+
+def test_caminho_completo_seletor_editar_salvar_voltar_jogar(montar_app, monkeypatch, tmp_path):
+    """Seletor -> Editar -> alterar -> salvar -> reler disco -> voltar -> jogar."""
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    # Não lista pastas reais do usuário em teste.
+    monkeypatch.setattr(
+        desafio.em, "pastas_salvamento_candidatas", lambda *a, **k: [str(tmp_path)]
+    )
+    montar, banco = montar_app
+    app, root, relogio = montar(contagem=0, num_equipes=2)
+    _escolher_tema(app, root, banco)
+    assert app.fase == FASE_AGUARDANDO
+
+    # Abre seletor e edita o banco.
+    root.focus_force()
+    root.update()
+    root.event_generate("<Control-t>")
+    root.update()
+    modal = next(w for w in root.winfo_children() if isinstance(w, ModalSelecaoPerguntas))
+
+    # Seleciona o banco e clica Editar.
+    for item in modal.lista_arquivos:
+        if os.path.abspath(item["caminho"]) == os.path.abspath(banco):
+            modal.arquivo_selecionado = item
+            modal._selecionar_indice(modal.lista_arquivos.index(item))
+            break
+    for card_info in modal.cards_widgets:
+        if modal.arquivo_selecionado and card_info["info"]["caminho"] == modal.arquivo_selecionado["caminho"]:
+            for child in card_info["card"].winfo_children():
+                if isinstance(child, tk.Button) and "Editar" in str(child.cget("text")):
+                    child.invoke()
+                    root.update()
+                    break
+    assert app._janela_editor is not None
+    editor = app._janela_editor
+
+    # Altera a pergunta e salva de verdade (sem mock de salvar_banco).
+    editor.formulario._set_texto("pergunta", "Pergunta editada no fluxo completo")
+    editor.formulario._ao_digitar("pergunta")
+    root.update()
+    assert editor.title().startswith("*")
+    assert str(editor.btn_salvar.cget("state")) == "normal"
+    assert editor.salvar() is True
+    root.update()
+
+    # Relê o arquivo do disco e confere.
+    depois = json.loads(banco.read_text(encoding="utf-8"))
+    if isinstance(depois, dict):
+        textos = [p["pergunta"] for p in depois["perguntas"]]
+    else:
+        textos = [p["pergunta"] for p in depois]
+    assert "Pergunta editada no fluxo completo" in textos
+    assert "Pergunta 1?" not in textos
+    assert banco.with_name(banco.name + ".bak").is_file()
+    print(f"[fluxo editar] gravado em: {banco}")
+
+    # Fecha o editor; o seletor reabre e lista o banco.
+    editor._fechar()
+    root.update()
+    modal2 = next(w for w in root.winfo_children() if isinstance(w, ModalSelecaoPerguntas))
+    caminhos = [os.path.abspath(i["caminho"]) for i in modal2.lista_arquivos]
+    assert os.path.abspath(str(banco)) in caminhos
+
+    # Confirma o tema e joga.
+    modal2._confirmar()
+    root.update()
+    assert app.fase == FASE_AGUARDANDO
+    assert app.pergunta_atual is not None
+
+
+
+
+
+def test_conflito_nome_com_confirmacao(montar_app, monkeypatch, tmp_path):
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    montar, banco = montar_app
+    app, root, _relogio = montar()
+
+    app.abrir_seletor_tema(inicial=True)
+    root.update()
+    modal = next(w for w in root.winfo_children() if isinstance(w, ModalSelecaoPerguntas))
+    for item in modal.lista_arquivos:
+        if os.path.abspath(item["caminho"]) == os.path.abspath(banco):
+            modal.arquivo_selecionado = item
+            modal._selecionar_indice(modal.lista_arquivos.index(item))
+            break
+    for card_info in modal.cards_widgets:
+        if modal.arquivo_selecionado and card_info["info"]["caminho"] == modal.arquivo_selecionado["caminho"]:
+            for child in card_info["card"].winfo_children():
+                if isinstance(child, tk.Button) and "Editar" in str(child.cget("text")):
+                    child.invoke()
+                    root.update()
+                    break
+    assert app._janela_editor is not None
+    editor = app._janela_editor
+
+    monkeypatch.setattr("tkinter.messagebox.askyesno", lambda *a, **k: True)
+    editor.salvar()
+    root.update()
+
+    editor._fechar()
+    root.update()
+
+@pytest.mark.parametrize("tamanho", [(1366, 768), (1920, 1080), (900, 600)])
+def test_seletor_layout_botoes_visiveis(montar_app, monkeypatch, tamanho):
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    montar, banco = montar_app
+    app, root, _relogio = montar()
+    root.geometry("%dx%d" % (tamanho[0], tamanho[1]))
+    root.update()
+
+    app.abrir_seletor_tema(inicial=True)
+    root.update()
+    modal = next(w for w in root.winfo_children() if isinstance(w, ModalSelecaoPerguntas))
+    modal.geometry("%dx%d" % (min(tamanho[0], 700), min(tamanho[1], 540)))
+    modal.update()
+
+    for card_info in modal.cards_widgets:
+        btns = [w for w in card_info["card"].winfo_children() if isinstance(w, tk.Button)]
+        assert len(btns) >= 1
+        for btn in btns:
+            assert btn.winfo_ismapped()
+
+    criar_encontrado = False
+    for frame in modal.winfo_children():
+        for child in frame.winfo_children():
+            if isinstance(child, tk.Button) and "Criar" in str(child.cget("text")):
+                criar_encontrado = True
+                assert child.winfo_ismapped()
+    assert criar_encontrado
+
+    modal.fechar_para_editor()
+    root.update()
+
+def test_caminho_completo_criar_salvar_jogar(montar_app, monkeypatch, tmp_path):
+    """Seletor -> Criar -> preencher -> salvar -> reler disco -> voltar -> jogar."""
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    # Sem pastas reais do usuário: todas as candidatas ficam no tmp_path.
+    monkeypatch.setattr(
+        desafio.em, "pastas_salvamento_candidatas", lambda *a, **k: [str(tmp_path)]
+    )
+    montar, _banco = montar_app
+    app, root, _relogio = montar()
+
+    app.abrir_seletor_tema(inicial=True)
+    root.update()
+    modal = next(w for w in root.winfo_children() if isinstance(w, ModalSelecaoPerguntas))
+
+    respostas = iter(["NovoTema", "Autor Teste"])
+    monkeypatch.setattr(desafio.simpledialog, "askstring", lambda *a, **k: next(respostas))
+    monkeypatch.setattr(desafio.messagebox, "showwarning", lambda *a, **k: None)
+    monkeypatch.setattr(desafio.messagebox, "askyesno", lambda *a, **k: True)
+
+    modal._criar()
+    root.update()
+
+    assert app._janela_editor is not None
+    editor = app._janela_editor
+
+    # O banco novo nasce com uma pergunta em branco: preenche para salvar.
+    _preencher_editor(editor, "Pergunta criada pela UI?")
+    root.update()
+    assert str(editor.btn_salvar.cget("state")) == "normal"
+    assert editor.salvar() is True
+    root.update()
+
+    destino = editor._ultimo_caminho_salvo
+    assert destino, "o editor não registrou o caminho gravado"
+    assert os.path.isfile(destino)
+    lido = json.loads(open(destino, encoding="utf-8").read())
+    assert lido["perguntas"][0]["pergunta"] == "Pergunta criada pela UI?"
+    print(f"[fluxo criar] gravado em: {destino}")
+
+    editor._fechar()
+    root.update()
+    # O seletor é reaberto via after_idle.
+    root.update()
+    modal2 = next(w for w in root.winfo_children() if isinstance(w, ModalSelecaoPerguntas))
+    caminhos = [os.path.abspath(i["caminho"]) for i in modal2.lista_arquivos]
+    assert os.path.abspath(destino) in caminhos
+
+    item = next(
+        i for i in modal2.lista_arquivos
+        if os.path.abspath(i["caminho"]) == os.path.abspath(destino)
+    )
+    modal2.arquivo_selecionado = item
+    modal2._selecionar_indice(modal2.lista_arquivos.index(item))
+    modal2._confirmar()
+    root.update()
+    assert app.fase == FASE_AGUARDANDO
+    assert app.pergunta_atual is not None
+
+
+def test_caminho_completo_salvar_como_copia_e_listar(montar_app, monkeypatch, tmp_path):
+    """Editar -> Salvar como cópia -> reler disco -> seletor lista a cópia."""
+    monkeypatch.setenv("DESAFIO_AUTO_FECHAR", "1")
+    monkeypatch.setattr(
+        desafio.em, "pastas_salvamento_candidatas", lambda *a, **k: [str(tmp_path)]
+    )
+    montar, _banco = montar_app
+    app, root, _relogio = montar()
+
+    origem = tmp_path / "origem"
+    origem.mkdir()
+    banco_path = origem / "banco_origem.json"
+    dados = {
+        "tema": "Tema Copia",
+        "autor": "Ana",
+        "licenca": "CC BY 4.0",
+        "perguntas": [
+            {
+                "pergunta": "Pergunta original?",
+                "alternativas": ["A", "B"],
+                "correta": 0,
+                "categoria": "Cat",
+                "explicacao": "",
+            }
+        ],
+    }
+    banco_path.write_text(json.dumps(dados, ensure_ascii=False), encoding="utf-8")
+
+    app.abrir_editor_perguntas(
+        caminho=str(banco_path),
+        ao_fechar_extra=lambda destino: root.after_idle(
+            lambda: app.abrir_seletor_tema(
+                inicial=True, caminho_selecionar=destino
+            )
+        ),
+    )
+    root.update()
+    editor = app._janela_editor
+    assert editor is not None
+
+    editor.formulario._set_texto("pergunta", "Pergunta copiada pela UI")
+    editor.formulario._ao_digitar("pergunta")
+    assert editor.salvar_como_copia() is True
+    root.update()
+
+    destino = editor._ultimo_caminho_salvo
+    assert os.path.isfile(destino)
+    assert os.path.abspath(destino) != os.path.abspath(str(banco_path))
+    lido = json.loads(open(destino, encoding="utf-8").read())
+    assert lido["perguntas"][0]["pergunta"] == "Pergunta copiada pela UI"
+    print(f"[fluxo copia] gravado em: {destino}")
+
+    editor._fechar()
+    root.update()
+    root.update()
+    modal = next(w for w in root.winfo_children() if isinstance(w, ModalSelecaoPerguntas))
+    caminhos = [os.path.abspath(i["caminho"]) for i in modal.lista_arquivos]
+    assert os.path.abspath(destino) in caminhos
+

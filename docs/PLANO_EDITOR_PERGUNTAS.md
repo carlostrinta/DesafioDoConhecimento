@@ -1,8 +1,9 @@
 # Plano do editor de perguntas
 
-> **Status:** plano aprovado. A Etapa E1 (modelo puro, validação por campo e
-> gravação segura) foi implementada; a interface gráfica continua fora desta
-> etapa. Este arquivo registra escopo, formato, decisões e riscos.
+> **Status:** plano aprovado. As etapas de modelo, gravação segura, lista,
+> formulário e integração com o jogo foram implementadas. O CSV e o
+> empacotamento do editor no `.exe` continuam fora do escopo desta rodada.
+> Este arquivo registra escopo, formato, decisões e riscos.
 >
 > **Público:** Carlos (decisões de produto) e quem for implementar.
 >
@@ -96,15 +97,16 @@ a validação única e a gravação atômica.
 
 ## 2. Onde o editor vive
 
-### Recomendação: tela dentro do aplicativo, atalho `F3`
+### Recomendação: tela dentro do aplicativo, atalho `Ctrl+T` (seletor de tema)
 
 - Um único processo, um único tema visual, um único caminho de configuração.
 - O editor compartilha o banco carregado, o validador e a pasta de perguntas.
-- `F3` abre/fecha o editor; `Esc` fecha sem salvar (com aviso se houver
-  alterações).
-- A tela é modal em relação ao jogo: enquanto o editor está aberto, a partida
-  não avança e os atalhos de jogo são suspensos.
+- O editor abre **apenas** a partir da tela de seleção de tema: botão "Editar" em cada tema da lista e botão "Criar" no rodapé. Teclado: `E` edita o tema selecionado; `Ctrl+N` cria novo banco.
+- `Esc` fecha sem salvar (com aviso se houver alterações).
+- A tela é modal em relação ao jogo: enquanto o editor está aberto, a partida não avança e os atalhos de jogo são suspensos.
 - Ao fechar o editor, o jogo recarrega o banco se o arquivo mudou.
+
+**Revisado em 2026-10-31 (decisões nº 7 e nº 12):** removido o atalho `F3` global durante o jogo. O editor não pode mais ser aberto no meio de uma rodada; só a partir do seletor de tema.
 
 ### Alternativa: janela separada
 
@@ -617,12 +619,12 @@ não ficam mais em aberto.
 | 4 | CSV na v1? Índice da correta? | **Fora da v1.** Se entrar na v1.1, o CSV usa `correta` **1–4** e converte para 0-based no JSON; importação tudo ou nada, com relatório por linha. |
 | 5 | Limites de texto | Enunciado 5–500; alternativa 1–300; explicação 0–1.000; categoria 1–80; 2–4 alternativas; mínimo 1 pergunta; máximo prático 5.000. |
 | 6 | Duplicatas: bloquear ou avisar? | **Avisar, não bloquear.** Normalizar com `strip`, espaços colapsados e caixa; a decisão final é do usuário. |
-| 7 | Editor com partida aberta? | Pode abrir com partida apenas **aberta** (sem rodada). Editar outro banco é livre; editar o banco em uso exige confirmação. Rodada em andamento **bloqueia**. |
+| 7 | Editor com partida aberta? | **Revisado (2026-10-31):** o editor **não** abre por F3 global durante o jogo. Abre **apenas** a partir da tela de seleção de tema (Ctrl+T ou inicial), com botão "Editar" em cada tema e botão "Criar" no rodapé. Teclado: E edita o tema selecionado; Ctrl+N cria novo banco. Sem bloqueio por fase (o seletor só aparece quando não há rodada ativa ou antes de iniciar). |
 | 8 | Partida salva invalidada | **Renomear** para `estado_partida.invalida-AAAA-MM-DD.json`; não apagar. Avisar na próxima abertura que a partida não pode ser retomada. |
 | 9 | ID persistente por pergunta | **Não na v1.** Gerar ID apenas em memória para duplicar/reordenar; não gravar no JSON. |
 | 10 | Undo/redo | Pilha da sessão, limite de 100 operações. Sobrevive ao salvamento; não sobrevive ao fechamento do aplicativo. |
 | 11 | Autosave | **Não.** Apenas aviso de alterações não salvas ao fechar, trocar de banco ou sair. |
-| 12 | Editor no `.exe` ou separado | **Dentro do aplicativo**, via `F3`, tanto no `.exe` quanto rodando pelo código-fonte. Janela separada fica fora da v1. |
+| 12 | Editor no `.exe` ou separado | **Dentro do aplicativo**, via botões na tela de seleção de tema (Editar/Criar), tanto no `.exe` quanto rodando pelo código-fonte. Janela separada fica fora da v1. |
 | 13 | Licença e autor | **CC BY 4.0** como padrão. `autor` é obrigatório para criar banco novo. Outra licença é permitida se declarada explicitamente no campo `licenca`. |
 | 14 | Rede/pasta compartilhada | **Não suportado na v1.** Trava advisory local; documentar a limitação e reavaliar se houver demanda. |
 | 15 | Tema do editor | Seguir o **tema escuro atual**; sem tema claro na v1. |
